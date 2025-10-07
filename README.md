@@ -36,6 +36,6 @@ The app leverages Kotlin and Jetpack Compose to deliver a modern, responsive, an
 
 | Name | Role | Responsibilities |
 | :--- | :--- | :--- |
-| **[Leyan Chen (buchloe@bu.edu)]** | Backend & Project Coordination | Core app logic, database management, module integration. |
-| **[Yijia Chen (cyj0709@bu.edu)]** | API & Sensor Integration Lead | E-commerce API integration, sensor features, multi-device testing. |
-| **[Juling Fan (juling7@bu.edu)]** | UI/UX & Frontend Lead | UI/UX design, Jetpack Compose implementation, navigation, accessibility. |
+| **Leyan Chen**<br/>buchloe@bu.edu | Backend & Project Coordination | Core app logic, database management, module integration. |
+| **Yijia Chen**<br/>cyj0709@bu.edu | API & Sensor Integration Lead | E-commerce API integration, sensor features, multi-device testing. |
+| **Juling Fan**<br/>juling7@bu.edu | UI/UX & Frontend Lead | UI/UX design, Jetpack Compose implementation, navigation, accessibility. |
