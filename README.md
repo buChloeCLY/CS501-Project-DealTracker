@@ -4,8 +4,6 @@ An intelligent shopping companion for Android that compares prices and tracks de
 
 This project is developed as part of our CS501 course, integrating key Android development concepts including data persistence, API integration, sensor utilization, and responsive design.
 
----
-
 ## Project Description
 
 DealTracker is an intelligent Android application designed to help users make informed purchasing decisions by comparing real-time prices from multiple e-commerce platforms. Users can search for products, view live price updates, subscribe to price-drop alerts, and receive personalized shopping recommendations based on browsing habits.
@@ -38,6 +36,6 @@ The app leverages Kotlin and Jetpack Compose to deliver a modern, responsive, an
 
 | Name | Role | Responsibilities |
 | :--- | :--- | :--- |
-| **[Leyan Chen]([buchloe@bu.edu])** | Backend & Project Coordination | Core app logic, database management, module integration. |
-| **[Yijia Chen]([cyj0709@bu.edu])** | API & Sensor Integration Lead | E-commerce API integration, sensor features, multi-device testing. |
-| **[Juling Fan]([juling7@bu.edu])** | UI/UX & Frontend Lead | UI/UX design, Jetpack Compose implementation, navigation, accessibility. |
+| **[Leyan Chen (buchloe@bu.edu)]** | Backend & Project Coordination | Core app logic, database management, module integration. |
+| **[Yijia Chen (cyj0709@bu.edu)]** | API & Sensor Integration Lead | E-commerce API integration, sensor features, multi-device testing. |
+| **[Juling Fan (juling7@bu.edu)]** | UI/UX & Frontend Lead | UI/UX design, Jetpack Compose implementation, navigation, accessibility. |
