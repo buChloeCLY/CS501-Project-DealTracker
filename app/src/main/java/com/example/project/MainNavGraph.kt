@@ -14,9 +14,9 @@ object Routes {
     const val DEALS = "deals"
     const val DETAIL_BASE = "detail"
     // 使用 Query 参数避免路径编码问题
-    fun detailRoute(name: String, price: String, rating: Float, source: String): String {
+    fun detailRoute(name: String, price: Double, rating: Float, source: String): String {
         val n = Uri.encode(name)
-        val p = Uri.encode(price)
+        val p = Uri.encode(price.toString())
         val s = Uri.encode(source)
         return "$DETAIL_BASE?name=$n&price=$p&rating=$rating&source=$s"
     }
