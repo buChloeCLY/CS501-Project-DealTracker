@@ -8,54 +8,50 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.ArrowDownward
+import androidx.compose.material.icons.outlined.ArrowUpward
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.List
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 
-// ---------------------- Data models ----------------------
+// ---------------------- Models ----------------------
 
-enum class FilterOption(val label: String) {
-    PriceRange("price range"),
-    Platform("platform"),
-    FreeShipping("free shipping"),
-    SellerType("seller type"),
-    StockAvailability("stock availability")
-}
-
-// 排序方式（英文翻译）：
-// 销量 -> Sales
-// 价格从低到高 -> Price: Low to High
-// 价格从高到低 -> Price: High to Low
-// 评分 -> Rating
-enum class SortOption(val label: String) {
-    Sales("Sales"),
-    PriceLowToHigh("Price: Low to High"),
-    PriceHighToLow("Price: High to Low"),
-    Rating("Rating")
-}
+enum class Platform { Amazon, BestBuy }
 
 data class ProductUi(
     val title: String,
-    val price: String,
-    val rating: Float,   // 0..5
-    val source: String,  // e.g., "Best Price from Amazon"
-    val badgeText: String = "COMPARE"
-)
+    val price: Double,
+    val rating: Float,     // 0..5
+    val source: String,    // "Best Price from Amazon" ...
+    val sales: Int,        // 用于“销量”排序
+    val platform: Platform,
+    val freeShipping: Boolean,
+    val inStock: Boolean
+) {
+    val priceText: String get() = "$" + "%.2f".format(price)
+}
+
+enum class SortField(val label: String) {
+    Sales("Sales"),
+    Price("Price"),
+    Rating("Rating")
+}
+enum class SortOrder { Asc, Desc }
 
 // ---------------------- Top-level screen ----------------------
 
@@ -64,30 +60,64 @@ fun DealsScreen(
     modifier: Modifier = Modifier,
     onCompareClick: (ProductUi) -> Unit = {}
 ) {
-    val products = remember {
+    // Mock data
+    val allProducts = remember {
         listOf(
-            ProductUi("iPhone 16 Pro", "$999", 4.0f, "Best Price from Amazon"),
-            ProductUi("Samsung Ultra", "$999", 4.3f, "Best Price from Amazon"),
-            ProductUi("OnePlus 12", "$799", 3.5f, "Official Store")
+            ProductUi("iPhone 16 Pro", 999.0, 4.6f, "Best Price from Amazon", sales = 12030, platform = Platform.Amazon, freeShipping = true,  inStock = true),
+            ProductUi("Samsung Galaxy Ultra", 999.0, 4.4f, "Best Price from Amazon", sales = 10112, platform = Platform.Amazon, freeShipping = false, inStock = true),
+            ProductUi("OnePlus 12", 799.0, 4.2f, "Official Store",         sales =  6120, platform = Platform.BestBuy, freeShipping = true,  inStock = true),
+            ProductUi("Google Pixel 9", 899.0, 4.5f, "Official Store",     sales =  8540, platform = Platform.BestBuy, freeShipping = false, inStock = false),
+            ProductUi("Moto X Pro", 699.0, 3.9f, "Best Price from Amazon", sales =  2350, platform = Platform.Amazon,  freeShipping = true,  inStock = true),
         )
     }
 
-    var openFilter by remember { mutableStateOf(false) }
-    var openSort by remember { mutableStateOf(false) }
+    // Filter states
+    var filterSheetOpen by remember { mutableStateOf(false) }
+    var sortSheetOpen by remember { mutableStateOf(false) }
 
-    var selectedFilters by remember { mutableStateOf(setOf<FilterOption>()) }
-    var selectedSort by remember { mutableStateOf(SortOption.Sales) }
+    // price range（为简单起见 0~2000）
+    var priceMin by remember { mutableStateOf(0f) }
+    var priceMax by remember { mutableStateOf(2000f) }
+
+    // platform 精选
+    var chooseAmazon by remember { mutableStateOf(true) }
+    var chooseBestBuy by remember { mutableStateOf(true) }
+
+    // free shipping / stock availability
+    var onlyFreeShipping by remember { mutableStateOf(false) }
+    var onlyInStock by remember { mutableStateOf(false) }
+
+    // Sort
+    var sortField by remember { mutableStateOf(SortField.Sales) }
+    var sortOrder by remember { mutableStateOf(SortOrder.Desc) } // 默认“从高到低”
+
+    // Derived list after filter + sort
+    val filteredSorted = remember(
+        allProducts, priceMin, priceMax, chooseAmazon, chooseBestBuy, onlyFreeShipping, onlyInStock, sortField, sortOrder
+    ) {
+        allProducts
+            .asSequence()
+            .filter { it.price in priceMin..priceMax }
+            .filter { (chooseAmazon && it.platform == Platform.Amazon) || (chooseBestBuy && it.platform == Platform.BestBuy) }
+            .filter { if (onlyFreeShipping) it.freeShipping else true }
+            .filter { if (onlyInStock) it.inStock else true }
+            .sortedWith(
+                when (sortField) {
+                    SortField.Sales -> compareBy<ProductUi> { it.sales }
+                    SortField.Price -> compareBy { it.price }
+                    SortField.Rating -> compareBy { it.rating }
+                }.let { cmp -> if (sortOrder == SortOrder.Desc) cmp.reversed() else cmp }
+            )
+            .toList()
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Deals", style = MaterialTheme.typography.titleLarge) },
                 actions = {
-                    IconButton(onClick = { /* TODO: search action */ }) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Search"
-                        )
+                    IconButton(onClick = { /* TODO search */ }) {
+                        Icon(Icons.Filled.Search, contentDescription = "Search")
                     }
                 }
             )
@@ -99,86 +129,193 @@ fun DealsScreen(
                 .padding(innerPadding)
                 .fillMaxSize()
         ) {
-            // Filter / Sort row (chips)
+            // Filter / Sort entry
             Row(
                 Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                AssistChip(
-                    onClick = { openFilter = true },
-                    label = { Text("filter") }
-                )
-                AssistChip(
-                    onClick = { openSort = true },
-                    label = { Text("sort") }
-                )
+                AssistChip(onClick = { filterSheetOpen = true }, label = { Text("filter") })
+                AssistChip(onClick = { sortSheetOpen = true }, label = { Text("sort") })
             }
 
-            // Product list
+            // List
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(products) { item ->
-                    ProductCard(
-                        product = item,
-                        onCompareClick = onCompareClick
-                    )
+                items(filteredSorted) { item ->
+                    ProductCard(product = item, onCompareClick = onCompareClick)
                 }
             }
         }
     }
 
-    // Filter sheet
-    if (openFilter) {
-        ModalBottomSheet(onDismissRequest = { openFilter = false }) {
-            Text(
-                "Filter",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(16.dp)
-            )
-            FlowRowWithChips(
-                options = FilterOption.values().toList(),
-                selected = selectedFilters,
-                onToggle = { opt ->
-                    selectedFilters =
-                        if (opt in selectedFilters) selectedFilters - opt else selectedFilters + opt
+    if (filterSheetOpen) {
+        FilterSheet(
+            priceMin = priceMin,
+            priceMax = priceMax,
+            onPriceChange = { min, max -> priceMin = min; priceMax = max },
+            chooseAmazon = chooseAmazon,
+            chooseBestBuy = chooseBestBuy,
+            onPlatformToggle = { p, checked ->
+                when (p) {
+                    Platform.Amazon -> chooseAmazon = checked
+                    Platform.BestBuy -> chooseBestBuy = checked
                 }
-            )
-            Spacer(Modifier.height(24.dp))
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.End
-            ) {
-                TextButton(onClick = { selectedFilters = emptySet() }) { Text("Clear") }
-                Spacer(Modifier.width(8.dp))
-                Button(onClick = { openFilter = false }) { Text("Apply") }
-            }
+            },
+            onlyFreeShipping = onlyFreeShipping,
+            onOnlyFreeShippingChange = { onlyFreeShipping = it },
+            onlyInStock = onlyInStock,
+            onOnlyInStockChange = { onlyInStock = it },
+            onClear = {
+                priceMin = 0f; priceMax = 2000f
+                chooseAmazon = true; chooseBestBuy = true
+                onlyFreeShipping = false; onlyInStock = false
+            },
+            onApply = { filterSheetOpen = false },
+            onDismiss = { filterSheetOpen = false }
+        )
+    }
+
+    if (sortSheetOpen) {
+        SortSheet(
+            sortField = sortField,
+            sortOrder = sortOrder,
+            onFieldChange = { sortField = it },
+            onOrderChange = { sortOrder = it },
+            onDismiss = { sortSheetOpen = false }
+        )
+    }
+}
+
+// ---------------------- Filter Sheet ----------------------
+
+@Composable
+private fun FilterSheet(
+    priceMin: Float,
+    priceMax: Float,
+    onPriceChange: (Float, Float) -> Unit,
+    chooseAmazon: Boolean,
+    chooseBestBuy: Boolean,
+    onPlatformToggle: (Platform, Boolean) -> Unit,
+    onlyFreeShipping: Boolean,
+    onOnlyFreeShippingChange: (Boolean) -> Unit,
+    onlyInStock: Boolean,
+    onOnlyInStockChange: (Boolean) -> Unit,
+    onClear: () -> Unit,
+    onApply: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.padding(16.dp)) {
+            Text("Filter", style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(12.dp))
+
+            // Price Range
+            Text("price range", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+
+            var tmpRange by remember { mutableStateOf(priceMin..priceMax) }
+            Text(
+                "$${tmpRange.start.roundToInt()} - $${tmpRange.endInclusive.roundToInt()}",
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(8.dp))
+            RangeSlider(
+                value = tmpRange,
+                onValueChange = { range ->
+                    val start = range.start.coerceIn(0f, 2000f)
+                    val end = range.endInclusive.coerceIn(0f, 2000f)
+                    tmpRange = start..end
+                },
+                valueRange = 0f..2000f,
+                steps = 19
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            // Platform 精选
+            Text("platform", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = chooseAmazon,
+                    onClick = { onPlatformToggle(Platform.Amazon, !chooseAmazon) },
+                    label = { Text("Amazon") }
+                )
+                FilterChip(
+                    selected = chooseBestBuy,
+                    onClick = { onPlatformToggle(Platform.BestBuy, !chooseBestBuy) },
+                    label = { Text("BestBuy") }
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+
+            // Free shipping / Stock availability
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("free shipping", style = MaterialTheme.typography.titleMedium)
+                Switch(checked = onlyFreeShipping, onCheckedChange = onOnlyFreeShippingChange)
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("stock availability", style = MaterialTheme.typography.titleMedium)
+                Switch(checked = onlyInStock, onCheckedChange = onOnlyInStockChange)
+            }
+
+            Spacer(Modifier.height(24.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onClear) { Text("Clear") }
+                Spacer(Modifier.width(8.dp))
+                Button(onClick = {
+                    onPriceChange(tmpRange.start, tmpRange.endInclusive)
+                    onApply()
+                }) { Text("Apply") }
+            }
+            Spacer(Modifier.height(8.dp))
         }
     }
+}
 
-    // Sort sheet
-    if (openSort) {
-        ModalBottomSheet(onDismissRequest = { openSort = false }) {
+// ---------------------- Sort Sheet ----------------------
+
+@Composable
+private fun SortSheet(
+    sortField: SortField,
+    sortOrder: SortOrder,
+    onFieldChange: (SortField) -> Unit,
+    onOrderChange: (SortOrder) -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.padding(16.dp)) {
+            Text("Sort", style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.height(8.dp))
             Text(
-                "Sort",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(16.dp)
+                "Choose a field and order",
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Column(Modifier.padding(horizontal = 8.dp)) {
-                SortOption.values().forEach { opt ->
+            Spacer(Modifier.height(16.dp))
+
+            // Field
+            Column {
+                SortField.values().forEach { f ->
                     ListItem(
-                        headlineContent = { Text(opt.label) },
+                        headlineContent = { Text(f.label) },
                         trailingContent = {
                             RadioButton(
-                                selected = selectedSort == opt,
-                                onClick = { selectedSort = opt; openSort = false }
+                                selected = (sortField == f),
+                                onClick = { onFieldChange(f) }
                             )
                         },
                         modifier = Modifier.fillMaxWidth()
@@ -186,23 +323,44 @@ fun DealsScreen(
                     Divider()
                 }
             }
+
             Spacer(Modifier.height(12.dp))
+            Text("Order", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = (sortOrder == SortOrder.Asc),
+                    onClick = { onOrderChange(SortOrder.Asc) },
+                    label = { Text("Low to High") },
+                    leadingIcon = { Icon(Icons.Outlined.ArrowUpward, contentDescription = null) }
+                )
+                FilterChip(
+                    selected = (sortOrder == SortOrder.Desc),
+                    onClick = { onOrderChange(SortOrder.Desc) },
+                    label = { Text("High to Low") },
+                    leadingIcon = { Icon(Icons.Outlined.ArrowDownward, contentDescription = null) }
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Button(onClick = onDismiss) { Text("Done") }
+            }
+            Spacer(Modifier.height(8.dp))
         }
     }
 }
 
-// ---------------------- Reusable UI pieces ----------------------
+// ---------------------- Product Card ----------------------
 
 @Composable
 private fun ProductCard(
     product: ProductUi,
     onCompareClick: (ProductUi) -> Unit
 ) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    ElevatedCard(Modifier.fillMaxWidth()) {
         Row(Modifier.padding(16.dp)) {
-            // Left: circular placeholder image
             Box(
                 modifier = Modifier
                     .size(72.dp)
@@ -210,7 +368,6 @@ private fun ProductCard(
                     .background(Color(0xFFDDEEE0)),
                 contentAlignment = Alignment.Center
             ) {
-                // 用占位图标（你也可换成真实图片）
                 Icon(
                     imageVector = Icons.Outlined.Image,
                     contentDescription = null
@@ -229,20 +386,23 @@ private fun ProductCard(
 
                 StarsRow(rating = product.rating)
 
-                Spacer(Modifier.height(4.dp))
-                Text(product.price, style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.height(6.dp))
+                Text(product.priceText, style = MaterialTheme.typography.titleSmall)
+                val sub = when (product.platform) {
+                    Platform.Amazon -> "Amazon"
+                    Platform.BestBuy -> "BestBuy"
+                }
                 Text(
-                    product.source,
+                    "${product.source} • $sub • Sales ${product.sales}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
 
                 Spacer(Modifier.height(8.dp))
-                Button(
-                    onClick = { onCompareClick(product) },
-                    modifier = Modifier.widthIn(min = 120.dp)
-                ) {
-                    Text(product.badgeText)
+                Button(onClick = { onCompareClick(product) }, modifier = Modifier.widthIn(min = 120.dp)) {
+                    Text("COMPARE")
                 }
             }
         }
@@ -254,9 +414,9 @@ private fun StarsRow(rating: Float, max: Int = 5) {
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         repeat(max) { idx ->
             val filled = idx < rating.toInt()
-            val imageVector = if (filled) Icons.Filled.Star else Icons.Outlined.StarBorder
+            val iv = if (filled) Icons.Filled.Star else Icons.Outlined.StarBorder
             Icon(
-                imageVector = imageVector,
+                imageVector = iv,
                 contentDescription = null,
                 tint = if (filled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
             )
@@ -264,61 +424,32 @@ private fun StarsRow(rating: Float, max: Int = 5) {
     }
 }
 
+// ---------------------- Bottom Bar ----------------------
+
 @Composable
 private fun DealsBottomBar() {
     NavigationBar {
         NavigationBarItem(
             selected = true, onClick = { /* TODO */ },
-            icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
+            icon = { Icon(Icons.Outlined.Home, contentDescription = "Home") },
             label = { Text("Home") }
         )
         NavigationBarItem(
             selected = false, onClick = { /* TODO */ },
-            icon = { Icon(Icons.Default.List, contentDescription = "Deals") },
+            icon = { Icon(Icons.Outlined.List, contentDescription = "Deals") },
             label = { Text("Deals") }
         )
         NavigationBarItem(
             selected = false, onClick = { /* TODO */ },
-            icon = { Icon(Icons.Default.Add, contentDescription = "Lists") },
-            label = { Text("Lists") }
-        )
-        NavigationBarItem(
-            selected = false, onClick = { /* TODO */ },
-            icon = { Icon(Icons.Default.Person, contentDescription = "Profile") },
+            icon = { Icon(Icons.Filled.Person, contentDescription = "Profile") },
             label = { Text("Profile") }
         )
     }
 }
 
-// 简单 FlowRow（无依赖库）——用多行换行布局放筛选 Chip
-@Composable
-private fun FlowRowWithChips(
-    options: List<FilterOption>,
-    selected: Set<FilterOption>,
-    onToggle: (FilterOption) -> Unit
-) {
-    // 简约实现：每行放3个
-    Column(Modifier.padding(horizontal = 8.dp)) {
-        options.chunked(3).forEach { row ->
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                row.forEach { opt ->
-                    FilterChip(
-                        selected = opt in selected,
-                        onClick = { onToggle(opt) },
-                        label = { Text(opt.label) }
-                    )
-                }
-            }
-        }
-    }
-}
+// ---------------------- Preview ----------------------
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, widthDp = 420)
 @Composable
 private fun DealsScreenPreview() {
     MaterialTheme { DealsScreen() }
