@@ -35,13 +35,13 @@ fun HomeScreen(navController: NavHostController) {
             )
         },
         bottomBar = {
-            BottomNavigationBar(
-                currentRoute = Routes.HOME,
-                onHomeClick = { /* Already here */ },
-                onDealsClick = { navController.navigate(Routes.DEALS) },
-                onListClick = { /* TODO */ },
-                onProfileClick = { /* TODO */ }
-            )
+//            BottomNavigationBar(
+//                currentRoute = Routes.HOME,
+//                onHomeClick = { /* Already here */ },
+//                onDealsClick = { navController.navigate(Routes.DEALS) },
+//                onListClick = { /* TODO */ },
+//                onProfileClick = { /* TODO */ }
+//            )
         }
     ) { innerPadding ->
         LazyColumn(
@@ -169,38 +169,38 @@ fun DealsOfTheDaySection() {
     }
 }
 
-@Composable
-fun BottomNavigationBar(
-    currentRoute: String,
-    onHomeClick: () -> Unit,
-    onDealsClick: () -> Unit,
-    onListClick: () -> Unit,
-    onProfileClick: () -> Unit
-) {
-    NavigationBar {
-        NavigationBarItem(
-            selected = currentRoute == Routes.HOME,
-            onClick = onHomeClick,
-            icon = { Icon(Icons.Filled.Home, contentDescription = "Home") },
-            label = { Text("Home") }
-        )
-        NavigationBarItem(
-            selected = currentRoute == Routes.DEALS,
-            onClick = onDealsClick,
-            icon = { Icon(Icons.Outlined.LocalOffer, contentDescription = "Deals") },
-            label = { Text("Deals") }
-        )
-        NavigationBarItem(
-            selected = currentRoute == Routes.LISTS,
-            onClick = onListClick,
-            icon = { Icon(Icons.Outlined.Add, contentDescription = "Lists") },
-            label = { Text("Lists") }
-        )
-        NavigationBarItem(
-            selected = currentRoute == Routes.PROFILE,
-            onClick = onProfileClick,
-            icon = { Icon(Icons.Default.Person, contentDescription = "Profile") },
-            label = { Text("Profile") }
-        )
-    }
-}
+//@Composable
+//fun BottomNavigationBar(
+//    currentRoute: String,
+//    onHomeClick: () -> Unit,
+//    onDealsClick: () -> Unit,
+//    onListClick: () -> Unit,
+//    onProfileClick: () -> Unit
+//) {
+//    NavigationBar {
+//        NavigationBarItem(
+//            selected = currentRoute == Routes.HOME,
+//            onClick = onHomeClick,
+//            icon = { Icon(Icons.Filled.Home, contentDescription = "Home") },
+//            label = { Text("Home") }
+//        )
+//        NavigationBarItem(
+//            selected = currentRoute == Routes.DEALS,
+//            onClick = onDealsClick,
+//            icon = { Icon(Icons.Outlined.LocalOffer, contentDescription = "Deals") },
+//            label = { Text("Deals") }
+//        )
+//        NavigationBarItem(
+//            selected = currentRoute == Routes.LISTS,
+//            onClick = onListClick,
+//            icon = { Icon(Icons.Outlined.Add, contentDescription = "Lists") },
+//            label = { Text("Lists") }
+//        )
+//        NavigationBarItem(
+//            selected = currentRoute == Routes.PROFILE,
+//            onClick = onProfileClick,
+//            icon = { Icon(Icons.Default.Person, contentDescription = "Profile") },
+//            label = { Text("Profile") }
+//        )
+//    }
+//}
