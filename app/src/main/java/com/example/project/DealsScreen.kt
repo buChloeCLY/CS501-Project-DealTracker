@@ -30,6 +30,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 import androidx.compose.material.icons.outlined.LocalShipping
+import androidx.navigation.compose.rememberNavController
+
 
 
 // ---------------------- Models ----------------------
@@ -480,5 +482,20 @@ private fun StarsRow(rating: Float, max: Int = 5) {
 @Preview(showBackground = true, widthDp = 420)
 @Composable
 private fun DealsScreenPreview() {
-    MaterialTheme { DealsScreen() }
+    val navController = rememberNavController()   // ✅ 增加这行
+
+    MaterialTheme {
+        DealsScreen(
+            onCompareClick = { product ->
+                navController.navigate(
+                    Routes.detailRoute(
+                        name = product.title,
+                        price = product.price,
+                        rating = product.rating,
+                        source = product.source
+                    )
+                )
+            }
+        )
+    }
 }

@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
 
-package com.example.project.ui.theme
+package com.example.page3.viewmodel
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -28,7 +28,6 @@ import com.example.page3.model.PricePoint
 import com.example.page3.model.Product
 import com.example.page3.ui.theme.AppColors
 import com.example.page3.ui.theme.AppDimens
-import com.example.project.DealsBottomBar
 import kotlinx.coroutines.launch
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -84,7 +83,6 @@ fun ProductDetailScreen(
                 }
             )
         },
-        bottomBar = { DealsBottomBar() },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         Column(

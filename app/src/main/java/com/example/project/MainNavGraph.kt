@@ -8,6 +8,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.example.page3.viewmodel.ProductDetailScreen
 
 //管理页面之间的导航跳转：
 //“从哪一个界面跳到哪一个界面”
@@ -57,5 +58,24 @@ fun MainNavGraph(navController: NavHostController, modifier: Modifier = Modifier
                 }
             )
         }
+
+        composable(
+            route = Routes.DETAIL_BASE +
+                    "?name={name}&price={price}&rating={rating}&source={source}"
+        ) { backStackEntry ->
+            val name = backStackEntry.arguments?.getString("name") ?: ""
+            val price = backStackEntry.arguments?.getString("price")?.toDoubleOrNull() ?: 0.0
+            val rating = backStackEntry.arguments?.getString("rating")?.toFloatOrNull() ?: 0f
+            val source = backStackEntry.arguments?.getString("source") ?: ""
+
+            ProductDetailScreen(
+                name = name,
+                price = price,
+                rating = rating,
+                source = source,
+                navController = navController
+            )
+        }
+
     }
 }
