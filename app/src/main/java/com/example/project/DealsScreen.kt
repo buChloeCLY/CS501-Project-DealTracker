@@ -8,11 +8,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ArrowDownward
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.Home
@@ -29,6 +29,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
+import androidx.compose.material.icons.outlined.LocalShipping
+
 
 // ---------------------- Models ----------------------
 
@@ -58,8 +60,11 @@ enum class SortOrder { Asc, Desc }
 
 @Composable
 fun DealsScreen(
-    modifier: Modifier = Modifier,
-    onCompareClick: (ProductUi) -> Unit = {}
+    showBack: Boolean = false,
+    onBack: () -> Unit = {},
+    onCompareClick: (ProductUi) -> Unit = {},
+    bottomCurrent: String = Routes.DEALS,
+    onBottomTabSelected: (String) -> Unit = {}
 ) {
     // Mock data
     val allProducts = remember {
@@ -116,14 +121,24 @@ fun DealsScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Deals", style = MaterialTheme.typography.titleLarge) },
-                actions = {
-                    IconButton(onClick = { /* TODO search */ }) {
-                        Icon(Icons.Filled.Search, contentDescription = "Search")
+                navigationIcon = {
+                    if (showBack) {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back"
+                            )
+                        }
                     }
                 }
             )
         },
-        bottomBar = { DealsBottomBar() }
+        bottomBar = {
+//            BottomNavBarRouteAware(
+//                currentRoute = bottomCurrent,
+//                onTabSelected = onBottomTabSelected
+//            )
+        }
     ) { innerPadding ->
         Column(
             Modifier
@@ -427,31 +442,38 @@ private fun StarsRow(rating: Float, max: Int = 5) {
 
 // ---------------------- Bottom Bar ----------------------
 
-@Composable
-private fun DealsBottomBar() {
-    NavigationBar {
-        NavigationBarItem(
-            selected = true, onClick = { /* TODO */ },
-            icon = { Icon(Icons.Outlined.Home, contentDescription = "Home") },
-            label = { Text("Home") }
-        )
-        NavigationBarItem(
-            selected = false, onClick = { /* TODO */ },
-            icon = { Icon(Icons.Outlined.LocalOffer, contentDescription = "Deals") },
-            label = { Text("Deals") }
-        )
-        NavigationBarItem(
-            selected = false, onClick = { /* TODO */ },
-            icon = { Icon(Icons.Default.Add, contentDescription = "Lists") },
-            label = { Text("Lists") }
-        )
-        NavigationBarItem(
-            selected = false, onClick = { /* TODO */ },
-            icon = { Icon(Icons.Filled.Person, contentDescription = "Profile") },
-            label = { Text("Profile") }
-        )
-    }
-}
+//@Composable
+//fun BottomNavBarRouteAware(
+//    currentRoute: String,
+//    onTabSelected: (String) -> Unit
+//) {
+//    NavigationBar {
+//        NavigationBarItem(
+//            selected = currentRoute == Routes.HOME,
+//            onClick = { onTabSelected(Routes.HOME) },
+//            icon = { Icon(Icons.Outlined.Home, contentDescription = "Home") },
+//            label = { Text("Home") }
+//        )
+//        NavigationBarItem(
+//            selected = currentRoute == Routes.DEALS,
+//            onClick = { onTabSelected(Routes.DEALS) },
+//            icon = { Icon(Icons.Outlined.LocalOffer, contentDescription = "Deals") },
+//            label = { Text("Deals") }
+//        )
+//        NavigationBarItem(
+//            selected = currentRoute == Routes.LISTS,
+//            onClick = { onTabSelected(Routes.LISTS) },
+//            icon = { Icon(Icons.Outlined.Add, contentDescription = "Lists") },
+//            label = { Text("Lists") }
+//        )
+//        NavigationBarItem(
+//            selected = currentRoute == Routes.PROFILE,
+//            onClick = { onTabSelected(Routes.PROFILE) },
+//            icon = { Icon(Icons.Filled.Person, contentDescription = "Profile") },
+//            label = { Text("Profile") }
+//        )
+//    }
+//}
 
 // ---------------------- Preview ----------------------
 

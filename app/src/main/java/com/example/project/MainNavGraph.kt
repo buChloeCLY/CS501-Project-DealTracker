@@ -1,13 +1,13 @@
 package com.example.project
 
 import android.net.Uri
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-
-import com.example.project.HomeScreen
-import com.example.project.DealsScreen
 
 //管理页面之间的导航跳转：
 //“从哪一个界面跳到哪一个界面”
@@ -31,18 +31,31 @@ object Routes {
 
 
 @Composable
-fun MainNavGraph(navController: NavHostController) {
+fun MainNavGraph(navController: NavHostController, modifier: Modifier = Modifier) {
     NavHost(
         navController = navController,
-        startDestination = Routes.HOME
+        startDestination = Routes.HOME,
+        modifier = modifier
     ) {
         composable(Routes.HOME) {
             HomeScreen(navController)
         }
+
         composable(Routes.DEALS) {
-            DealsScreen()
+            DealsScreen(
+                showBack = navController.previousBackStackEntry != null,
+                onBack = { navController.popBackStack() },
+                onCompareClick = { product ->
+                    navController.navigate(
+                        Routes.detailRoute(
+                            name = product.title,
+                            price = product.price,
+                            rating = product.rating,
+                            source = product.source
+                        )
+                    )
+                }
+            )
         }
     }
 }
-
-
