@@ -6,10 +6,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.outlined.LocalOffer
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,13 +22,45 @@ import androidx.navigation.NavHostController
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(navController: NavHostController) {
+    var isSearchMode by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Home", fontWeight = FontWeight.Bold) },
+                title = {
+                    if (!isSearchMode) {
+                        Text("Home", fontWeight = FontWeight.Bold)
+                    } else {
+                        TextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text("Search products...") },
+                            singleLine = true,
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent
+                            )
+                        )
+                    }
+                },
                 actions = {
-                    IconButton(onClick = { /* TODO: implement search */ }) {
-                        Icon(Icons.Default.Person, contentDescription = "Search")
+                    IconButton(onClick = {
+                        if (isSearchMode && searchQuery.isNotEmpty()) {
+                            // TODO: 搜索逻辑
+                        } else {
+                            isSearchMode = !isSearchMode
+                            if (!isSearchMode) searchQuery = ""
+                        }
+                    }) {
+                        Icon(
+                            imageVector = if (!isSearchMode) Icons.Default.Search else Icons.Default.Close,
+                            contentDescription = "Search"
+                        )
                     }
                 }
             )
@@ -141,6 +172,7 @@ fun DealsOfTheDaySection() {
         Triple("Apple Watch", "$349", "Target"),
         Triple("Samsung TV 65\"", "$799", "BestBuy"),
         Triple("MacBook Air M3", "$1199", "Apple"),
+        Triple("Nintendo Switch 2", "$349", "GameStop")
     )
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -181,7 +213,7 @@ fun BottomNavigationBar(
         NavigationBarItem(
             selected = currentRoute == Routes.HOME,
             onClick = onHomeClick,
-            icon = { Icon(Icons.Filled.Home, contentDescription = "Home") },
+            icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
             label = { Text("Home") }
         )
         NavigationBarItem(
