@@ -19,5 +19,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "DealTrackerV1"
+rootProject.name = "project"
 include(":app")
+ 
