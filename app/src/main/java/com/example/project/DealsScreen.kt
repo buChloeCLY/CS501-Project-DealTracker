@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.filled.Person
@@ -16,7 +17,7 @@ import androidx.compose.material.icons.outlined.ArrowDownward
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.List
+import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -436,8 +437,13 @@ private fun DealsBottomBar() {
         )
         NavigationBarItem(
             selected = false, onClick = { /* TODO */ },
-            icon = { Icon(Icons.Outlined.List, contentDescription = "Deals") },
+            icon = { Icon(Icons.Outlined.LocalOffer, contentDescription = "Deals") },
             label = { Text("Deals") }
+        )
+        NavigationBarItem(
+            selected = false, onClick = { /* TODO */ },
+            icon = { Icon(Icons.Default.Add, contentDescription = "Lists") },
+            label = { Text("Lists") }
         )
         NavigationBarItem(
             selected = false, onClick = { /* TODO */ },
