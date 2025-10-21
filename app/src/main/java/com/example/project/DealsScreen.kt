@@ -8,9 +8,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ArrowDownward
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.Home
@@ -24,9 +26,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavController
 import kotlin.math.roundToInt
+import androidx.compose.material.icons.outlined.LocalShipping
+
 
 // ---------------------- Models ----------------------
 
@@ -35,9 +39,9 @@ enum class Platform { Amazon, BestBuy }
 data class ProductUi(
     val title: String,
     val price: Double,
-    val rating: Float,
-    val source: String,
-    val sales: Int,
+    val rating: Float,     // 0..5
+    val source: String,    // "Best Price from Amazon" ...
+    val sales: Int,        // 用于“销量”排序
     val platform: Platform,
     val freeShipping: Boolean,
     val inStock: Boolean
@@ -45,43 +49,57 @@ data class ProductUi(
     val priceText: String get() = "$" + "%.2f".format(price)
 }
 
-enum class SortField(val label: String) { Sales("Sales"), Price("Price"), Rating("Rating") }
+enum class SortField(val label: String) {
+    Sales("Sales"),
+    Price("Price"),
+    Rating("Rating")
+}
 enum class SortOrder { Asc, Desc }
 
-// ---------------------- Screen ----------------------
+// ---------------------- Top-level screen ----------------------
 
 @Composable
 fun DealsScreen(
-    navController: NavController,
-    onCompareClick: (ProductUi) -> Unit,
-    modifier: Modifier = Modifier
+    showBack: Boolean = false,
+    onBack: () -> Unit = {},
+    onCompareClick: (ProductUi) -> Unit = {},
+    bottomCurrent: String = Routes.DEALS,
+    onBottomTabSelected: (String) -> Unit = {}
 ) {
+    // Mock data
     val allProducts = remember {
         listOf(
-            ProductUi("iPhone 16 Pro", 1099.0, 4.6f, "Apple Store", 12030, Platform.Amazon, true, true),
-            ProductUi("Samsung S24 Ultra", 999.0, 4.4f, "Samsung", 10112, Platform.Amazon, false, true),
-            ProductUi("Google Pixel 9", 849.0, 4.5f, "Google Store", 8540, Platform.BestBuy, false, true),
+            ProductUi("iPhone 16 Pro", 999.0, 4.6f, "Best Price from Amazon", sales = 12030, platform = Platform.Amazon, freeShipping = true,  inStock = true),
+            ProductUi("Samsung Galaxy Ultra", 999.0, 4.4f, "Best Price from Amazon", sales = 10112, platform = Platform.Amazon, freeShipping = false, inStock = true),
+            ProductUi("OnePlus 12", 799.0, 4.2f, "Official Store",         sales =  6120, platform = Platform.BestBuy, freeShipping = true,  inStock = true),
+            ProductUi("Google Pixel 9", 899.0, 4.5f, "Official Store",     sales =  8540, platform = Platform.BestBuy, freeShipping = false, inStock = false),
+            ProductUi("Moto X Pro", 699.0, 3.9f, "Best Price from Amazon", sales =  2350, platform = Platform.Amazon,  freeShipping = true,  inStock = true),
         )
     }
 
+    // Filter states
     var filterSheetOpen by remember { mutableStateOf(false) }
     var sortSheetOpen by remember { mutableStateOf(false) }
 
+    // price range（为简单起见 0~2000）
     var priceMin by remember { mutableStateOf(0f) }
     var priceMax by remember { mutableStateOf(2000f) }
 
+    // platform 精选
     var chooseAmazon by remember { mutableStateOf(true) }
     var chooseBestBuy by remember { mutableStateOf(true) }
 
+    // free shipping / stock availability
     var onlyFreeShipping by remember { mutableStateOf(false) }
     var onlyInStock by remember { mutableStateOf(false) }
 
+    // Sort
     var sortField by remember { mutableStateOf(SortField.Sales) }
-    var sortOrder by remember { mutableStateOf(SortOrder.Desc) }
+    var sortOrder by remember { mutableStateOf(SortOrder.Desc) } // 默认“从高到低”
 
+    // Derived list after filter + sort
     val filteredSorted = remember(
-        allProducts, priceMin, priceMax, chooseAmazon, chooseBestBuy,
-        onlyFreeShipping, onlyInStock, sortField, sortOrder
+        allProducts, priceMin, priceMax, chooseAmazon, chooseBestBuy, onlyFreeShipping, onlyInStock, sortField, sortOrder
     ) {
         allProducts
             .asSequence()
@@ -94,7 +112,7 @@ fun DealsScreen(
                     SortField.Sales -> compareBy<ProductUi> { it.sales }
                     SortField.Price -> compareBy { it.price }
                     SortField.Rating -> compareBy { it.rating }
-                }.let { if (sortOrder == SortOrder.Desc) it.reversed() else it }
+                }.let { cmp -> if (sortOrder == SortOrder.Desc) cmp.reversed() else cmp }
             )
             .toList()
     }
@@ -102,22 +120,32 @@ fun DealsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Deals") },
-                actions = {
-                    IconButton(onClick = { }) {
-                        Icon(Icons.Filled.Search, contentDescription = "Search")
+                title = { Text("Deals", style = MaterialTheme.typography.titleLarge) },
+                navigationIcon = {
+                    if (showBack) {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back"
+                            )
+                        }
                     }
                 }
             )
         },
-        bottomBar = { DealsBottomBar() }
+        bottomBar = {
+//            BottomNavBarRouteAware(
+//                currentRoute = bottomCurrent,
+//                onTabSelected = onBottomTabSelected
+//            )
+        }
     ) { innerPadding ->
-
         Column(
             Modifier
-                .fillMaxSize()
                 .padding(innerPadding)
+                .fillMaxSize()
         ) {
+            // Filter / Sort entry
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -128,16 +156,14 @@ fun DealsScreen(
                 AssistChip(onClick = { sortSheetOpen = true }, label = { Text("sort") })
             }
 
+            // List
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(16.dp)
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(filteredSorted) { item ->
-                    ProductCard(
-                        product = item,
-                        onCompareClick = { onCompareClick(item) }    // ✅ 关键变化
-                    )
+                    ProductCard(product = item, onCompareClick = onCompareClick)
                 }
             }
         }
@@ -145,15 +171,20 @@ fun DealsScreen(
 
     if (filterSheetOpen) {
         FilterSheet(
-            priceMin, priceMax,
+            priceMin = priceMin,
+            priceMax = priceMax,
             onPriceChange = { min, max -> priceMin = min; priceMax = max },
-            chooseAmazon, chooseBestBuy,
+            chooseAmazon = chooseAmazon,
+            chooseBestBuy = chooseBestBuy,
             onPlatformToggle = { p, checked ->
-                if (p == Platform.Amazon) chooseAmazon = checked else chooseBestBuy = checked
+                when (p) {
+                    Platform.Amazon -> chooseAmazon = checked
+                    Platform.BestBuy -> chooseBestBuy = checked
+                }
             },
-            onlyFreeShipping,
+            onlyFreeShipping = onlyFreeShipping,
             onOnlyFreeShippingChange = { onlyFreeShipping = it },
-            onlyInStock,
+            onlyInStock = onlyInStock,
             onOnlyInStockChange = { onlyInStock = it },
             onClear = {
                 priceMin = 0f; priceMax = 2000f
@@ -167,7 +198,8 @@ fun DealsScreen(
 
     if (sortSheetOpen) {
         SortSheet(
-            sortField, sortOrder,
+            sortField = sortField,
+            sortOrder = sortOrder,
             onFieldChange = { sortField = it },
             onOrderChange = { sortOrder = it },
             onDismiss = { sortSheetOpen = false }
@@ -175,50 +207,6 @@ fun DealsScreen(
     }
 }
 
-// ---------------------- Product Card ----------------------
-
-@Composable
-private fun ProductCard(
-    product: ProductUi,
-    onCompareClick: (ProductUi) -> Unit
-) {
-    ElevatedCard(Modifier.fillMaxWidth()) {
-        Row(Modifier.padding(16.dp)) {
-            Box(
-                modifier = Modifier
-                    .size(72.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFDDEEE0)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Outlined.Image, contentDescription = null)
-            }
-
-            Spacer(Modifier.width(16.dp))
-
-            Column(Modifier.weight(1f)) {
-                Text(product.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(product.priceText)
-                Spacer(Modifier.height(8.dp))
-                Button(onClick = { onCompareClick(product) }) {   // ✅ 这里触发跳转
-                    Text("COMPARE")
-                }
-            }
-        }
-    }
-}
-
-// ---------------------- Bottom Bar ----------------------
-
-@Composable
-fun DealsBottomBar() {
-    NavigationBar {
-        NavigationBarItem(selected = false, onClick = {}, icon = { Icon(Icons.Outlined.Home, null) }, label = { Text("Home") })
-        NavigationBarItem(selected = true, onClick = {}, icon = { Icon(Icons.Outlined.LocalOffer, null) }, label = { Text("Deals") })
-        NavigationBarItem(selected = false, onClick = {}, icon = { Icon(Icons.Filled.Add, null) }, label = { Text("Lists") })
-        NavigationBarItem(selected = false, onClick = {}, icon = { Icon(Icons.Filled.Person, null) }, label = { Text("Profile") })
-    }
-}
 // ---------------------- Filter Sheet ----------------------
 
 @Composable
@@ -378,4 +366,119 @@ private fun SortSheet(
             Spacer(Modifier.height(8.dp))
         }
     }
+}
+
+// ---------------------- Product Card ----------------------
+
+@Composable
+private fun ProductCard(
+    product: ProductUi,
+    onCompareClick: (ProductUi) -> Unit
+) {
+    ElevatedCard(Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(16.dp)) {
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFDDEEE0)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Image,
+                    contentDescription = null
+                )
+            }
+
+            Spacer(Modifier.width(16.dp))
+
+            Column(Modifier.weight(1f)) {
+                Text(
+                    product.title,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                StarsRow(rating = product.rating)
+
+                Spacer(Modifier.height(6.dp))
+                Text(product.priceText, style = MaterialTheme.typography.titleSmall)
+                val sub = when (product.platform) {
+                    Platform.Amazon -> "Amazon"
+                    Platform.BestBuy -> "BestBuy"
+                }
+                Text(
+                    "${product.source} • $sub • Sales ${product.sales}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(Modifier.height(8.dp))
+                Button(onClick = { onCompareClick(product) }, modifier = Modifier.widthIn(min = 120.dp)) {
+                    Text("COMPARE")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StarsRow(rating: Float, max: Int = 5) {
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        repeat(max) { idx ->
+            val filled = idx < rating.toInt()
+            val iv = if (filled) Icons.Filled.Star else Icons.Outlined.StarBorder
+            Icon(
+                imageVector = iv,
+                contentDescription = null,
+                tint = if (filled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+            )
+        }
+    }
+}
+
+// ---------------------- Bottom Bar ----------------------
+
+//@Composable
+//fun BottomNavBarRouteAware(
+//    currentRoute: String,
+//    onTabSelected: (String) -> Unit
+//) {
+//    NavigationBar {
+//        NavigationBarItem(
+//            selected = currentRoute == Routes.HOME,
+//            onClick = { onTabSelected(Routes.HOME) },
+//            icon = { Icon(Icons.Outlined.Home, contentDescription = "Home") },
+//            label = { Text("Home") }
+//        )
+//        NavigationBarItem(
+//            selected = currentRoute == Routes.DEALS,
+//            onClick = { onTabSelected(Routes.DEALS) },
+//            icon = { Icon(Icons.Outlined.LocalOffer, contentDescription = "Deals") },
+//            label = { Text("Deals") }
+//        )
+//        NavigationBarItem(
+//            selected = currentRoute == Routes.LISTS,
+//            onClick = { onTabSelected(Routes.LISTS) },
+//            icon = { Icon(Icons.Outlined.Add, contentDescription = "Lists") },
+//            label = { Text("Lists") }
+//        )
+//        NavigationBarItem(
+//            selected = currentRoute == Routes.PROFILE,
+//            onClick = { onTabSelected(Routes.PROFILE) },
+//            icon = { Icon(Icons.Filled.Person, contentDescription = "Profile") },
+//            label = { Text("Profile") }
+//        )
+//    }
+//}
+
+// ---------------------- Preview ----------------------
+
+@Preview(showBackground = true, widthDp = 420)
+@Composable
+private fun DealsScreenPreview() {
+    MaterialTheme { DealsScreen() }
 }
