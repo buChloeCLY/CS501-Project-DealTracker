@@ -205,7 +205,6 @@ fun DealsScreen(
         ) {
             Column(
                 Modifier
-                    .padding(innerPadding)
                     .fillMaxSize()
             ) {
                 // Filter / Sort entry
