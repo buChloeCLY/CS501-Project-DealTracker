@@ -2,22 +2,29 @@
 
 package com.example.project
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ArrowDownward
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.LocalOffer
+import androidx.compose.material.icons.outlined.LocalShipping
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,16 +35,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import kotlin.math.roundToInt
-import androidx.compose.material.icons.outlined.LocalShipping
-import androidx.navigation.compose.rememberNavController
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.SmallFloatingActionButton
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
+import androidx.navigation.compose.rememberNavController
 
 
 // ---------------------- Models ----------------------
@@ -64,6 +73,94 @@ enum class SortField(val label: String) {
 }
 enum class SortOrder { Asc, Desc }
 
+// ---------------------- ViewModel + StateFlow ----------------------
+
+data class DealsFilterState(
+    val priceMin: Float = 0f,
+    val priceMax: Float = 2000f,
+    val chooseAmazon: Boolean = true,
+    val chooseBestBuy: Boolean = true,
+    val onlyFreeShipping: Boolean = false,
+    val onlyInStock: Boolean = false
+)
+
+data class DealsSortState(
+    val field: SortField = SortField.Sales,
+    val order: SortOrder = SortOrder.Desc
+)
+
+data class DealsUiState(
+    val products: List<ProductUi> = emptyList(),
+    val filteredSorted: List<ProductUi> = emptyList(),
+    val filters: DealsFilterState = DealsFilterState(),
+    val sort: DealsSortState = DealsSortState()
+)
+
+class DealsViewModel : ViewModel() {
+
+    // 商品样例数据（来自你原文件）
+    private val _products = MutableStateFlow(
+        listOf(
+            ProductUi("iPhone 16 Pro", 999.0, 4.6f, "Best Price from Amazon", 12030, Platform.Amazon,  true,  true),
+            ProductUi("Samsung Galaxy Ultra", 999.0, 4.4f, "Best Price from Amazon", 10112, Platform.Amazon,  false, true),
+            ProductUi("OnePlus 12", 799.0, 4.2f, "Official Store",           6120, Platform.BestBuy, true,  true),
+            ProductUi("Google Pixel 9", 899.0, 4.5f, "Official Store",        8540, Platform.BestBuy, false, false),
+            ProductUi("Moto X Pro", 699.0, 3.9f, "Best Price from Amazon",    2350, Platform.Amazon,  true,  true),
+            // 额外样例
+            ProductUi("Sony WH-1000XM5", 329.0, 4.7f, "Official Store",        9300, Platform.BestBuy, true,  true),
+            ProductUi("AirPods Pro 2", 249.0, 4.6f, "Best Price from Amazon", 15230, Platform.Amazon,  true,  true),
+            ProductUi("Nintendo Switch OLED", 349.0, 4.8f, "Official Store",  20110, Platform.BestBuy, false, true),
+            ProductUi("Kindle Paperwhite", 139.0, 4.5f, "Best Price from Amazon", 18450, Platform.Amazon, true, true),
+            ProductUi("GoPro HERO12", 399.0, 4.4f, "Official Store",           4210, Platform.BestBuy, false, true),
+            ProductUi("Logitech MX Master 3S", 99.0, 4.7f, "Best Price from Amazon", 9750, Platform.Amazon, true, true),
+        )
+    )
+    val products: StateFlow<List<ProductUi>> = _products
+
+    private val _filters = MutableStateFlow(DealsFilterState())
+    val filters: StateFlow<DealsFilterState> = _filters
+
+    private val _sort = MutableStateFlow(DealsSortState())
+    val sort: StateFlow<DealsSortState> = _sort
+
+    val uiState: StateFlow<DealsUiState> =
+        combine(products, filters, sort) { list, f, s ->
+            val filtered = list.asSequence()
+                .filter { it.price in f.priceMin..f.priceMax }
+                .filter { (f.chooseAmazon && it.platform == Platform.Amazon) || (f.chooseBestBuy && it.platform == Platform.BestBuy) }
+                .filter { if (f.onlyFreeShipping) it.freeShipping else true }
+                .filter { if (f.onlyInStock) it.inStock else true }
+                .toList()
+
+            val sorted = when (s.field) {
+                SortField.Sales  -> filtered.sortedBy { it.sales }
+                SortField.Price  -> filtered.sortedBy { it.price }
+                SortField.Rating -> filtered.sortedBy { it.rating }
+            }.let { if (s.order == SortOrder.Desc) it.reversed() else it }
+
+            DealsUiState(
+                products = list,
+                filteredSorted = sorted,
+                filters = f,
+                sort = s
+            )
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            DealsUiState(products = _products.value, filteredSorted = _products.value) // 初始值
+        )
+
+    // ---- 更新方法，供 UI 调用 ----
+    fun setPrice(min: Float, max: Float) = _filters.update { it.copy(priceMin = min, priceMax = max) }
+    fun toggleAmazon(checked: Boolean)  = _filters.update { it.copy(chooseAmazon = checked) }
+    fun toggleBestBuy(checked: Boolean) = _filters.update { it.copy(chooseBestBuy = checked) }
+    fun setOnlyFreeShipping(v: Boolean) = _filters.update { it.copy(onlyFreeShipping = v) }
+    fun setOnlyInStock(v: Boolean)      = _filters.update { it.copy(onlyInStock = v) }
+    fun setSortField(field: SortField)   = _sort.update { it.copy(field = field) }
+    fun setSortOrder(order: SortOrder)   = _sort.update { it.copy(order = order) }
+    fun clearFilters()                   = _filters.update { DealsFilterState() }
+}
+
 // ---------------------- Top-level screen ----------------------
 
 @Composable
@@ -71,71 +168,17 @@ fun DealsScreen(
     showBack: Boolean = false,
     onBack: () -> Unit = {},
     onCompareClick: (ProductUi) -> Unit = {},
-    bottomCurrent: String = Routes.DEALS,
-    onBottomTabSelected: (String) -> Unit = {}
+    viewModel: DealsViewModel = viewModel()
 ) {
-    // Mock data
-    val allProducts = remember {
-        listOf(
-            ProductUi("iPhone 16 Pro", 999.0, 4.6f, "Best Price from Amazon", sales = 12030, platform = Platform.Amazon, freeShipping = true,  inStock = true),
-            ProductUi("Samsung Galaxy Ultra", 999.0, 4.4f, "Best Price from Amazon", sales = 10112, platform = Platform.Amazon, freeShipping = false, inStock = true),
-            ProductUi("OnePlus 12", 799.0, 4.2f, "Official Store",         sales =  6120, platform = Platform.BestBuy, freeShipping = true,  inStock = true),
-            ProductUi("Google Pixel 9", 899.0, 4.5f, "Official Store",     sales =  8540, platform = Platform.BestBuy, freeShipping = false, inStock = false),
-            ProductUi("Moto X Pro", 699.0, 3.9f, "Best Price from Amazon", sales =  2350, platform = Platform.Amazon,  freeShipping = true,  inStock = true),
-            // ⭐ 新增样例
-            ProductUi("Sony WH-1000XM5", 329.0, 4.7f, "Official Store",      sales = 9300, platform = Platform.BestBuy, freeShipping = true,  inStock = true),
-            ProductUi("AirPods Pro 2", 249.0, 4.6f, "Best Price from Amazon", sales = 15230, platform = Platform.Amazon,  freeShipping = true,  inStock = true),
-            ProductUi("Nintendo Switch OLED", 349.0, 4.8f, "Official Store",  sales = 20110, platform = Platform.BestBuy, freeShipping = false, inStock = true),
-            ProductUi("Kindle Paperwhite", 139.0, 4.5f, "Best Price from Amazon", sales = 18450, platform = Platform.Amazon, freeShipping = true, inStock = true),
-            ProductUi("GoPro HERO12", 399.0, 4.4f, "Official Store",          sales = 4210, platform = Platform.BestBuy,   freeShipping = false, inStock = true),
-            ProductUi("Logitech MX Master 3S", 99.0, 4.7f, "Best Price from Amazon", sales = 9750, platform = Platform.Amazon, freeShipping = true, inStock = true),
-            )
-    }
+    val ui by viewModel.uiState.collectAsState()
 
     // Filter states
     var filterSheetOpen by remember { mutableStateOf(false) }
     var sortSheetOpen by remember { mutableStateOf(false) }
 
-    // price range（为简单起见 0~2000）
-    var priceMin by remember { mutableStateOf(0f) }
-    var priceMax by remember { mutableStateOf(2000f) }
-
-    // platform 精选
-    var chooseAmazon by remember { mutableStateOf(true) }
-    var chooseBestBuy by remember { mutableStateOf(true) }
-
-    // free shipping / stock availability
-    var onlyFreeShipping by remember { mutableStateOf(false) }
-    var onlyInStock by remember { mutableStateOf(false) }
-
-    // Sort
-    var sortField by remember { mutableStateOf(SortField.Sales) }
-    var sortOrder by remember { mutableStateOf(SortOrder.Desc) } // 默认“从高到低”
-
     // 列表状态 + 协程作用域
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
-
-
-    // Derived list after filter + sort
-    val filteredSorted = remember(
-        allProducts, priceMin, priceMax, chooseAmazon, chooseBestBuy, onlyFreeShipping, onlyInStock, sortField, sortOrder
-    ) {
-        allProducts
-            .asSequence()
-            .filter { it.price in priceMin..priceMax }
-            .filter { (chooseAmazon && it.platform == Platform.Amazon) || (chooseBestBuy && it.platform == Platform.BestBuy) }
-            .filter { if (onlyFreeShipping) it.freeShipping else true }
-            .filter { if (onlyInStock) it.inStock else true }
-            .sortedWith(
-                when (sortField) {
-                    SortField.Sales -> compareBy<ProductUi> { it.sales }
-                    SortField.Price -> compareBy { it.price }
-                    SortField.Rating -> compareBy { it.rating }
-                }.let { cmp -> if (sortOrder == SortOrder.Desc) cmp.reversed() else cmp }
-            )
-            .toList()
-    }
 
     Scaffold(
         topBar = {
@@ -153,12 +196,7 @@ fun DealsScreen(
                 }
             )
         },
-        bottomBar = {
-//            BottomNavBarRouteAware(
-//                currentRoute = bottomCurrent,
-//                onTabSelected = onBottomTabSelected
-//            )
-        }
+        bottomBar = {}
     ) { innerPadding ->
         Box(
             Modifier
@@ -188,7 +226,7 @@ fun DealsScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     state = listState
                 ) {
-                    items(filteredSorted) { item ->
+                    items(ui.filteredSorted) { item ->
                         ProductCard(product = item, onCompareClick = onCompareClick)
                     }
                 }
@@ -214,39 +252,37 @@ fun DealsScreen(
 
     }
 
+    // Filter Sheet（读 UI 状态，写 ViewModel）
     if (filterSheetOpen) {
         FilterSheet(
-            priceMin = priceMin,
-            priceMax = priceMax,
-            onPriceChange = { min, max -> priceMin = min; priceMax = max },
-            chooseAmazon = chooseAmazon,
-            chooseBestBuy = chooseBestBuy,
+            priceMin = ui.filters.priceMin,
+            priceMax = ui.filters.priceMax,
+            onPriceChange = { min, max -> viewModel.setPrice(min, max) },
+            chooseAmazon = ui.filters.chooseAmazon,
+            chooseBestBuy = ui.filters.chooseBestBuy,
             onPlatformToggle = { p, checked ->
                 when (p) {
-                    Platform.Amazon -> chooseAmazon = checked
-                    Platform.BestBuy -> chooseBestBuy = checked
+                    Platform.Amazon -> viewModel.toggleAmazon(checked)
+                    Platform.BestBuy -> viewModel.toggleBestBuy(checked)
                 }
             },
-            onlyFreeShipping = onlyFreeShipping,
-            onOnlyFreeShippingChange = { onlyFreeShipping = it },
-            onlyInStock = onlyInStock,
-            onOnlyInStockChange = { onlyInStock = it },
-            onClear = {
-                priceMin = 0f; priceMax = 2000f
-                chooseAmazon = true; chooseBestBuy = true
-                onlyFreeShipping = false; onlyInStock = false
-            },
+            onlyFreeShipping = ui.filters.onlyFreeShipping,
+            onOnlyFreeShippingChange = { viewModel.setOnlyFreeShipping(it) },
+            onlyInStock = ui.filters.onlyInStock,
+            onOnlyInStockChange = { viewModel.setOnlyInStock(it) },
+            onClear = { viewModel.clearFilters() },
             onApply = { filterSheetOpen = false },
             onDismiss = { filterSheetOpen = false }
         )
     }
 
+    // Sort Sheet（读 UI 状态，写 ViewModel）
     if (sortSheetOpen) {
         SortSheet(
-            sortField = sortField,
-            sortOrder = sortOrder,
-            onFieldChange = { sortField = it },
-            onOrderChange = { sortOrder = it },
+            sortField = ui.sort.field,
+            sortOrder = ui.sort.order,
+            onFieldChange = { viewModel.setSortField(it) },
+            onOrderChange = { viewModel.setSortOrder(it) },
             onDismiss = { sortSheetOpen = false }
         )
     }
@@ -484,41 +520,6 @@ private fun StarsRow(rating: Float, max: Int = 5) {
         }
     }
 }
-
-// ---------------------- Bottom Bar ----------------------
-
-//@Composable
-//fun BottomNavBarRouteAware(
-//    currentRoute: String,
-//    onTabSelected: (String) -> Unit
-//) {
-//    NavigationBar {
-//        NavigationBarItem(
-//            selected = currentRoute == Routes.HOME,
-//            onClick = { onTabSelected(Routes.HOME) },
-//            icon = { Icon(Icons.Outlined.Home, contentDescription = "Home") },
-//            label = { Text("Home") }
-//        )
-//        NavigationBarItem(
-//            selected = currentRoute == Routes.DEALS,
-//            onClick = { onTabSelected(Routes.DEALS) },
-//            icon = { Icon(Icons.Outlined.LocalOffer, contentDescription = "Deals") },
-//            label = { Text("Deals") }
-//        )
-//        NavigationBarItem(
-//            selected = currentRoute == Routes.LISTS,
-//            onClick = { onTabSelected(Routes.LISTS) },
-//            icon = { Icon(Icons.Outlined.Add, contentDescription = "Lists") },
-//            label = { Text("Lists") }
-//        )
-//        NavigationBarItem(
-//            selected = currentRoute == Routes.PROFILE,
-//            onClick = { onTabSelected(Routes.PROFILE) },
-//            icon = { Icon(Icons.Filled.Person, contentDescription = "Profile") },
-//            label = { Text("Profile") }
-//        )
-//    }
-//}
 
 // ---------------------- Preview ----------------------
 
