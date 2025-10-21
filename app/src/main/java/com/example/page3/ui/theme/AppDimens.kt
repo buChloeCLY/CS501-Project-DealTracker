@@ -1,4 +1,4 @@
-package com.example.dealtrackerv1.ui.theme
+package com.example.page3.ui.theme
 
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp

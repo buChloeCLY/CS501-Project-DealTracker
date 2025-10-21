@@ -1,4 +1,4 @@
-package com.example.dealtrackerv1
+package com.example.page3
 
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4

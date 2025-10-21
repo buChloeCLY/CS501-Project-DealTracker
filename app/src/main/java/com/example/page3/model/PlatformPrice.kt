@@ -1,7 +1,7 @@
-package com.example.dealtrackerv1.model
+package com.example.page3.model
 
 data class PlatformPrice(
     val platformName: String,  // Amazon
     val platformIcon: String,  // drawable name or url
-    val price: Int             // 999
+    val price: Double             // 999
 )
