@@ -31,7 +31,13 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.navigation.compose.rememberNavController
-
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.SmallFloatingActionButton
+import kotlinx.coroutines.launch
 
 
 // ---------------------- Models ----------------------
@@ -76,7 +82,14 @@ fun DealsScreen(
             ProductUi("OnePlus 12", 799.0, 4.2f, "Official Store",         sales =  6120, platform = Platform.BestBuy, freeShipping = true,  inStock = true),
             ProductUi("Google Pixel 9", 899.0, 4.5f, "Official Store",     sales =  8540, platform = Platform.BestBuy, freeShipping = false, inStock = false),
             ProductUi("Moto X Pro", 699.0, 3.9f, "Best Price from Amazon", sales =  2350, platform = Platform.Amazon,  freeShipping = true,  inStock = true),
-        )
+            // ⭐ 新增样例
+            ProductUi("Sony WH-1000XM5", 329.0, 4.7f, "Official Store",      sales = 9300, platform = Platform.BestBuy, freeShipping = true,  inStock = true),
+            ProductUi("AirPods Pro 2", 249.0, 4.6f, "Best Price from Amazon", sales = 15230, platform = Platform.Amazon,  freeShipping = true,  inStock = true),
+            ProductUi("Nintendo Switch OLED", 349.0, 4.8f, "Official Store",  sales = 20110, platform = Platform.BestBuy, freeShipping = false, inStock = true),
+            ProductUi("Kindle Paperwhite", 139.0, 4.5f, "Best Price from Amazon", sales = 18450, platform = Platform.Amazon, freeShipping = true, inStock = true),
+            ProductUi("GoPro HERO12", 399.0, 4.4f, "Official Store",          sales = 4210, platform = Platform.BestBuy,   freeShipping = false, inStock = true),
+            ProductUi("Logitech MX Master 3S", 99.0, 4.7f, "Best Price from Amazon", sales = 9750, platform = Platform.Amazon, freeShipping = true, inStock = true),
+            )
     }
 
     // Filter states
@@ -98,6 +111,11 @@ fun DealsScreen(
     // Sort
     var sortField by remember { mutableStateOf(SortField.Sales) }
     var sortOrder by remember { mutableStateOf(SortOrder.Desc) } // 默认“从高到低”
+
+    // 列表状态 + 协程作用域
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+
 
     // Derived list after filter + sort
     val filteredSorted = remember(
@@ -142,33 +160,58 @@ fun DealsScreen(
 //            )
         }
     ) { innerPadding ->
-        Column(
+        Box(
             Modifier
-                .padding(innerPadding)
+                .padding(innerPadding)     // 👈 确保给到系统/底栏的安全区，按钮不会压住底栏
                 .fillMaxSize()
         ) {
-            // Filter / Sort entry
-            Row(
+            Column(
                 Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(innerPadding)
+                    .fillMaxSize()
             ) {
-                AssistChip(onClick = { filterSheetOpen = true }, label = { Text("filter") })
-                AssistChip(onClick = { sortSheetOpen = true }, label = { Text("sort") })
-            }
+                // Filter / Sort entry
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    AssistChip(onClick = { filterSheetOpen = true }, label = { Text("filter") })
+                    AssistChip(onClick = { sortSheetOpen = true }, label = { Text("sort") })
+                }
 
-            // List
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                // List
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    state = listState
+                ) {
+                    items(filteredSorted) { item ->
+                        ProductCard(product = item, onCompareClick = onCompareClick)
+                    }
+                }
+            }
+            val showScrollTop by remember {
+                derivedStateOf { listState.firstVisibleItemIndex > 4 }  // 5个以后出现
+            }
+            AnimatedVisibility(
+                visible = showScrollTop,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = 16.dp)  // 👈 与底栏错开，不遮挡
             ) {
-                items(filteredSorted) { item ->
-                    ProductCard(product = item, onCompareClick = onCompareClick)
+                SmallFloatingActionButton(
+                    onClick = { scope.launch { listState.animateScrollToItem(0) } }
+                ) {
+                    Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Back to top")
                 }
             }
         }
+
     }
 
     if (filterSheetOpen) {
