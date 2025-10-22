@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.page3.model.PlatformPrice
 import com.example.page3.model.PricePoint
@@ -44,7 +45,18 @@ fun ProductDetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    // 用从 NavGraph 传进来的参数构造 Product
+    // ✅ ViewModel 注入（联网数据来源）
+    val viewModel: ProductViewModel = viewModel()
+
+    // ✅ UI 从 ViewModel 的 StateFlow 收集数据
+    val platformPrices by viewModel.platformPrices.collectAsState()
+
+    // ✅ 首次加载时从后端取数据（pid 先写死为 1）
+    LaunchedEffect(Unit) {
+        viewModel.loadPlatformPrices(pid = 1)
+    }
+
+    // 用传入参数构造产品信息
     val product = Product(
         name = name,
         color = "Black",
@@ -54,17 +66,12 @@ fun ProductDetailScreen(
         imageUrl = ""
     )
 
-    // 临时假数据（后面可替换）
+    // 临时历史价格假数据（将来也能替换后端）
     val priceHistory = listOf(
         PricePoint("09/01", price + 50),
         PricePoint("09/10", price + 20),
         PricePoint("09/20", price),
         PricePoint("09/25", price - 40),
-    )
-    val platformPrices = listOf(
-        PlatformPrice("Amazon", "", price),
-        PlatformPrice("BestBuy", "",price + 20),
-        PlatformPrice("Apple Store", "",price + 50),
     )
 
     Scaffold(
@@ -102,6 +109,7 @@ fun ProductDetailScreen(
                 lineStrokeWidth = 2.dp
             )
 
+            // ✅ 直接展示从数据库返回的价格列表
             PlatformPriceCardList(
                 items = platformPrices,
                 onItemClick = { platformName ->
@@ -111,6 +119,7 @@ fun ProductDetailScreen(
         }
     }
 }
+
 
 @Composable
 private fun ProductHeader(product: Product) {
