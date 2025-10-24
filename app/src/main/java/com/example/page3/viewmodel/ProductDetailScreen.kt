@@ -35,6 +35,10 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.pow
 import kotlinx.coroutines.launch
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.nativeCanvas
+
 
 // ---------------------- TOP-LEVEL SCREEN ----------------------
 
@@ -183,59 +187,101 @@ private fun PriceHistoryChart(
     xLabelTilted: Boolean,
     lineStrokeWidth: Dp
 ) {
-    println(data)
-    println("...............")
     if (data.isEmpty()) return
-    // 只有一个点 → 画圆点
-    if (data.size == 1) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(AppDimens.CornerRadius),
-            colors = CardDefaults.cardColors(containerColor = AppColors.Card)
-        ) {
-            Canvas(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(height)
-                    .padding(start = 48.dp, top = 16.dp, end = 16.dp)
-            ) {
-                drawCircle(
-                    color = AppColors.ChartLine,
-                    radius = 8f,
-                    center = androidx.compose.ui.geometry.Offset(size.width/2, size.height/2)
-                )
-            }
-        }
-        return
-    }
 
     val leftAxisSpace = 48.dp
+    val bottomAxisSpace = 48.dp
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(AppDimens.CornerRadius),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(AppDimens.CornerRadius),
         colors = CardDefaults.cardColors(containerColor = AppColors.Card)
     ) {
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(height)
+                .height(height + bottomAxisSpace)
                 .padding(start = leftAxisSpace, top = 16.dp, end = 16.dp)
         ) {
             val prices = data.map { it.price }
-            val min = prices.min()
-            val max = prices.max()
-            val (yMin, yMax, _) = niceAxis(min, max, yTickCount)
+            val minVal = prices.min()
+            val maxVal = prices.max()
+            val (yMin, yMax, step) = niceAxis(minVal, maxVal, yTickCount)
 
-            val w = size.width
-            val h = size.height
-            val path = Path()
+            val chartHeight = height.toPx()
+            val chartWidth = size.width
+            val stepCount = ((yMax - yMin) / step).toInt()
 
+            // prepare paints
+            val yLabelPaint = android.graphics.Paint().apply {
+                color = AppColors.PrimaryText.toArgb()
+                textSize = 30f
+                textAlign = android.graphics.Paint.Align.RIGHT
+                isAntiAlias = true
+            }
+
+            val xLabelPaint = android.graphics.Paint().apply {
+                color = AppColors.PrimaryText.toArgb()
+                textSize = 28f
+                textAlign = android.graphics.Paint.Align.CENTER
+                isAntiAlias = true
+            }
+
+            // === horizontal grid lines + y labels ===
+            for (i in 0..stepCount) {
+                val yy = chartHeight - (i * (chartHeight / stepCount))
+
+                // grid
+                drawLine(
+                    color = AppColors.ChartLine,
+                    start = androidx.compose.ui.geometry.Offset(0f, yy),
+                    end = androidx.compose.ui.geometry.Offset(chartWidth, yy),
+                    strokeWidth = 1f
+                )
+
+                // label
+                val label = (yMin + step * i).toInt().toString()
+                drawIntoCanvas { cnv ->
+                    cnv.nativeCanvas.drawText(
+                        label,
+                        -24.dp.toPx(),
+                        yy + 8f,
+                        yLabelPaint
+                    )
+                }
+            }
+
+            // === x labels ===
+            val xCount = (data.size - 1).coerceAtLeast(1)
             data.forEachIndexed { i, p ->
-                val x = i * (w / (data.size - 1))
+                val xx = i * (chartWidth / xCount)
+                val baseY = chartHeight + 20f
+
+                drawIntoCanvas { cnv ->
+                    val nc = cnv.nativeCanvas
+                    if (xLabelTilted) {
+                        nc.save()
+                        nc.rotate(-45f, xx, baseY)
+                    }
+                    nc.drawText(
+                        p.date,
+                        xx,
+                        baseY + 20f,
+                        xLabelPaint
+                    )
+                    if (xLabelTilted) {
+                        nc.restore()
+                    }
+                }
+            }
+
+            // === price line ===
+            val path = Path()
+            data.forEachIndexed { i, p ->
+                val x = i * (chartWidth / xCount)
                 val denom = (yMax - yMin).takeIf { it > 0 } ?: 1.0
                 val ratio = (p.price - yMin) / denom
-                val y = h - (ratio * h).toFloat()
+                val y = chartHeight - (ratio * chartHeight).toFloat()
                 if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
             }
 

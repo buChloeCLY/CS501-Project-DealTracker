@@ -6,25 +6,22 @@ from decimal import Decimal
 app = Flask(__name__)
 CORS(app)
 
-# ---------------- DB CONNECTION ----------------
-# 放到 try 中，避免启动时数据库无响应导致服务挂掉
-try:
-    conn = pymysql.connect(
-        host="database-1.cjw0amswcib4.us-east-2.rds.amazonaws.com",
-        user="admin",
-        password="Test12345!",
-        database="dealtracker",
-        cursorclass=pymysql.cursors.DictCursor,
-        autocommit=True,
-    )
-except Exception as e:
-    # 数据库连不上，后续查询接口仍返回空数据，不影响服务启动
-    conn = None
+# ---------------- DB CONFIG ----------------
+DB_CONFIG = dict(
+    host="database-1.cjw0amswcib4.us-east-2.rds.amazonaws.com",
+    user="admin",
+    password="Test12345!",
+    database="dealtracker",
+    cursorclass=pymysql.cursors.DictCursor,
+    autocommit=True,
+)
+
+def get_conn():
+    """ 为每一次请求单独返回一个连接，避免 read-of-closed-file """
+    return pymysql.connect(**DB_CONFIG)
 
 
-# ---------------- UTIL ----------------
 def _to_jsonable(rows):
-    """把 Decimal 转成 float"""
     for r in rows:
         for k, v in r.items():
             if isinstance(v, Decimal):
@@ -32,15 +29,11 @@ def _to_jsonable(rows):
     return rows
 
 
-# ---------------- API: 平台价格原始数据 ----------------
+# ---------------- API: 价格原始数据 ----------------
 @app.route("/price/<int:pid>")
 def get_prices(pid: int):
-    # 如果 conn = None（数据库未连接） → 直接返回空数组
-    if conn is None:
-        return jsonify([]), 200
-
     try:
-        conn.ping(reconnect=True)
+        conn = get_conn()
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -52,21 +45,24 @@ def get_prices(pid: int):
                 (pid,),
             )
             rows = cur.fetchall()
-            return jsonify(_to_jsonable(rows))
+            return jsonify(_to_jsonable(rows)), 200
     except Exception as e:
-        # 线上容错：不把错误传到前端
+        print("SQL ERROR:", e)
         return jsonify([]), 200
+    finally:
+        try:
+            conn.close()
+        except:
+            pass
 
 
-# ---------------- API: 历史最低价（折线图） ----------------
+# ---------------- API: 历史价格（折线图） ----------------
 @app.route("/history/<int:pid>")
 def get_history(pid: int):
     days = request.args.get("days", default=7, type=int)
 
-    if conn is None:
-        return jsonify([]), 200
-
     try:
+        conn = get_conn()
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -86,25 +82,32 @@ def get_history(pid: int):
                 """,
                 (pid, days)
             )
-
             rows = cur.fetchall()
             out = [{"date": r["date"], "price": float(r["price"])} for r in rows]
             return jsonify(out), 200
-
     except Exception as e:
-        print("SQL ERROR:", e)  # 临时调试用，你之后也可以删掉
+        print("SQL ERROR:", e)
         return jsonify([]), 200
+    finally:
+        try:
+            conn.close()
+        except:
+            pass
 
-# ---------------- ERROR HANDLER ----------------
+
+# ---------------- FAVICON 避免 500 ----------------
+@app.route("/favicon.ico")
+def favicon():
+    return "", 204
+
+
+# ---------------- 错误处理 ----------------
 @app.errorhandler(Exception)
 def on_error(e):
-    # 不泄露细节给客户端
+    print("UNCAUGHT ERROR:", e)
     return jsonify({"error": "internal"}), 500
-
-
 
 
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
-    # 安卓可以访问必须是 host=0.0.0.0
     app.run(host="0.0.0.0", port=5001)
