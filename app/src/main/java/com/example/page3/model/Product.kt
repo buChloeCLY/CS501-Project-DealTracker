@@ -1,6 +1,7 @@
 package com.example.page3.model
 
 data class Product(
+    val pid:Int,
     val name: String,
     val color: String,
     val storage: String,

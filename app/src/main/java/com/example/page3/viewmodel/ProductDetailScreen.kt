@@ -20,58 +20,57 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.example.page3.model.HistoryPointDto
 import com.example.page3.model.PlatformPrice
 import com.example.page3.model.PricePoint
 import com.example.page3.model.Product
 import com.example.page3.ui.theme.AppColors
 import com.example.page3.ui.theme.AppDimens
-import kotlinx.coroutines.launch
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.pow
+import kotlinx.coroutines.launch
+
+// ---------------------- TOP-LEVEL SCREEN ----------------------
 
 @Composable
 fun ProductDetailScreen(
+    pid:Int,
     name: String,
     price: Double,
     rating: Float,
     source: String,
     navController: NavController
 ) {
+    val viewModel: ProductViewModel = viewModel()
+
+
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    // ✅ ViewModel 注入（联网数据来源）
-    val viewModel: ProductViewModel = viewModel()
-
-    // ✅ UI 从 ViewModel 的 StateFlow 收集数据
+    // ✅ ViewModel states
     val platformPrices by viewModel.platformPrices.collectAsState()
+    val priceHistoryState by viewModel.priceHistory.collectAsState()
 
-    // ✅ 首次加载时从后端取数据（pid 先写死为 1）
+    // 初始加载
     LaunchedEffect(Unit) {
         viewModel.loadPlatformPrices(pid = 1)
+        viewModel.loadPriceHistory(pid = 1, days = 7)
     }
 
-    // 用传入参数构造产品信息
     val product = Product(
+        pid=1,
         name = name,
         color = "Black",
         storage = "128GB",
         currentPrice = price,
         originalPrice = price * 1.15,
         imageUrl = ""
-    )
-
-    // 临时历史价格假数据（将来也能替换后端）
-    val priceHistory = listOf(
-        PricePoint("09/01", price + 50),
-        PricePoint("09/10", price + 20),
-        PricePoint("09/20", price),
-        PricePoint("09/25", price - 40),
     )
 
     Scaffold(
@@ -101,15 +100,38 @@ fun ProductDetailScreen(
         ) {
             ProductHeader(product)
 
-            PriceHistoryChart(
-                data = priceHistory,
-                height = 220.dp,
-                yTickCount = 5,
-                xLabelTilted = true,
-                lineStrokeWidth = 2.dp
-            )
+            // ✅ 历史 Loading / Error fallback
+            when {
+                priceHistoryState.loading -> {
+                    Column(
+                        Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        CircularProgressIndicator()
+                        Spacer(Modifier.height(8.dp))
+                        Text("Loading history…")
+                    }
+                }
+                priceHistoryState.data.isEmpty() -> {
+                    Column(
+                        Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("No history available1")
+                    }
+                }
 
-            // ✅ 直接展示从数据库返回的价格列表
+                else -> {
+                    PriceHistoryChart(
+                        data = priceHistoryState.data.takeLast(7),
+                        height = 220.dp,
+                        yTickCount = 5,
+                        xLabelTilted = true,
+                        lineStrokeWidth = 2.dp
+                    )
+                }
+            }
+
             PlatformPriceCardList(
                 items = platformPrices,
                 onItemClick = { platformName ->
@@ -120,6 +142,7 @@ fun ProductDetailScreen(
     }
 }
 
+// ---------------------- Product Header ----------------------
 
 @Composable
 private fun ProductHeader(product: Product) {
@@ -131,9 +154,7 @@ private fun ProductHeader(product: Product) {
         Column(Modifier.padding(AppDimens.CardPadding)) {
             Text(product.name, fontSize = AppDimens.TitleText, fontWeight = FontWeight.Bold, color = AppColors.PrimaryText)
             Text("${product.color}, ${product.storage}", color = AppColors.SecondaryText)
-
             Spacer(Modifier.height(8.dp))
-
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     "$${product.currentPrice}",
@@ -145,22 +166,48 @@ private fun ProductHeader(product: Product) {
                 Text(
                     "$${product.originalPrice}",
                     color = AppColors.SecondaryText,
-                    textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough
+                    textDecoration = TextDecoration.LineThrough
                 )
             }
         }
     }
 }
 
+// ---------------------- Price History Chart ----------------------
+
 @Composable
 private fun PriceHistoryChart(
-    data: List<PricePoint>,
+    data: List<HistoryPointDto>,
     height: Dp,
     yTickCount: Int,
     xLabelTilted: Boolean,
     lineStrokeWidth: Dp
 ) {
+    println(data)
+    println("...............")
     if (data.isEmpty()) return
+    // 只有一个点 → 画圆点
+    if (data.size == 1) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(AppDimens.CornerRadius),
+            colors = CardDefaults.cardColors(containerColor = AppColors.Card)
+        ) {
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(height)
+                    .padding(start = 48.dp, top = 16.dp, end = 16.dp)
+            ) {
+                drawCircle(
+                    color = AppColors.ChartLine,
+                    radius = 8f,
+                    center = androidx.compose.ui.geometry.Offset(size.width/2, size.height/2)
+                )
+            }
+        }
+        return
+    }
 
     val leftAxisSpace = 48.dp
 
@@ -171,13 +218,14 @@ private fun PriceHistoryChart(
     ) {
         Canvas(
             modifier = Modifier
+                .fillMaxWidth()
                 .height(height)
                 .padding(start = leftAxisSpace, top = 16.dp, end = 16.dp)
         ) {
             val prices = data.map { it.price }
             val min = prices.min()
             val max = prices.max()
-            val (yMin, yMax, yStep) = niceAxis(min, max, yTickCount)
+            val (yMin, yMax, _) = niceAxis(min, max, yTickCount)
 
             val w = size.width
             val h = size.height
@@ -185,14 +233,23 @@ private fun PriceHistoryChart(
 
             data.forEachIndexed { i, p ->
                 val x = i * (w / (data.size - 1))
-                val ratio = (p.price - yMin) / (yMax - yMin).coerceAtLeast(1.0)
+                val denom = (yMax - yMin).takeIf { it > 0 } ?: 1.0
+                val ratio = (p.price - yMin) / denom
                 val y = h - (ratio * h).toFloat()
                 if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
             }
-            drawPath(path, AppColors.ChartLine, style = Stroke(lineStrokeWidth.toPx(), cap = StrokeCap.Round))
+
+            drawPath(
+                path,
+                AppColors.ChartLine,
+                style = Stroke(lineStrokeWidth.toPx(), cap = StrokeCap.Round)
+            )
         }
     }
 }
+
+
+// ---------------------- Platform Price Cards ----------------------
 
 @Composable
 private fun PlatformPriceCardList(
@@ -222,10 +279,12 @@ private fun PlatformPriceCardList(
     }
 }
 
+// ---------------------- AXIS UTILITY ----------------------
+
 private data class AxisInfo(val min: Double, val max: Double, val step: Double)
 
 private fun niceAxis(minVal: Double, maxVal: Double, tickCount: Int): AxisInfo {
-    val d = (maxVal - minVal).toDouble()
+    val d = (maxVal - minVal)
     val rawStep = d / (tickCount - 1).coerceAtLeast(1)
     val exp = floor(kotlin.math.log10(rawStep))
     val base = rawStep / 10.0.pow(exp)

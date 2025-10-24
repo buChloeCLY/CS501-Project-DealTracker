@@ -39,6 +39,7 @@ import androidx.navigation.compose.rememberNavController
 enum class Platform { Amazon, BestBuy }
 
 data class ProductUi(
+    val pid: Int,
     val title: String,
     val price: Double,
     val rating: Float,     // 0..5
@@ -71,11 +72,11 @@ fun DealsScreen(
     // Mock data
     val allProducts = remember {
         listOf(
-            ProductUi("iPhone 16 Pro", 999.0, 4.6f, "Best Price from Amazon", sales = 12030, platform = Platform.Amazon, freeShipping = true,  inStock = true),
-            ProductUi("Samsung Galaxy Ultra", 999.0, 4.4f, "Best Price from Amazon", sales = 10112, platform = Platform.Amazon, freeShipping = false, inStock = true),
-            ProductUi("OnePlus 12", 799.0, 4.2f, "Official Store",         sales =  6120, platform = Platform.BestBuy, freeShipping = true,  inStock = true),
-            ProductUi("Google Pixel 9", 899.0, 4.5f, "Official Store",     sales =  8540, platform = Platform.BestBuy, freeShipping = false, inStock = false),
-            ProductUi("Moto X Pro", 699.0, 3.9f, "Best Price from Amazon", sales =  2350, platform = Platform.Amazon,  freeShipping = true,  inStock = true),
+            ProductUi(1,"iPhone 16 Pro", 999.0, 4.6f, "Best Price from Amazon", sales = 12030, platform = Platform.Amazon, freeShipping = true,  inStock = true),
+            ProductUi(2,"Samsung Galaxy Ultra", 999.0, 4.4f, "Best Price from Amazon", sales = 10112, platform = Platform.Amazon, freeShipping = false, inStock = true),
+            ProductUi(3,"OnePlus 12", 799.0, 4.2f, "Official Store",         sales =  6120, platform = Platform.BestBuy, freeShipping = true,  inStock = true),
+            ProductUi(4,"Google Pixel 9", 899.0, 4.5f, "Official Store",     sales =  8540, platform = Platform.BestBuy, freeShipping = false, inStock = false),
+            ProductUi(5,"Moto X Pro", 699.0, 3.9f, "Best Price from Amazon", sales =  2350, platform = Platform.Amazon,  freeShipping = true,  inStock = true),
         )
     }
 
@@ -489,6 +490,7 @@ private fun DealsScreenPreview() {
             onCompareClick = { product ->
                 navController.navigate(
                     Routes.detailRoute(
+                        pid = product.pid,
                         name = product.title,
                         price = product.price,
                         rating = product.rating,
