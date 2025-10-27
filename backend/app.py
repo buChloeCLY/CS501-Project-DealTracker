@@ -30,6 +30,7 @@ def _to_jsonable(rows):
 
 
 # ---------------- API: 价格原始数据 ----------------
+# ---------------- API: 每个平台的最新价格 ----------------
 @app.route("/price/<int:pid>")
 def get_prices(pid: int):
     try:
@@ -37,12 +38,18 @@ def get_prices(pid: int):
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT id, pid, price, date, platform, idInPlatform, link
-                FROM price
-                WHERE pid = %s
-                ORDER BY date ASC
+                SELECT p1.id, p1.pid, p1.price, p1.date, p1.platform, p1.idInPlatform, p1.link
+                FROM price p1
+                INNER JOIN (
+                    SELECT platform, MAX(date) AS max_date
+                    FROM price
+                    WHERE pid = %s
+                    GROUP BY platform
+                ) p2 ON p1.platform = p2.platform AND p1.date = p2.max_date
+                WHERE p1.pid = %s
+                ORDER BY p1.price ASC
                 """,
-                (pid,),
+                (pid, pid),
             )
             rows = cur.fetchall()
             return jsonify(_to_jsonable(rows)), 200
@@ -54,8 +61,6 @@ def get_prices(pid: int):
             conn.close()
         except:
             pass
-
-
 # ---------------- API: 历史价格（折线图） ----------------
 @app.route("/history/<int:pid>")
 def get_history(pid: int):

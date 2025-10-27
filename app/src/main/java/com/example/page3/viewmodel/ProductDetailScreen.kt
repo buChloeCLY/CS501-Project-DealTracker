@@ -11,7 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -44,7 +44,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 
 @Composable
 fun ProductDetailScreen(
-    pid:Int,
+    pid: Int,
     name: String,
     price: Double,
     rating: Float,
@@ -52,7 +52,6 @@ fun ProductDetailScreen(
     navController: NavController
 ) {
     val viewModel: ProductViewModel = viewModel()
-
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -62,33 +61,27 @@ fun ProductDetailScreen(
     val priceHistoryState by viewModel.priceHistory.collectAsState()
 
     // 初始加载
-    LaunchedEffect(Unit) {
-        viewModel.loadPlatformPrices(pid = 1)
-        viewModel.loadPriceHistory(pid = 1, days = 7)
+    LaunchedEffect(pid) {
+        viewModel.loadPlatformPrices(pid = pid)
+        viewModel.loadPriceHistory(pid = pid, days = 7)
     }
 
-    val product = Product(
-        pid=1,
-        name = name,
-        color = "Black",
-        storage = "128GB",
-        currentPrice = price,
-        originalPrice = price * 1.15,
-        imageUrl = ""
-    )
+    // ✅ 从 platformPrices 计算当前最低价
+    val currentPrice = platformPrices.minOfOrNull { it.price } ?: price
+    val lowestPlatform = platformPrices.minByOrNull { it.price }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(product.name) },
+                title = { Text(name) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* TODO */ }) {
-                        Icon(Icons.Filled.Search, contentDescription = "Search")
+                    IconButton(onClick = { /* TODO: Add tracking */ }) {
+                        Icon(Icons.Filled.Add, contentDescription = "Add")
                     }
                 }
             )
@@ -102,9 +95,15 @@ fun ProductDetailScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            ProductHeader(product)
+            // ✅ 产品头部：显示最低价和来源
+            ProductHeader(
+                name = name,
+                currentPrice = currentPrice,
+                lowestPlatform = lowestPlatform?.platformName,
+                hasData = platformPrices.isNotEmpty()
+            )
 
-            // ✅ 历史 Loading / Error fallback
+            // ✅ 历史价格图表
             when {
                 priceHistoryState.loading -> {
                     Column(
@@ -113,18 +112,29 @@ fun ProductDetailScreen(
                     ) {
                         CircularProgressIndicator()
                         Spacer(Modifier.height(8.dp))
-                        Text("Loading history…")
+                        Text("Loading history…", color = AppColors.SecondaryText)
                     }
                 }
                 priceHistoryState.data.isEmpty() -> {
-                    Column(
-                        Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(AppDimens.CornerRadius),
+                        colors = CardDefaults.cardColors(containerColor = AppColors.Card)
                     ) {
-                        Text("No history available1")
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(220.dp)
+                                .padding(16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "No price history available",
+                                color = AppColors.SecondaryText
+                            )
+                        }
                     }
                 }
-
                 else -> {
                     PriceHistoryChart(
                         data = priceHistoryState.data.takeLast(7),
@@ -136,12 +146,33 @@ fun ProductDetailScreen(
                 }
             }
 
-            PlatformPriceCardList(
-                items = platformPrices,
-                onItemClick = { platformName ->
-                    scope.launch { snackbarHostState.showSnackbar("Open $platformName") }
+            // ✅ 平台价格列表
+            if (platformPrices.isEmpty()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(AppDimens.CornerRadius),
+                    colors = CardDefaults.cardColors(containerColor = AppColors.Card)
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "No platform prices available",
+                            color = AppColors.SecondaryText
+                        )
+                    }
                 }
-            )
+            } else {
+                PlatformPriceCardList(
+                    items = platformPrices,
+                    onItemClick = { platformName ->
+                        scope.launch { snackbarHostState.showSnackbar("Open $platformName") }
+                    }
+                )
+            }
         }
     }
 }
@@ -149,28 +180,51 @@ fun ProductDetailScreen(
 // ---------------------- Product Header ----------------------
 
 @Composable
-private fun ProductHeader(product: Product) {
+private fun ProductHeader(
+    name: String,
+    currentPrice: Double,
+    lowestPlatform: String?,
+    hasData: Boolean
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(AppDimens.CornerRadius),
         colors = CardDefaults.cardColors(containerColor = AppColors.Card)
     ) {
         Column(Modifier.padding(AppDimens.CardPadding)) {
-            Text(product.name, fontSize = AppDimens.TitleText, fontWeight = FontWeight.Bold, color = AppColors.PrimaryText)
-            Text("${product.color}, ${product.storage}", color = AppColors.SecondaryText)
+            Text(
+                name,
+                fontSize = AppDimens.TitleText,
+                fontWeight = FontWeight.Bold,
+                color = AppColors.PrimaryText
+            )
+
             Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.Bottom) {
+
+            // ✅ 显示当前最低价
+            if (hasData) {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        "$${"%.2f".format(currentPrice)}",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = AppDimens.TitleText,
+                        color = AppColors.Accent
+                    )
+                    if (lowestPlatform != null) {
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "from $lowestPlatform",
+                            color = AppColors.SecondaryText,
+                            fontSize = AppDimens.BodyText
+                        )
+                    }
+                }
+            } else {
                 Text(
-                    "$${product.currentPrice}",
+                    "Price: Unknown",
                     fontWeight = FontWeight.Bold,
                     fontSize = AppDimens.TitleText,
-                    color = AppColors.Accent
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    "$${product.originalPrice}",
-                    color = AppColors.SecondaryText,
-                    textDecoration = TextDecoration.LineThrough
+                    color = AppColors.SecondaryText
                 )
             }
         }
@@ -194,7 +248,7 @@ private fun PriceHistoryChart(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(AppDimens.CornerRadius),
+        shape = RoundedCornerShape(AppDimens.CornerRadius),
         colors = CardDefaults.cardColors(containerColor = AppColors.Card)
     ) {
         Canvas(
@@ -313,12 +367,22 @@ private fun PlatformPriceCardList(
                 colors = CardDefaults.cardColors(containerColor = AppColors.Card)
             ) {
                 Row(
-                    Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                    Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(row.platformName, fontWeight = FontWeight.Medium, color = AppColors.PrimaryText)
-                    Text("$${row.price}", fontWeight = FontWeight.Bold, color = AppColors.Accent)
+                    Text(
+                        row.platformName,
+                        fontWeight = FontWeight.Medium,
+                        color = AppColors.PrimaryText
+                    )
+                    Text(
+                        "$${"%.2f".format(row.price)}",
+                        fontWeight = FontWeight.Bold,
+                        color = AppColors.Accent
+                    )
                 }
             }
         }
