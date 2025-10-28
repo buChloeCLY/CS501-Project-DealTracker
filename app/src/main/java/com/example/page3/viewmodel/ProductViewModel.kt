@@ -10,6 +10,7 @@ import com.example.page3.repository.PriceRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import com.example.page3.model.Platform
 
 data class HistoryUiState(
     val loading: Boolean = true,
@@ -23,10 +24,15 @@ class ProductViewModel : ViewModel() {
 
     fun getProduct(): Product = Product(
         pid = 1,
-        name = "iPhone 16",
+        title = "iPhone 16",
+        price = 999.0,
+        rating = 4.6f,
+        platform = Platform.Amazon,
+        freeShipping = true,
+        inStock = true,
+        // 可选信息（保留兼容）
         color = "White",
         storage = "256G",
-        currentPrice = 999.0,
         originalPrice = 1999.0,
         imageUrl = ""
     )

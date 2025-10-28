@@ -48,7 +48,7 @@ fun ProductDetailScreen(
     name: String,
     price: Double,
     rating: Float,
-    source: String,
+//    source: String,
     navController: NavController
 ) {
     val viewModel: ProductViewModel = viewModel()

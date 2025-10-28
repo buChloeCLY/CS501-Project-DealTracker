@@ -7,6 +7,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.example.page3.viewmodel.ProductDetailScreen
+import com.example.page3.model.Product
 
 object Routes {
     const val HOME = "home"
@@ -15,11 +16,10 @@ object Routes {
     const val PROFILE = "profile"
     const val DETAIL_BASE = "detail"
 
-    fun detailRoute(pid: Int, name: String, price: Double, rating: Float, source: String): String {
+    fun detailRoute(pid: Int, name: String, price: Double, rating: Float): String {
         val n = Uri.encode(name)
         val p = Uri.encode(price.toString())
-        val s = Uri.encode(source)
-        return "$DETAIL_BASE?pid=$pid&name=$n&price=$p&rating=$rating&source=$s"
+        return "$DETAIL_BASE?pid=$pid&name=$n&price=$p&rating=$rating"
     }
 }
 
@@ -38,14 +38,13 @@ fun MainNavGraph(navController: NavHostController, modifier: Modifier = Modifier
             DealsScreen(
                 showBack = navController.previousBackStackEntry != null,
                 onBack = { navController.popBackStack() },
-                onCompareClick = { product ->
+                onCompareClick = { product: Product ->
                     navController.navigate(
                         Routes.detailRoute(
                             pid = product.pid,
                             name = product.title,
                             price = product.price,
-                            rating = product.rating,
-                            source = product.source
+                            rating = product.rating
                         )
                     )
                 }
@@ -55,20 +54,18 @@ fun MainNavGraph(navController: NavHostController, modifier: Modifier = Modifier
         // ✅ 这里加上 pid
         composable(
             route = Routes.DETAIL_BASE +
-                    "?pid={pid}&name={name}&price={price}&rating={rating}&source={source}"
+                    "?pid={pid}&name={name}&price={price}&rating={rating}"
         ) { backStackEntry ->
             val pid = backStackEntry.arguments?.getString("pid")?.toIntOrNull() ?: 1
             val name = backStackEntry.arguments?.getString("name") ?: ""
             val price = backStackEntry.arguments?.getString("price")?.toDoubleOrNull() ?: 0.0
             val rating = backStackEntry.arguments?.getString("rating")?.toFloatOrNull() ?: 0f
-            val source = backStackEntry.arguments?.getString("source") ?: ""
 
             ProductDetailScreen(
                 pid = pid,
                 name = name,
                 price = price,
                 rating = rating,
-                source = source,
                 navController = navController
             )
         }
