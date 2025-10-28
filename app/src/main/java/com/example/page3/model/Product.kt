@@ -17,4 +17,13 @@ data class Product(
     val storage: String? = null,
     val originalPrice: Double? = null,
     val imageUrl: String = ""
-)
+){
+    // 便捷属性
+    val priceText: String get() = "$" + "%.2f".format(price)
+
+    // ✅ 动态生成来源信息
+    val sourceText: String get() = when (platform) {
+        Platform.Amazon -> "Best Price from Amazon"
+        Platform.BestBuy -> "Best Price from BestBuy"
+    }
+}
