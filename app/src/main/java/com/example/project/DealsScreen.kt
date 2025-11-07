@@ -147,6 +147,7 @@ fun DealsScreen(
                 when (p) {
                     Platform.Amazon -> viewModel.toggleAmazon(checked)
                     Platform.BestBuy -> viewModel.toggleBestBuy(checked)
+                    Platform.Walmart -> viewModel.toggleWalmart(checked)
                 }
             },
             onlyFreeShipping = ui.filters.onlyFreeShipping,

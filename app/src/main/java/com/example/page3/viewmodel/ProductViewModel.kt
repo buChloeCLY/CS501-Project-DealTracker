@@ -2,6 +2,7 @@ package com.example.page3.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.page3.model.Category
 import com.example.page3.model.HistoryPointDto
 import com.example.page3.model.PlatformPrice
 import com.example.page3.model.PricePoint
@@ -31,9 +32,8 @@ class ProductViewModel : ViewModel() {
         freeShipping = true,
         inStock = true,
         // 可选信息（保留兼容）
-        color = "White",
-        storage = "256G",
-        originalPrice = 1999.0,
+        information = "White",
+        category = Category.Electronics,
         imageUrl = ""
     )
 

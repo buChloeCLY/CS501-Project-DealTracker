@@ -1,7 +1,8 @@
 package com.example.page3.model
 
 // ✅ 平台枚举（原先在 DealsScreen 内部的 Platform 挪到 model 层）
-enum class Platform { Amazon, BestBuy }
+enum class Platform { Amazon, BestBuy, Walmart }
+enum class Category { Electronics, Beauty, Home, Food, Fashion, Sports,  }
 
 // ✅ 统一、精简且覆盖 UI 所需字段
 data class Product(
@@ -13,9 +14,8 @@ data class Product(
     val freeShipping: Boolean,  // 包邮
     val inStock: Boolean,       // 有货
     // ↓ 以下为可选信息，保留兼容你们之前结构（需要就填，不需要就留空）
-    val color: String? = null,
-    val storage: String? = null,
-    val originalPrice: Double? = null,
+    val information: String? = null,
+    val category: Category,
     val imageUrl: String = ""
 ){
     // 便捷属性
@@ -25,5 +25,6 @@ data class Product(
     val sourceText: String get() = when (platform) {
         Platform.Amazon -> "Best Price from Amazon"
         Platform.BestBuy -> "Best Price from BestBuy"
+        Platform.Walmart -> "Best Price from Walmart"
     }
 }
