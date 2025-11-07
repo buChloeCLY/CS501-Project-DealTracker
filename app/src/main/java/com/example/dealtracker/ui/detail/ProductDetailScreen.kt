@@ -1,7 +1,6 @@
 package com.example.dealtracker.ui.detail
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -26,7 +24,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -74,7 +71,6 @@ fun ProductDetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    // ✅ 修复 1 & 2: 添加正确的 collectAsState 调用
     val platformPricesState = viewModel.platformPrices.collectAsState()
     val priceHistoryState = viewModel.priceHistory.collectAsState()
 
@@ -83,11 +79,9 @@ fun ProductDetailScreen(
         viewModel.loadPriceHistory(pid = pid, days = 7)
     }
 
-    // ✅ 修复 3 & 4: 使用 .value 获取实际值
     val platformPrices = platformPricesState.value
     val priceHistory = priceHistoryState.value
 
-    // ✅ 修复 5 & 6: 正确使用 lambda 参数
     val currentPrice = platformPrices.minOfOrNull { platformPrice -> platformPrice.price } ?: price
     val lowestPlatform = platformPrices.minByOrNull { platformPrice -> platformPrice.price }
 
@@ -101,8 +95,21 @@ fun ProductDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* TODO: Add tracking */ }) {
-                        Icon(Icons.Filled.Add, contentDescription = "Add")
+                    IconButton(onClick = {
+                        // 临时模拟添加商品
+                        val product = com.example.dealtracker.domain.model.Product(
+                            pid = pid,
+                            title = name,
+                            price = price,
+                            rating = rating,
+                            platform = com.example.dealtracker.domain.model.Platform.Amazon,
+                            freeShipping = true,
+                            inStock = true,
+                            imageUrl = ""
+                        )
+                        com.example.dealtracker.ui.wishlist.WishListHolder.add(product)
+                    }) {
+                        Icon(Icons.Filled.Add, contentDescription = "Add to WishList")
                     }
                 }
             )
@@ -116,16 +123,15 @@ fun ProductDetailScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // ✅ 产品头部：显示最低价和来源
+            // 产品头部：显示最低价和来源
             ProductHeader(
                 name = name,
                 currentPrice = currentPrice,
-                // ✅ 修复 7: 正确访问 platformName
                 lowestPlatform = lowestPlatform?.platformName,
                 hasData = platformPrices.isNotEmpty()
             )
 
-            // ✅ 历史价格图表
+            // 历史价格图表
             when {
                 priceHistory.loading -> {
                     Column(
@@ -168,7 +174,7 @@ fun ProductDetailScreen(
                 }
             }
 
-            // ✅ 平台价格列表
+            // 平台价格列表
             if (platformPrices.isEmpty()) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -221,7 +227,7 @@ private fun ProductHeader(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // ✅ 显示当前最低价
+            // 显示当前最低价
             if (hasData) {
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(

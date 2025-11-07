@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.project"
+    namespace = "com.example.dealtracker"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.project"
+        applicationId = "com.example.dealtracker"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -67,7 +67,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
 
-    // ✅ Retrofit
+    // Retrofit
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("com.squareup.okhttp3:logging-interceptor:5.0.0-alpha.11")

@@ -1,6 +1,6 @@
 package com.example.dealtracker.domain.model
 
-// ✅ 平台枚举
+// 平台枚举
 enum class Platform {
     Amazon,
     BestBuy

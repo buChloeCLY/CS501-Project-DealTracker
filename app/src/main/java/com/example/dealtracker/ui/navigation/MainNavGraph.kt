@@ -8,8 +8,10 @@ import androidx.navigation.compose.composable
 import com.example.dealtracker.ui.deals.DealsScreen
 import com.example.dealtracker.ui.detail.ProductDetailScreen
 import com.example.dealtracker.ui.home.HomeScreen
+import com.example.dealtracker.ui.wishlist.WishListScreen
 
-// ✅ 主导航图配置
+
+// 主导航图配置
 @Composable
 fun MainNavGraph(
     navController: NavHostController,
@@ -62,8 +64,11 @@ fun MainNavGraph(
             )
         }
 
+        // 收藏页
+        composable(Routes.LISTS) {
+            WishListScreen(navController = navController)
+        }
         // TODO: 后续添加其他页面
-        // composable(Routes.LISTS) { WishlistScreen(navController) }
         // composable(Routes.PROFILE) { ProfileScreen(navController) }
     }
 }

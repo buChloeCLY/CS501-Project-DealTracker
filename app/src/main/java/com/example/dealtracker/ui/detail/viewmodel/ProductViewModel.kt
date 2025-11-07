@@ -39,7 +39,7 @@ class ProductViewModel : ViewModel() {
         }
     }
 
-    // ✅ 修复：使用 PricePoint 而不是 HistoryPriceDto
+    // 使用 PricePoint 而不是 HistoryPriceDto
     private val _priceHistory = MutableStateFlow(HistoryUiState())
     val priceHistory: StateFlow<HistoryUiState> = _priceHistory
 

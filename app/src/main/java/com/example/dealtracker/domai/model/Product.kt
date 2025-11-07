@@ -1,6 +1,6 @@
 package com.example.dealtracker.domain.model
 
-// ✅ 统一、精简且覆盖 UI 所需字段的产品模型
+// 统一、精简且覆盖 UI 所需字段的产品模型
 data class Product(
     val pid: Int,
     val title: String,          // 产品标题
@@ -9,7 +9,7 @@ data class Product(
     val platform: Platform,     // 平台来源
     val freeShipping: Boolean,  // 是否包邮
     val inStock: Boolean,       // 是否有货
-    // ↓ 可选信息，保留兼容性
+    // 可选信息，保留兼容性
     val color: String? = null,
     val storage: String? = null,
     val originalPrice: Double? = null,

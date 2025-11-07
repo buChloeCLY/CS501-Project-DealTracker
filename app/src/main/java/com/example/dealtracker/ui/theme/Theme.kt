@@ -16,7 +16,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-// ✅ 深色主题配色方案
+//  深色主题配色方案
 private val DarkColorScheme = darkColorScheme(
     primary = Purple80,
     secondary = PurpleGrey80,
@@ -30,7 +30,7 @@ private val DarkColorScheme = darkColorScheme(
     onSurface = Color(0xFFFFFFFF)
 )
 
-// ✅ 浅色主题配色方案
+// 浅色主题配色方案
 private val LightColorScheme = lightColorScheme(
     primary = Purple40,
     secondary = PurpleGrey40,
@@ -44,7 +44,7 @@ private val LightColorScheme = lightColorScheme(
     onSurface = Color(0xFF1C1B1F)
 )
 
-// ✅ 应用主题
+//  应用主题
 @Composable
 fun DealTrackerTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),

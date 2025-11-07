@@ -3,7 +3,7 @@ package com.example.dealtracker.domain.repository
 import com.example.dealtracker.domain.model.PlatformPrice
 import com.example.dealtracker.domain.model.PricePoint
 
-// ✅ 价格数据仓库接口（领域层定义）
+// 价格数据仓库接口（领域层定义）
 interface PriceRepository {
     /**
      * 获取指定产品在所有平台的价格

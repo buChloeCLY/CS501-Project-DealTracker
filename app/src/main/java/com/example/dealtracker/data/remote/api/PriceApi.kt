@@ -6,7 +6,7 @@ import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query
 
-// ✅ 价格相关API接口
+// 价格相关API接口
 interface PriceApi {
     /**
      * 获取指定产品在所有平台的价格记录

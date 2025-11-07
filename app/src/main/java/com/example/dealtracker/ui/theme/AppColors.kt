@@ -2,7 +2,7 @@ package com.example.dealtracker.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// ✅ 应用自定义颜色系统
+// 应用自定义颜色系统
 object AppColors {
     // 背景色
     val Background = Color(0xFFF8F1E9)

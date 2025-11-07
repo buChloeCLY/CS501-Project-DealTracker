@@ -2,7 +2,7 @@ package com.example.dealtracker.ui.navigation
 
 import android.net.Uri
 
-// ✅ 应用路由定义
+// 应用路由定义
 object Routes {
     // 主页面路由
     const val HOME = "home"

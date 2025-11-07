@@ -3,7 +3,7 @@ package com.example.dealtracker.ui.theme
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// ✅ 应用尺寸规范系统
+// 应用尺寸规范系统
 object AppDimens {
     // 间距
     val ScreenPadding = 16.dp

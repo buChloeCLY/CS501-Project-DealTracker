@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 
-// ✅ 筛选状态
+// 筛选状态
 data class DealsFilterState(
     val priceMin: Float = 0f,
     val priceMax: Float = 2000f,
@@ -21,13 +21,13 @@ data class DealsFilterState(
     val onlyInStock: Boolean = false
 )
 
-// ✅ 排序状态
+// 排序状态
 data class DealsSortState(
     val field: SortField = SortField.Price,
     val order: SortOrder = SortOrder.Asc
 )
 
-// ✅ UI 状态
+// UI 状态
 data class DealsUiState(
     val products: List<Product> = emptyList(),
     val filteredSorted: List<Product> = emptyList(),
@@ -37,7 +37,7 @@ data class DealsUiState(
 
 class DealsViewModel : ViewModel() {
 
-    // ✅ 样例数据
+    // 样例数据
     private val _products = MutableStateFlow(
         listOf(
             Product(1, "iPhone 16 Pro", price = 999.0, originalPrice = 1199.0, imageUrl = "",
@@ -81,7 +81,7 @@ class DealsViewModel : ViewModel() {
     private val _sort = MutableStateFlow(DealsSortState())
     val sort: StateFlow<DealsSortState> = _sort
 
-    // ✅ 组合 Flow - 自动计算筛选和排序后的结果
+    // 组合 Flow - 自动计算筛选和排序后的结果
     val uiState: StateFlow<DealsUiState> =
         combine(_products, _filters, _sort) { list, f, s ->
             val filtered = list.asSequence()
