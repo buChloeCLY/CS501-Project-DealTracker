@@ -10,29 +10,36 @@ import com.example.dealtracker.ui.detail.ProductDetailScreen
 import com.example.dealtracker.ui.home.HomeScreen
 import com.example.dealtracker.ui.wishlist.WishListScreen
 
-
-// 主导航图配置
+/**
+ * 主导航图配置
+ *
+ * 管理应用的页面跳转关系，基于 Navigation Compose。
+ * 每个 composable() 定义一个路由对应的页面。
+ */
 @Composable
 fun MainNavGraph(
     navController: NavHostController,
     modifier: Modifier = Modifier
 ) {
+    // NavHost：设置起始页（Home）
     NavHost(
         navController = navController,
         startDestination = Routes.HOME,
         modifier = modifier
     ) {
-        // 首页
+
+        // ============= 首页 Home =============
         composable(Routes.HOME) {
             HomeScreen(navController = navController)
         }
 
-        // 商品列表页
+        // ============= Deals 页面 =============
         composable(Routes.DEALS) {
             DealsScreen(
                 showBack = navController.previousBackStackEntry != null,
                 onBack = { navController.popBackStack() },
                 onCompareClick = { product ->
+                    // 跳转到详情页（带参数）
                     navController.navigate(
                         Routes.detailRoute(
                             pid = product.pid,
@@ -45,16 +52,19 @@ fun MainNavGraph(
             )
         }
 
-        // 商品详情页（带参数）
+        // ============= 商品详情页（带参数） =============
         composable(
             route = Routes.DETAIL_BASE +
                     "?pid={pid}&name={name}&price={price}&rating={rating}"
         ) { backStackEntry ->
+
+            // 从路由参数中解析数据
             val pid = backStackEntry.arguments?.getString("pid")?.toIntOrNull() ?: 1
             val name = backStackEntry.arguments?.getString("name") ?: ""
             val price = backStackEntry.arguments?.getString("price")?.toDoubleOrNull() ?: 0.0
             val rating = backStackEntry.arguments?.getString("rating")?.toFloatOrNull() ?: 0f
 
+            // 渲染详情页（含历史价格图表 + 平台信息）
             ProductDetailScreen(
                 pid = pid,
                 name = name,
@@ -64,11 +74,14 @@ fun MainNavGraph(
             )
         }
 
-        // 收藏页
+        // ============= 收藏页 WishList =============
         composable(Routes.LISTS) {
             WishListScreen(navController = navController)
         }
-        // TODO: 后续添加其他页面
-        // composable(Routes.PROFILE) { ProfileScreen(navController) }
+
+        // =============  Profile 页面 =============
+        // composable(Routes.PROFILE) {
+        //     ProfileScreen(navController = navController)
+        // }
     }
 }
