@@ -48,30 +48,30 @@ class DealsViewModel : ViewModel() {
 
             Product(3, "OnePlus 12", price = 799.0, originalPrice = 899.0, imageUrl = "",
                 rating = 4.2f, platform = Platform.BestBuy, freeShipping = true, inStock = true),
-//
-//            Product(4, "Google Pixel 9", price = 899.0, originalPrice = 999.0, imageUrl = "",
-//                rating = 4.5f, platform = Platform.BestBuy, freeShipping = false, inStock = false),
-//
-//            Product(5, "Moto X Pro", price = 699.0, originalPrice = 799.0, imageUrl = "",
-//                rating = 3.9f, platform = Platform.Amazon, freeShipping = true, inStock = true),
-//
-//            Product(6, "Sony WH-1000XM5", price = 329.0, originalPrice = 399.0, imageUrl = "",
-//                rating = 4.7f, platform = Platform.BestBuy, freeShipping = true, inStock = true),
-//
-//            Product(7, "AirPods Pro 2", price = 249.0, originalPrice = 299.0, imageUrl = "",
-//                rating = 4.6f, platform = Platform.Amazon, freeShipping = true, inStock = true),
-//
-//            Product(8, "Nintendo Switch OLED", price = 349.0, originalPrice = 349.0, imageUrl = "",
-//                rating = 4.8f, platform = Platform.BestBuy, freeShipping = false, inStock = true),
-//
-//            Product(9, "Kindle Paperwhite", price = 139.0, originalPrice = 159.0, imageUrl = "",
-//                rating = 4.5f, platform = Platform.Amazon, freeShipping = true, inStock = true),
-//
-//            Product(10, "GoPro HERO12", price = 399.0, originalPrice = 449.0, imageUrl = "",
-//                rating = 4.4f, platform = Platform.BestBuy, freeShipping = false, inStock = true),
-//
-//            Product(11, "Logitech MX Master 3S", price = 99.0, originalPrice = 129.0, imageUrl = "",
-//                rating = 4.7f, platform = Platform.Amazon, freeShipping = true, inStock = true),
+
+            Product(4, "Google Pixel 9", price = 899.0, originalPrice = 999.0, imageUrl = "",
+                rating = 4.5f, platform = Platform.BestBuy, freeShipping = false, inStock = false),
+
+            Product(5, "Moto X Pro", price = 699.0, originalPrice = 799.0, imageUrl = "",
+                rating = 3.9f, platform = Platform.Amazon, freeShipping = true, inStock = true),
+
+            Product(6, "Sony WH-1000XM5", price = 329.0, originalPrice = 399.0, imageUrl = "",
+                rating = 4.7f, platform = Platform.BestBuy, freeShipping = true, inStock = true),
+
+            Product(7, "AirPods Pro 2", price = 249.0, originalPrice = 299.0, imageUrl = "",
+                rating = 4.6f, platform = Platform.Amazon, freeShipping = true, inStock = true),
+
+            Product(8, "Nintendo Switch OLED", price = 349.0, originalPrice = 349.0, imageUrl = "",
+                rating = 4.8f, platform = Platform.BestBuy, freeShipping = false, inStock = true),
+
+            Product(9, "Kindle Paperwhite", price = 139.0, originalPrice = 159.0, imageUrl = "",
+                rating = 4.5f, platform = Platform.Amazon, freeShipping = true, inStock = true),
+
+            Product(10, "GoPro HERO12", price = 399.0, originalPrice = 449.0, imageUrl = "",
+                rating = 4.4f, platform = Platform.BestBuy, freeShipping = false, inStock = true),
+
+            Product(11, "Logitech MX Master 3S", price = 99.0, originalPrice = 129.0, imageUrl = "",
+                rating = 4.7f, platform = Platform.Amazon, freeShipping = true, inStock = true),
         )
     )
 
