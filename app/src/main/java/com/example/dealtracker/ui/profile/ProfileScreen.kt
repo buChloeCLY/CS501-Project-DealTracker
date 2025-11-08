@@ -14,7 +14,7 @@ import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,10 +24,28 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import com.example.dealtracker.domain.UserManager
+import com.example.dealtracker.domain.model.User
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(navController: NavHostController) {
+    // 初始化测试用户数据
+    LaunchedEffect(Unit) {
+        if (UserManager.getUser() == null) {
+            UserManager.setUser(
+                User(
+                    uid = 1,
+                    name = "John Doe",
+                    email = "john.doe@email.com",
+                    gender = "Male"
+                )
+            )
+        }
+    }
+
+    val currentUser by UserManager.currentUser.collectAsState()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -83,14 +101,14 @@ fun ProfileScreen(navController: NavHostController) {
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "John Doe",
+                text = currentUser?.name ?: "Guest",
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFF212121)
             )
 
             Text(
-                text = "john.doe@email.com",
+                text = currentUser?.email ?: "Not logged in",
                 fontSize = 14.sp,
                 color = Color(0xFF757575)
             )

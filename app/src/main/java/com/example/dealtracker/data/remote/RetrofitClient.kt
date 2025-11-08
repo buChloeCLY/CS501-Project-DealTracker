@@ -1,6 +1,7 @@
 package com.example.dealtracker.data.remote
 
 import com.example.dealtracker.data.remote.api.PriceApi
+import com.example.dealtracker.data.remote.api.UserApi
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
@@ -13,7 +14,9 @@ object RetrofitClient {
     val priceApi: PriceApi by lazy {
         createRetrofit().create(PriceApi::class.java)
     }
-
+    val userApi: UserApi by lazy {
+        createRetrofit().create(UserApi::class.java)
+    }
     private fun createRetrofit(): Retrofit {
         return Retrofit.Builder()
             .baseUrl(BASE_URL)
