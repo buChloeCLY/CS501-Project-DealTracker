@@ -94,15 +94,15 @@ com.example.dealtracker/
 ### 改了配置，运行前记得sync一下
 
 ### 搭建 Node.js 后端（backend文件夹）：
-创建项目：
+创建项目（在backend文件夹下）：
 npm init -y
 
 安装依赖：
-bashnpm install express mysql2 axios cors dotenv node-cron
+npm install express mysql2 axios cors dotenv node-cron
 
-创建 .env 文件
+创建 .env 文件（已完成
 
-复制 server.js
+复制 server.js（已完成
 启动服务器：
 node server.js
 ```
