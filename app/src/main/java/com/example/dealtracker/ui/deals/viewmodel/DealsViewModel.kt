@@ -1,18 +1,22 @@
 package com.example.dealtracker.ui.deals.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.dealtracker.data.remote.repository.ProductRepositoryImpl
 import com.example.dealtracker.domain.model.Category
 import com.example.dealtracker.domain.model.Platform
 import com.example.dealtracker.domain.model.Product
+import com.example.dealtracker.domain.repository.ProductRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
-// ✅ 排序字段枚举 - 移除了 Sales
+// 排序字段
 //enum class SortField(val label: String) {
 //    Price("Price"),
 //    Rating("Rating")
@@ -20,7 +24,7 @@ import kotlinx.coroutines.flow.update
 //
 //enum class SortOrder { Asc, Desc }
 
-// ✅ 筛选状态
+// 筛选状态
 data class DealsFilterState(
     val priceMin: Float = 0f,
     val priceMax: Float = 2000f,
@@ -31,147 +35,30 @@ data class DealsFilterState(
     val onlyInStock: Boolean = false
 )
 
-// ✅ 排序状态 - 默认按价格排序
+// 排序状态
 data class DealsSortState(
     val field: SortField = SortField.Price,
     val order: SortOrder = SortOrder.Asc
 )
 
-// ✅ UI 状态
+// UI 状态
 data class DealsUiState(
     val products: List<Product> = emptyList(),
     val filteredSorted: List<Product> = emptyList(),
     val filters: DealsFilterState = DealsFilterState(),
-    val sort: DealsSortState = DealsSortState()
+    val sort: DealsSortState = DealsSortState(),
+    val isLoading: Boolean = false,
+    val error: String? = null
 )
 
 class DealsViewModel : ViewModel() {
 
-    // ✅ 样例数据 - 移除了 sales 和 source
-    private val _products = MutableStateFlow(
-        listOf(
-            Product(
-                pid = 1,
-                title = "iPhone 16 Pro",
-                price = 999.0,
-                rating = 4.6f,
-                platform = Platform.Amazon,
-                freeShipping = true,
-                inStock = true,
-                information = "Latest flagship with A18 Pro chip",
-                category = Category.Electronics,
-                imageUrl = ""
-            ),
-            Product(
-                pid = 2,
-                title = "Samsung Galaxy S24 Ultra",
-                price = 1199.0,
-                rating = 4.4f,
-                platform = Platform.BestBuy,
-                freeShipping = false,
-                inStock = true,
-                information = "200MP camera, S Pen included",
-                category = Category.Electronics,
-                imageUrl = ""
-            ),
-            Product(
-                pid = 3,
-                title = "OnePlus 12",
-                price = 799.0,
-                rating = 4.2f,
-                platform = Platform.Walmart,
-                freeShipping = true,
-                inStock = true,
-                information = "Snapdragon 8 Gen 3",
-                category = Category.Electronics,
-                imageUrl = ""
-            ),
-            Product(
-                pid = 4,
-                title = "Google Pixel 9 Pro",
-                price = 899.0,
-                rating = 4.5f,
-                platform = Platform.Amazon,
-                freeShipping = false,
-                inStock = false,
-                information = "Best AI camera features",
-                category = Category.Electronics,
-                imageUrl = ""
-            ),
-            Product(
-                pid = 5,
-                title = "Sony WH-1000XM5",
-                price = 329.0,
-                rating = 4.7f,
-                platform = Platform.BestBuy,
-                freeShipping = true,
-                inStock = true,
-                information = "Industry-leading noise cancellation",
-                category = Category.Electronics,
-                imageUrl = ""
-            ),
-            Product(
-                pid = 6,
-                title = "AirPods Pro 2",
-                price = 249.0,
-                rating = 4.6f,
-                platform = Platform.Amazon,
-                freeShipping = true,
-                inStock = true,
-                information = "USB-C charging, adaptive audio",
-                category = Category.Electronics,
-                imageUrl = ""
-            ),
-            Product(
-                pid = 7,
-                title = "Nintendo Switch OLED",
-                price = 349.0,
-                rating = 4.8f,
-                platform = Platform.Walmart,
-                freeShipping = false,
-                inStock = true,
-                information = "7-inch OLED screen",
-                category = Category.Electronics,
-                imageUrl = ""
-            ),
-            Product(
-                pid = 8,
-                title = "Kindle Paperwhite",
-                price = 139.0,
-                rating = 4.5f,
-                platform = Platform.Amazon,
-                freeShipping = true,
-                inStock = true,
-                information = "Waterproof e-reader",
-                category = Category.Electronics,
-                imageUrl = ""
-            ),
-            Product(
-                pid = 9,
-                title = "GoPro HERO12 Black",
-                price = 399.0,
-                rating = 4.4f,
-                platform = Platform.BestBuy,
-                freeShipping = false,
-                inStock = true,
-                information = "5.3K video, waterproof to 33ft",
-                category = Category.Electronics,
-                imageUrl = ""
-            ),
-            Product(
-                pid = 10,
-                title = "Logitech MX Master 3S",
-                price = 99.0,
-                rating = 4.7f,
-                platform = Platform.Walmart,
-                freeShipping = true,
-                inStock = true,
-                information = "Ergonomic wireless mouse",
-                category = Category.Electronics,
-                imageUrl = ""
-            )
-        )
-    )
+    private val TAG = "DealsViewModel"
+
+    // ✅ 使用 Repository
+    private val repository: ProductRepository = ProductRepositoryImpl()
+
+    private val _products = MutableStateFlow<List<Product>>(emptyList())
     val products: StateFlow<List<Product>> = _products
 
     private val _filters = MutableStateFlow(DealsFilterState())
@@ -180,14 +67,22 @@ class DealsViewModel : ViewModel() {
     private val _sort = MutableStateFlow(DealsSortState())
     val sort: StateFlow<DealsSortState> = _sort
 
-    // ✅ 组合 Flow - 自动计算筛选和排序后的结果
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error
+
+    // 组合 Flow - 自动计算筛选和排序
     val uiState: StateFlow<DealsUiState> =
-        combine(products, filters, sort) { list, f, s ->
+        combine(products, filters, sort, isLoading, error) { list, f, s, loading, err ->
             val filtered = list.asSequence()
                 .filter { it.price in f.priceMin.toDouble()..f.priceMax.toDouble() }
-                .filter { (f.chooseAmazon && it.platform == Platform.Amazon) ||
-                        (f.chooseBestBuy && it.platform == Platform.BestBuy) ||
-                        (f.chooseWalmart && it.platform == Platform.Walmart) }
+                .filter {
+                    (f.chooseAmazon && it.platform == Platform.Amazon) ||
+                            (f.chooseBestBuy && it.platform == Platform.BestBuy) ||
+                            (f.chooseWalmart && it.platform == Platform.Walmart)
+                }
                 .filter { if (f.onlyFreeShipping) it.freeShipping else true }
                 .filter { if (f.onlyInStock) it.inStock else true }
                 .toList()
@@ -201,22 +96,113 @@ class DealsViewModel : ViewModel() {
                 products = list,
                 filteredSorted = sorted,
                 filters = f,
-                sort = s
+                sort = s,
+                isLoading = loading,
+                error = err
             )
         }.stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(5_000),
-            DealsUiState(products = _products.value, filteredSorted = _products.value)
+            DealsUiState(isLoading = true)
         )
 
-    // ---- 更新方法 ----
+    init {
+        // 初始化时自动加载产品
+        loadProducts()
+    }
+
+    /**
+     * 从后端 API 加载所有产品
+     */
+    fun loadProducts() {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
+
+            Log.d(TAG, "📦 Loading products from backend...")
+
+            repository.getAllProducts()
+                .onSuccess { productList ->
+                    _products.value = productList
+                    Log.d(TAG, "✅ Loaded ${productList.size} products")
+                }
+                .onFailure { exception ->
+                    val errorMsg = exception.message ?: "Unknown error"
+                    _error.value = errorMsg
+                    Log.e(TAG, "❌ Failed to load products: $errorMsg")
+
+                    // 失败时使用备用数据（可选）
+                    _products.value = getDummyProducts()
+                }
+
+            _isLoading.value = false
+        }
+    }
+
+    /**
+     * 搜索产品
+     */
+    fun searchProducts(query: String) {
+        if (query.isBlank()) {
+            loadProducts()
+            return
+        }
+
+        viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
+
+            Log.d(TAG, "🔍 Searching: $query")
+
+            repository.searchProducts(query)
+                .onSuccess { productList ->
+                    _products.value = productList
+                    Log.d(TAG, "✅ Found ${productList.size} products")
+                }
+                .onFailure { exception ->
+                    _error.value = "Search failed: ${exception.message}"
+                    Log.e(TAG, "❌ Search error")
+                }
+
+            _isLoading.value = false
+        }
+    }
+
+    /**
+     * 刷新产品列表
+     */
+    fun refreshProducts() {
+        loadProducts()
+    }
+
+    /**
+     * 备用假数据（API 连接失败时使用）
+     */
+    private fun getDummyProducts(): List<Product> {
+        return listOf(
+            Product(
+                pid = 999,
+                title = "⚠️ Demo Product - API Not Connected",
+                price = 99.0,
+                rating = 4.0f,
+                platform = Platform.Amazon,
+                freeShipping = true,
+                inStock = true,
+                information = "Please check:\n1. Node.js server is running\n2. Backend URL is correct\n3. Database has data",
+                category = Category.Electronics,
+                imageUrl = ""
+            )
+        )
+    }
+
+    // ---- 筛选和排序方法 ----
     fun setPrice(min: Float, max: Float) = _filters.update { it.copy(priceMin = min, priceMax = max) }
-    fun toggleAmazon(checked: Boolean)  = _filters.update { it.copy(chooseAmazon = checked) }
+    fun toggleAmazon(checked: Boolean) = _filters.update { it.copy(chooseAmazon = checked) }
     fun toggleBestBuy(checked: Boolean) = _filters.update { it.copy(chooseBestBuy = checked) }
     fun toggleWalmart(checked: Boolean) = _filters.update { it.copy(chooseWalmart = checked) }
     fun setOnlyFreeShipping(v: Boolean) = _filters.update { it.copy(onlyFreeShipping = v) }
-    fun setOnlyInStock(v: Boolean)      = _filters.update { it.copy(onlyInStock = v) }
-    fun setSortField(field: SortField)   = _sort.update { it.copy(field = field) }
-    fun setSortOrder(order: SortOrder)   = _sort.update { it.copy(order = order) }
-    fun clearFilters()                   = _filters.update { DealsFilterState() }
+    fun setOnlyInStock(v: Boolean) = _filters.update { it.copy(onlyInStock = v) }
+    fun setSortField(field: SortField) = _sort.update { it.copy(field = field) }
+    fun setSortOrder(order: SortOrder) = _sort.update { it.copy(order = order) }
+    fun clearFilters() = _filters.update { DealsFilterState() }
 }
