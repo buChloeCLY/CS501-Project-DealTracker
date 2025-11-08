@@ -9,6 +9,11 @@ import com.example.dealtracker.ui.deals.DealsScreen
 import com.example.dealtracker.ui.detail.ProductDetailScreen
 import com.example.dealtracker.ui.home.HomeScreen
 import com.example.dealtracker.ui.wishlist.WishListScreen
+import com.example.dealtracker.ui.profile.SettingsScreen
+import com.example.dealtracker.ui.profile.ProfileScreen
+import com.example.dealtracker.ui.profile.HistoryScreen
+import com.example.dealtracker.ui.profile.EditProfileScreen
+
 
 /**
  * 主导航图配置
@@ -80,8 +85,24 @@ fun MainNavGraph(
         }
 
         // =============  Profile 页面 =============
-        // composable(Routes.PROFILE) {
-        //     ProfileScreen(navController = navController)
-        // }
+         composable(Routes.PROFILE) {
+             ProfileScreen(navController = navController)
+         }
+        composable(Routes.HISTORY) {
+            HistoryScreen(navController = navController)
+        }
+
+        composable(Routes.SETTINGS) {
+            SettingsScreen(navController = navController)
+        }
+
+        composable("wishlist") {
+            WishListScreen(navController = navController)
+        }
+
+        composable(Routes.EDIT_PROFILE) {
+            EditProfileScreen(navController = navController)
+        }
     }
+
 }

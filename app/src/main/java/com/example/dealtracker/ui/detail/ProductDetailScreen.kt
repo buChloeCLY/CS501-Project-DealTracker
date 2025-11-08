@@ -310,9 +310,14 @@ private fun PriceHistoryChart(
                 val baseY = chartHeight + 20f
                 drawIntoCanvas { cnv ->
                     val nc = cnv.nativeCanvas
-                    if (xLabelTilted) nc.rotate(-45f, xx, baseY)
+                    if (xLabelTilted) {
+                        nc.save()  // 添加这一行！
+                        nc.rotate(-45f, xx, baseY)
+                    }
                     nc.drawText(p.date, xx, baseY + 20f, xLabelPaint)
-                    if (xLabelTilted) nc.restore()
+                    if (xLabelTilted) {
+                        nc.restore()
+                    }
                 }
             }
 

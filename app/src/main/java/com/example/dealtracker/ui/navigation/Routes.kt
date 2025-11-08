@@ -15,6 +15,14 @@ object Routes {
     const val PROFILE = "profile" // 个人页：账户、设置等
     const val DETAIL_BASE = "detail" // 商品详情页（带参数）
 
+    const val HISTORY = "history"      // 添加
+
+    const val SETTINGS = "settings"    // 添加
+
+    const val WISHLIST = "wishlist"    // 添加
+
+    const val EDIT_PROFILE = "edit_profile"
+
     /**
      * 生成商品详情页的完整路由字符串。
      *
