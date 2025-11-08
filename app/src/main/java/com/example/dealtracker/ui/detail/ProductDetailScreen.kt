@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.example.dealtracker.domain.model.Category
 import com.example.dealtracker.domain.model.PlatformPrice
 import com.example.dealtracker.domain.model.PricePoint
 import com.example.dealtracker.ui.detail.viewmodel.ProductViewModel
@@ -87,7 +88,8 @@ fun ProductDetailScreen(
                             platform = Platform.Amazon,
                             freeShipping = true,
                             inStock = true,
-                            imageUrl = ""
+                            imageUrl = "",
+                            category = Category.Electronics
                         )
 
                         if (wishList.any { it.pid == pid }) {

@@ -3,6 +3,7 @@ package com.example.dealtracker.ui.detail.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.dealtracker.data.remote.repository.PriceRepositoryImpl
+import com.example.dealtracker.domain.model.Category
 import com.example.dealtracker.domain.model.Platform
 import com.example.dealtracker.domain.model.Product
 import com.example.dealtracker.domain.model.PlatformPrice
@@ -24,9 +25,9 @@ class ProductViewModel : ViewModel() {
         platform = Platform.Amazon,
         freeShipping = true,
         inStock = true,
-        color = "White",
-        storage = "256G",
-        originalPrice = 1999.0,
+        // 可选信息（保留兼容）
+        information = "White",
+        category = Category.Electronics,
         imageUrl = ""
     )
 
