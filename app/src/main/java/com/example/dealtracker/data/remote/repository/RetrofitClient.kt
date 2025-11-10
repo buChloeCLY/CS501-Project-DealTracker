@@ -7,6 +7,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
+//连接 Node.js 后端（主数据库API）, 对应server.js, 端口8080，调用api接口DatabaseApiService
 /**
  * Retrofit 客户端配置
  */

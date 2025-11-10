@@ -99,7 +99,7 @@ fun HomeScreen(navController: NavHostController) {
                     onCategoryClick = { navController.navigateToRoot(Routes.DEALS) }
                 )
             }
-            item { DealsOfTheDaySection() }
+            item { DealsOfTheDaySection(navController = navController) }
         }
     }
 }
@@ -178,8 +178,9 @@ fun CategoryCard(category: String, modifier: Modifier = Modifier) {
     }
 }
 
+//  DealsOfTheDaySection 可点击 iPhone16 进入详情页
 @Composable
-fun DealsOfTheDaySection() {
+fun DealsOfTheDaySection(navController: NavHostController) {
     Text(
         text = "Deals of the Day",
         style = androidx.compose.material3.MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
@@ -189,7 +190,7 @@ fun DealsOfTheDaySection() {
     Spacer(Modifier.height(8.dp))
 
     val deals = listOf(
-        Triple("iPhone 16 Pro", "$999", "Amazon"),
+        Triple("iPhone 16", "$999", "Amazon"),
         Triple("Dyson Hair Dryer", "$399", "BestBuy"),
         Triple("Sony Headphones", "$249", "Walmart"),
         Triple("Nike Running Shoes", "$120", "Nike"),
@@ -205,7 +206,19 @@ fun DealsOfTheDaySection() {
                     .fillMaxWidth()
                     .height(90.dp)
                     .background(Color(0xFFF7F7F7), shape = RoundedCornerShape(12.dp))
-                    .padding(horizontal = 12.dp),
+                    .padding(horizontal = 12.dp)
+                    .clickable {
+                        if (name == "iPhone 16") {
+                            navController.navigate(
+                                Routes.detailRoute(
+                                    pid = 1,
+                                    name = name,
+                                    price = price.removePrefix("$").toDouble(),
+                                    rating = 4.8f
+                                )
+                            )
+                        }
+                    },
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
@@ -217,7 +230,11 @@ fun DealsOfTheDaySection() {
                 Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)) {
                     Text(name, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                     Text(price, color = Color(0xFF388E3C), fontSize = 15.sp)
-                    Text("Available on $site", color = Color.Gray, style = androidx.compose.material3.MaterialTheme.typography.bodySmall)
+                    Text(
+                        "Available on $site",
+                        color = Color.Gray,
+                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall
+                    )
                 }
             }
         }
