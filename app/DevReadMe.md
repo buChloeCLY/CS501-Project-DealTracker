@@ -79,7 +79,7 @@ com.example.dealtracker/
 │       ├── api/
 │       │   └── DatabaseApiService.kt        ← 新增
 │       ├── dto/
-│       │   └── ProductDto.kt                ✅ 已有，不需修改
+│       │   └── ProductDto.kt                已有，不需修改
 │       └── repository/
 │           ├── RetrofitClient.kt            ← 新增
 │           └── ProductRepositoryImpl.kt     ← 新增
@@ -109,9 +109,9 @@ node server.js
 
 应该看到：
 ```
-✅ Database connected successfully
-🚀 Server running on http://localhost:8080
-⏰ Daily update scheduled at 3:00 AM
+Database connected successfully
+Server running on http://localhost:8080
+Daily update scheduled at 3:00 AM
 
 步骤 3: 首次导入 20 个产品（已导入
 使用 Postman 或 curl：
@@ -140,15 +140,14 @@ generateInformation(product) 生成：
 "ASIN: B0XXXXXXX • Prime Eligible • Best Seller • 15,234 ratings • Sales: 10K+ • Delivery: Tomorrow"
 
 包含的信息：
-
-✅ ASIN（亚马逊产品编号）
-✅ Prime 会员资格
-✅ Best Seller 标识
-✅ Amazon's Choice 标识
-✅ 评价数量
-✅ 销量信息
-✅ 配送信息
-✅ 环保标识
+ASIN（亚马逊产品编号）
+Prime 会员资格
+Best Seller 标识
+Amazon's Choice 标识
+评价数量
+销量信息
+配送信息
+环保标识
 
 ┌───────────────────────────────────────────────────────────────┐
 │ Step 1 – One-time / Scheduled Data Import                     │

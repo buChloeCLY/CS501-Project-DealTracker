@@ -33,10 +33,10 @@ const pool = mysql.createPool({
 // 测试连接
 pool.getConnection()
     .then(connection => {
-        console.log('✅ Database connected successfully');
+        console.log('Database connected successfully');
         connection.release();
     })
-    .catch(err => console.error('❌ Database connection failed:', err));
+    .catch(err => console.error('Database connection failed:', err));
 
 // ===================================
 // RapidAPI 配置
@@ -70,14 +70,14 @@ async function fetchFromAmazonAPI(query, page = 1) {
         });
 
         const products = response.data.data?.products || [];
-        console.log(`✅ Fetched ${products.length} products from RapidAPI`);
+        console.log(`Fetched ${products.length} products from RapidAPI`);
         return products;
 
     } catch (error) {
         // 详细错误日志
         if (error.response) {
             // API 返回了错误响应
-            console.error('❌ RapidAPI error response:', {
+            console.error('RapidAPI error response:', {
                 status: error.response.status,
                 statusText: error.response.statusText,
                 data: error.response.data,
@@ -86,11 +86,11 @@ async function fetchFromAmazonAPI(query, page = 1) {
             throw new Error(`RapidAPI returned ${error.response.status}: ${JSON.stringify(error.response.data)}`);
         } else if (error.request) {
             // 请求发送了但没有收到响应
-            console.error('❌ No response from RapidAPI:', error.message);
+            console.error('No response from RapidAPI:', error.message);
             throw new Error(`No response from RapidAPI: ${error.message}`);
         } else {
             // 请求配置错误
-            console.error('❌ Request setup error:', error.message);
+            console.error('Request setup error:', error.message);
             throw error;
         }
     }
@@ -331,10 +331,10 @@ app.get('/api/products/price-range', async (req, res) => {
 // 管理员路由 - 数据导入和更新
 // ===================================
 
-// 🔥 首次导入 20 个产品（完整字段映射）
+// 首次导入 20 个产品（完整字段映射）
 app.post('/api/admin/import-initial', async (req, res) => {
     try {
-        console.log('🚀 Starting initial import (20 products with complete data)...');
+        console.log('Starting initial import (20 products with complete data)...');
 
         // 搜索热门产品类别
         const queries = ['electronics bestseller', 'phone'];
@@ -354,7 +354,7 @@ app.post('/api/admin/import-initial', async (req, res) => {
 
                     // 验证必填字段
                     if (!product.title || product.price <= 0) {
-                        console.log(`⚠️ Skipping invalid product: ${product.title}`);
+                        console.log(`Skipping invalid product: ${product.title}`);
                         continue;
                     }
 
@@ -383,10 +383,10 @@ app.post('/api/admin/import-initial', async (req, res) => {
                         category: product.category
                     });
 
-                    console.log(`✅ [${totalImported}] Imported: ${product.title.substring(0, 50)}... ($${product.price})`);
+                    console.log(`[${totalImported}] Imported: ${product.title.substring(0, 50)}... ($${product.price})`);
 
                 } catch (error) {
-                    console.error(`❌ Failed to import product:`, error.message);
+                    console.error(`Failed to import product:`, error.message);
                 }
             }
 
@@ -402,7 +402,7 @@ app.post('/api/admin/import-initial', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ Import failed:', error);
+        console.error('Import failed:', error);
         res.status(500).json({
             error: 'Import failed',
             details: error.message
@@ -410,15 +410,15 @@ app.post('/api/admin/import-initial', async (req, res) => {
     }
 });
 
-// 🔄 更新所有产品的价格和信息
+// 更新所有产品的价格和信息
 app.post('/api/admin/update-all-prices', async (req, res) => {
     try {
-        console.log('🔄 Starting price update for all products...');
+        console.log('Starting price update for all products...');
 
         // 获取数据库中的所有产品
         const [dbProducts] = await pool.query('SELECT pid, title FROM products');
 
-        console.log(`📦 Found ${dbProducts.length} products to update`);
+        console.log(`Found ${dbProducts.length} products to update`);
 
         let updatedCount = 0;
         let failedCount = 0;
@@ -462,10 +462,10 @@ app.post('/api/admin/update-all-prices', async (req, res) => {
                             newPrice: latestProduct.price
                         });
 
-                        console.log(`✅ Updated [${updatedCount}/${dbProducts.length}] ${dbProduct.title.substring(0, 40)}: $${latestProduct.price}`);
+                        console.log(`Updated [${updatedCount}/${dbProducts.length}] ${dbProduct.title.substring(0, 40)}: $${latestProduct.price}`);
                     }
                 } else {
-                    console.log(`⚠️ No results for: ${dbProduct.title}`);
+                    console.log(`No results for: ${dbProduct.title}`);
                 }
 
                 // 避免 API 限流（每个请求间隔 2 秒）
@@ -473,11 +473,11 @@ app.post('/api/admin/update-all-prices', async (req, res) => {
 
             } catch (error) {
                 failedCount++;
-                console.error(`❌ Failed to update ${dbProduct.title}:`, error.message);
+                console.error(`Failed to update ${dbProduct.title}:`, error.message);
             }
         }
 
-        console.log(`\n✅ Update completed: ${updatedCount} updated, ${failedCount} failed`);
+        console.log(`\nUpdate completed: ${updatedCount} updated, ${failedCount} failed`);
 
         res.json({
             success: true,
@@ -489,7 +489,7 @@ app.post('/api/admin/update-all-prices', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ Batch update failed:', error);
+        console.error('Batch update failed:', error);
         res.status(500).json({
             error: 'Update failed',
             details: error.message
@@ -501,8 +501,8 @@ app.post('/api/admin/update-all-prices', async (req, res) => {
 // 定时任务：每天凌晨 3 点更新所有产品
 // ===================================
 cron.schedule('0 3 * * *', async () => {
-    console.log('\n⏰ [Scheduled Task] Starting daily price update...');
-    console.log(`📅 ${new Date().toLocaleString()}`);
+    console.log('\n[Scheduled Task] Starting daily price update...');
+    console.log(`${new Date().toLocaleString()}`);
 
     try {
         const [dbProducts] = await pool.query('SELECT pid, title FROM products');
@@ -542,10 +542,10 @@ cron.schedule('0 3 * * *', async () => {
             }
         }
 
-        console.log(`✅ [Scheduled Task] Completed: ${updatedCount}/${dbProducts.length} products updated`);
+        console.log(`[Scheduled Task] Completed: ${updatedCount}/${dbProducts.length} products updated`);
 
     } catch (error) {
-        console.error('❌ [Scheduled Task] Failed:', error);
+        console.error('[Scheduled Task] Failed:', error);
     }
 }, {
     timezone: "America/New_York"
@@ -587,12 +587,12 @@ app.get('/api/test/transform', async (req, res) => {
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
     console.log('='.repeat(60));
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-    console.log(`📍 API Endpoint: http://localhost:${PORT}/api/products`);
-    console.log(`🔑 RapidAPI Key: ${RAPIDAPI_KEY ? '✅ Configured' : '❌ Missing'}`);
-    console.log(`⏰ Daily update scheduled at 3:00 AM EST`);
+    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`API Endpoint: http://localhost:${PORT}/api/products`);
+    console.log(`RapidAPI Key: ${RAPIDAPI_KEY ? 'Configured' : 'Missing'}`);
+    console.log(`Daily update scheduled at 3:00 AM EST`);
     console.log('='.repeat(60));
-    console.log('\n📝 Available Commands:');
+    console.log('\nAvailable Commands:');
     console.log('1. Import 20 products:');
     console.log('   POST http://localhost:8080/api/admin/import-initial\n');
     console.log('2. Update all prices:');

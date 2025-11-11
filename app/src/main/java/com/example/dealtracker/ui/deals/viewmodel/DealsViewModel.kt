@@ -55,7 +55,7 @@ class DealsViewModel : ViewModel() {
 
     private val TAG = "DealsViewModel"
 
-    // ✅ 使用 Repository
+    // 使用 Repository
     private val repository: ProductRepository = ProductRepositoryImpl()
 
     private val _products = MutableStateFlow<List<Product>>(emptyList())
@@ -119,17 +119,17 @@ class DealsViewModel : ViewModel() {
             _isLoading.value = true
             _error.value = null
 
-            Log.d(TAG, "📦 Loading products from backend...")
+            Log.d(TAG, "Loading products from backend...")
 
             repository.getAllProducts()
                 .onSuccess { productList ->
                     _products.value = productList
-                    Log.d(TAG, "✅ Loaded ${productList.size} products")
+                    Log.d(TAG, "Loaded ${productList.size} products")
                 }
                 .onFailure { exception ->
                     val errorMsg = exception.message ?: "Unknown error"
                     _error.value = errorMsg
-                    Log.e(TAG, "❌ Failed to load products: $errorMsg")
+                    Log.e(TAG, "Failed to load products: $errorMsg")
 
                     // 失败时使用备用数据（可选）
                     _products.value = getDummyProducts()
@@ -152,16 +152,16 @@ class DealsViewModel : ViewModel() {
             _isLoading.value = true
             _error.value = null
 
-            Log.d(TAG, "🔍 Searching: $query")
+            Log.d(TAG, "Searching: $query")
 
             repository.searchProducts(query)
                 .onSuccess { productList ->
                     _products.value = productList
-                    Log.d(TAG, "✅ Found ${productList.size} products")
+                    Log.d(TAG, "Found ${productList.size} products")
                 }
                 .onFailure { exception ->
                     _error.value = "Search failed: ${exception.message}"
-                    Log.e(TAG, "❌ Search error")
+                    Log.e(TAG, "Search error")
                 }
 
             _isLoading.value = false
@@ -182,7 +182,7 @@ class DealsViewModel : ViewModel() {
         return listOf(
             Product(
                 pid = 999,
-                title = "⚠️ Demo Product - API Not Connected",
+                title = "Demo Product - API Not Connected",
                 price = 99.0,
                 rating = 4.0f,
                 platform = Platform.Amazon,

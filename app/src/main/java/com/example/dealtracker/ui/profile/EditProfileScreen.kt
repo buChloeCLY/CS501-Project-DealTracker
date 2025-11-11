@@ -191,8 +191,8 @@ fun EditProfileScreen(navController: NavHostController) {
                             try {
                                 val uid = currentUser?.uid ?: 1
 
-                                println("🔍 Updating user $uid")
-                                println("🔍 Name: $name, Email: $email, Gender: $gender")
+                                println("Updating user $uid")
+                                println("Name: $name, Email: $email, Gender: $gender")
 
                                 val request = UserUpdateRequest(
                                     name = name,
@@ -203,9 +203,9 @@ fun EditProfileScreen(navController: NavHostController) {
 
                                 val response = RetrofitClient.userApi.updateUser(uid, request)
 
-                                println("🔍 Response code: ${response.code()}")
-                                println("🔍 Response body: ${response.body()}")
-                                println("🔍 Response error: ${response.errorBody()?.string()}")
+                                println("Response code: ${response.code()}")
+                                println("Response body: ${response.body()}")
+                                println("Response error: ${response.errorBody()?.string()}")
 
                                 isLoading = false
 
@@ -222,20 +222,20 @@ fun EditProfileScreen(navController: NavHostController) {
                                             )
                                         )
                                     }
-                                    println("✅ Update successful!")
+                                    println("Update successful!")
                                     showSuccessDialog = true
                                 } else {
                                     val errorBody = response.errorBody()?.string()
                                     errorMessage = response.body()?.error
                                         ?: errorBody
                                                 ?: "Failed to update profile. Please try again."
-                                    println("❌ Update failed: $errorMessage")
+                                    println("Update failed: $errorMessage")
                                     showErrorDialog = true
                                 }
                             } catch (e: Exception) {
                                 isLoading = false
                                 errorMessage = "Network error: ${e.message}"
-                                println("❌ Exception: ${e.message}")
+                                println("Exception: ${e.message}")
                                 e.printStackTrace()
                                 showErrorDialog = true
                             }
