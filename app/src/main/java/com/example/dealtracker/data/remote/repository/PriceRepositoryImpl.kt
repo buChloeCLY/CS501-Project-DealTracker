@@ -9,7 +9,7 @@ import com.example.dealtracker.domain.repository.PriceRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-// ✅ 价格仓库实现类
+// 价格仓库实现类
 class PriceRepositoryImpl : PriceRepository {
 
     private val api = RetrofitClient.priceApi
@@ -27,7 +27,7 @@ class PriceRepositoryImpl : PriceRepository {
                 }
             } catch (e: Exception) {
                 // TODO: 添加更详细的错误处理
-                println("❌ PriceRepository.getPlatformPrices error: ${e.message}")
+                println("PriceRepository.getPlatformPrices error: ${e.message}")
                 emptyList()
             }
         }
@@ -37,7 +37,7 @@ class PriceRepositoryImpl : PriceRepository {
         return withContext(Dispatchers.IO) {
             try {
                 val result: List<HistoryPriceDto> = api.getHistory(pid, days)
-                println("🔍 Repository getPriceHistory(pid=$pid) -> ${result.size} records")
+                println("Repository getPriceHistory(pid=$pid) -> ${result.size} records")
 
                 result.map { dto ->
                     PricePoint(
@@ -46,7 +46,7 @@ class PriceRepositoryImpl : PriceRepository {
                     )
                 }
             } catch (e: Exception) {
-                println("❌ PriceRepository.getPriceHistory error: ${e.message}")
+                println("PriceRepository.getPriceHistory error: ${e.message}")
                 emptyList()
             }
         }

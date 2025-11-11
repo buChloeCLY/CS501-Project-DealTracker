@@ -1,42 +1,16 @@
 package com.example.dealtracker.ui.detail
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Path
@@ -50,11 +24,15 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.example.dealtracker.domain.model.Category
 import com.example.dealtracker.domain.model.PlatformPrice
 import com.example.dealtracker.domain.model.PricePoint
 import com.example.dealtracker.ui.detail.viewmodel.ProductViewModel
 import com.example.dealtracker.ui.theme.AppColors
 import com.example.dealtracker.ui.theme.AppDimens
+import com.example.dealtracker.domain.model.Platform
+import com.example.dealtracker.domain.model.Product
+import com.example.dealtracker.ui.wishlist.WishListHolder
 import kotlinx.coroutines.launch
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -74,22 +52,22 @@ fun ProductDetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    // ✅ 修复 1 & 2: 添加正确的 collectAsState 调用
     val platformPricesState = viewModel.platformPrices.collectAsState()
     val priceHistoryState = viewModel.priceHistory.collectAsState()
+
+    // 收藏列表实时监听（防止状态不同步）
+    val wishList by WishListHolder.wishList.collectAsState()
 
     LaunchedEffect(pid) {
         viewModel.loadPlatformPrices(pid = pid)
         viewModel.loadPriceHistory(pid = pid, days = 7)
     }
 
-    // ✅ 修复 3 & 4: 使用 .value 获取实际值
     val platformPrices = platformPricesState.value
     val priceHistory = priceHistoryState.value
 
-    // ✅ 修复 5 & 6: 正确使用 lambda 参数
-    val currentPrice = platformPrices.minOfOrNull { platformPrice -> platformPrice.price } ?: price
-    val lowestPlatform = platformPrices.minByOrNull { platformPrice -> platformPrice.price }
+    val currentPrice = platformPrices.minOfOrNull { it.price } ?: price
+    val lowestPlatform = platformPrices.minByOrNull { it.price }
 
     Scaffold(
         topBar = {
@@ -101,8 +79,32 @@ fun ProductDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* TODO: Add tracking */ }) {
-                        Icon(Icons.Filled.Add, contentDescription = "Add")
+                    IconButton(onClick = {
+                        val product = Product(
+                            pid = pid,
+                            title = name,
+                            price = price,
+                            rating = rating,
+                            platform = Platform.Amazon,
+                            freeShipping = true,
+                            inStock = true,
+                            imageUrl = "",
+                            category = Category.Electronics
+                        )
+
+                        if (wishList.any { it.pid == pid }) {
+                            // 已存在于收藏夹
+                            scope.launch {
+                                snackbarHostState.showSnackbar("Already in Wish List")
+                            }
+                        } else {
+                            WishListHolder.add(product)
+                            scope.launch {
+                                snackbarHostState.showSnackbar("Added to Wish List")
+                            }
+                        }
+                    }) {
+                        Icon(Icons.Filled.Add, contentDescription = "Add to WishList")
                     }
                 }
             )
@@ -116,16 +118,15 @@ fun ProductDetailScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // ✅ 产品头部：显示最低价和来源
+            // 产品头部
             ProductHeader(
                 name = name,
                 currentPrice = currentPrice,
-                // ✅ 修复 7: 正确访问 platformName
                 lowestPlatform = lowestPlatform?.platformName,
                 hasData = platformPrices.isNotEmpty()
             )
 
-            // ✅ 历史价格图表
+            // 历史价格图表
             when {
                 priceHistory.loading -> {
                     Column(
@@ -150,10 +151,7 @@ fun ProductDetailScreen(
                                 .padding(16.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                "No price history available",
-                                color = AppColors.SecondaryText
-                            )
+                            Text("No price history available", color = AppColors.SecondaryText)
                         }
                     }
                 }
@@ -168,7 +166,7 @@ fun ProductDetailScreen(
                 }
             }
 
-            // ✅ 平台价格列表
+            // 平台价格列表
             if (platformPrices.isEmpty()) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -181,10 +179,7 @@ fun ProductDetailScreen(
                             .padding(16.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            "No platform prices available",
-                            color = AppColors.SecondaryText
-                        )
+                        Text("No platform prices available", color = AppColors.SecondaryText)
                     }
                 }
             } else {
@@ -221,7 +216,6 @@ private fun ProductHeader(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // ✅ 显示当前最低价
             if (hasData) {
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
@@ -284,7 +278,6 @@ private fun PriceHistoryChart(
             val chartWidth = size.width
             val stepCount = ((yMax - yMin) / step).toInt()
 
-            // prepare paints
             val yLabelPaint = android.graphics.Paint().apply {
                 color = AppColors.PrimaryText.toArgb()
                 textSize = 30f
@@ -299,55 +292,37 @@ private fun PriceHistoryChart(
                 isAntiAlias = true
             }
 
-            // === horizontal grid lines + y labels ===
             for (i in 0..stepCount) {
                 val yy = chartHeight - (i * (chartHeight / stepCount))
-
-                // grid
                 drawLine(
                     color = AppColors.ChartLine,
                     start = androidx.compose.ui.geometry.Offset(0f, yy),
                     end = androidx.compose.ui.geometry.Offset(chartWidth, yy),
                     strokeWidth = 1f
                 )
-
-                // label
                 val label = (yMin + step * i).toInt().toString()
                 drawIntoCanvas { cnv ->
-                    cnv.nativeCanvas.drawText(
-                        label,
-                        -24.dp.toPx(),
-                        yy + 8f,
-                        yLabelPaint
-                    )
+                    cnv.nativeCanvas.drawText(label, -24.dp.toPx(), yy + 8f, yLabelPaint)
                 }
             }
 
-            // === x labels ===
             val xCount = (data.size - 1).coerceAtLeast(1)
             data.forEachIndexed { i, p ->
                 val xx = i * (chartWidth / xCount)
                 val baseY = chartHeight + 20f
-
                 drawIntoCanvas { cnv ->
                     val nc = cnv.nativeCanvas
                     if (xLabelTilted) {
-                        nc.save()
+                        nc.save()  // 添加这一行！
                         nc.rotate(-45f, xx, baseY)
                     }
-                    nc.drawText(
-                        p.date,
-                        xx,
-                        baseY + 20f,
-                        xLabelPaint
-                    )
+                    nc.drawText(p.date, xx, baseY + 20f, xLabelPaint)
                     if (xLabelTilted) {
                         nc.restore()
                     }
                 }
             }
 
-            // === price line ===
             val path = Path()
             data.forEachIndexed { i, p ->
                 val x = i * (chartWidth / xCount)
@@ -357,11 +332,7 @@ private fun PriceHistoryChart(
                 if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
             }
 
-            drawPath(
-                path,
-                AppColors.ChartLine,
-                style = Stroke(lineStrokeWidth.toPx(), cap = StrokeCap.Round)
-            )
+            drawPath(path, AppColors.ChartLine, style = Stroke(lineStrokeWidth.toPx(), cap = StrokeCap.Round))
         }
     }
 }
@@ -388,24 +359,15 @@ private fun PlatformPriceCardList(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        row.platformName,
-                        fontWeight = FontWeight.Medium,
-                        color = AppColors.PrimaryText
-                    )
-                    Text(
-                        "$${"%.2f".format(row.price)}",
-                        fontWeight = FontWeight.Bold,
-                        color = AppColors.Accent
-                    )
+                    Text(row.platformName, fontWeight = FontWeight.Medium, color = AppColors.PrimaryText)
+                    Text("$${"%.2f".format(row.price)}", fontWeight = FontWeight.Bold, color = AppColors.Accent)
                 }
             }
         }
     }
 }
 
-// ---------------------- AXIS UTILITY ----------------------
-
+// --------- Utility ---------
 private data class AxisInfo(val min: Double, val max: Double, val step: Double)
 
 private fun niceAxis(minVal: Double, maxVal: Double, tickCount: Int): AxisInfo {

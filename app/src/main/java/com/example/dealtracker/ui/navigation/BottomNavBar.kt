@@ -11,7 +11,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 
-// ✅ 底部导航栏组件
+// 底部导航栏组件
 @Composable
 fun BottomNavBarRouteAware(
     currentRoute: String,

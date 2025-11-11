@@ -2,7 +2,7 @@ package com.example.dealtracker.data.remote.dto
 
 import com.google.gson.annotations.SerializedName
 
-// ✅ 网络价格数据传输对象
+// 网络价格数据传输对象
 data class PriceDto(
     @SerializedName("id")
     val id: Long,

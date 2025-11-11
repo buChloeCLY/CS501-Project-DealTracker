@@ -6,7 +6,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-// ✅ 应用字体排版系统
+// 应用字体排版系统
 val Typography = Typography(
     // 大标题
     titleLarge = TextStyle(

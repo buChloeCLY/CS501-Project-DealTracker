@@ -3,7 +3,7 @@ package com.example.dealtracker.ui.navigation
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 
-// ✅ 导航扩展函数
+// 导航扩展函数
 fun NavHostController.navigateToRoot(route: String) {
     val target = route.substringBefore("?")   // 防止带参数的路由干扰
 

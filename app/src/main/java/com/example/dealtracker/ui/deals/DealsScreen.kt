@@ -1,75 +1,35 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.example.dealtracker.ui.deals
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.ArrowDownward
-import androidx.compose.material.icons.outlined.ArrowUpward
-import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.StarBorder
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.RangeSlider
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SmallFloatingActionButton
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.compose.rememberNavController
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.dealtracker.domain.model.Platform
 import com.example.dealtracker.domain.model.Product
 import com.example.dealtracker.ui.deals.viewmodel.DealsViewModel
@@ -78,7 +38,10 @@ import com.example.dealtracker.ui.deals.viewmodel.SortOrder
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-@OptIn(ExperimentalMaterial3Api::class)
+// ===================================
+// 主屏幕
+// ===================================
+
 @Composable
 fun DealsScreen(
     showBack: Boolean = false,
@@ -87,13 +50,12 @@ fun DealsScreen(
     viewModel: DealsViewModel = viewModel()
 ) {
     val ui by viewModel.uiState.collectAsState()
+
     var filterSheetOpen by remember { mutableStateOf(false) }
     var sortSheetOpen by remember { mutableStateOf(false) }
+
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
-
-    val filterSheetState = rememberModalBottomSheetState()
-    val sortSheetState = rememberModalBottomSheetState()
 
     Scaffold(
         topBar = {
@@ -102,7 +64,7 @@ fun DealsScreen(
                 navigationIcon = {
                     if (showBack) {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                         }
                     }
                 }
@@ -110,60 +72,124 @@ fun DealsScreen(
         }
     ) { innerPadding ->
         Box(
-            modifier = Modifier
+            Modifier
                 .padding(innerPadding)
                 .fillMaxSize()
         ) {
-            Column(Modifier.fillMaxSize()) {
-                // Filter / Sort chips
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+            // 加载状态
+            if (ui.isLoading) {
+                Column(
+                    modifier = Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    AssistChip(
-                        onClick = { filterSheetOpen = true },
-                        label = { Text("Filter") }
-                    )
-                    AssistChip(
-                        onClick = { sortSheetOpen = true },
-                        label = { Text("Sort") }
-                    )
+                    CircularProgressIndicator()
+                    Spacer(Modifier.height(16.dp))
+                    Text("Loading products from database...")
                 }
-
-                // Product list
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    state = listState
+            }
+            // 错误状态
+            else if (ui.error != null) {
+                Column(
+                    modifier = Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    items(ui.filteredSorted) { product ->
-                        ProductCard(
-                            product = product,
-                            onCompareClick = onCompareClick
-                        )
+                    Icon(
+                        Icons.Filled.Error,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        "Failed to load products",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        ui.error ?: "Unknown error",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 32.dp)
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Button(onClick = { viewModel.refreshProducts() }) {
+                        Icon(Icons.Filled.Refresh, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Retry")
                     }
                 }
             }
+            // 产品列表
+            else {
+                Column(Modifier.fillMaxSize()) {
+                    // Filter / Sort 按钮
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        AssistChip(
+                            onClick = { filterSheetOpen = true },
+                            label = { Text("Filter") },
+                            leadingIcon = { Icon(Icons.Outlined.FilterList, null) }
+                        )
+                        AssistChip(
+                            onClick = { sortSheetOpen = true },
+                            label = { Text("Sort") },
+                            leadingIcon = { Icon(Icons.Outlined.Sort, null) }
+                        )
+                        AssistChip(
+                            onClick = { viewModel.refreshProducts() },
+                            label = { Text("Refresh") },
+                            leadingIcon = { Icon(Icons.Filled.Refresh, null) }
+                        )
+                    }
 
-            // Scroll to top FAB
-            val showScrollTop by remember {
-                derivedStateOf { listState.firstVisibleItemIndex > 4 }
-            }
-            AnimatedVisibility(
-                visible = showScrollTop,
-                enter = fadeIn(),
-                exit = fadeOut(),
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 16.dp, bottom = 16.dp)
-            ) {
-                SmallFloatingActionButton(
-                    onClick = { scope.launch { listState.animateScrollToItem(0) } }
+                    // 产品列表
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        state = listState
+                    ) {
+                        // 产品数量提示
+                        item {
+                            Text(
+                                "${ui.filteredSorted.size} products found",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        items(ui.filteredSorted) { product ->
+                            ProductCard(
+                                product = product,
+                                onCompareClick = onCompareClick
+                            )
+                        }
+                    }
+                }
+
+                // 置顶按钮
+                val showScrollTop by remember {
+                    derivedStateOf { listState.firstVisibleItemIndex > 4 }
+                }
+                AnimatedVisibility(
+                    visible = showScrollTop,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = 16.dp)
                 ) {
-                    Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Back to top")
+                    SmallFloatingActionButton(
+                        onClick = { scope.launch { listState.animateScrollToItem(0) } }
+                    ) {
+                        Icon(Icons.Filled.KeyboardArrowUp, "Back to top")
+                    }
                 }
             }
         }
@@ -171,289 +197,143 @@ fun DealsScreen(
 
     // Filter Sheet
     if (filterSheetOpen) {
-        ModalBottomSheet(
-            onDismissRequest = { filterSheetOpen = false },
-            sheetState = filterSheetState
-        ) {
-            FilterSheetContent(
-                priceMin = ui.filters.priceMin,
-                priceMax = ui.filters.priceMax,
-                onPriceChange = { min, max -> viewModel.setPrice(min, max) },
-                chooseAmazon = ui.filters.chooseAmazon,
-                chooseBestBuy = ui.filters.chooseBestBuy,
-                onPlatformToggle = { p, checked ->
-                    when (p) {
-                        Platform.Amazon -> viewModel.toggleAmazon(checked)
-                        Platform.BestBuy -> viewModel.toggleBestBuy(checked)
-                    }
-                },
-                onlyFreeShipping = ui.filters.onlyFreeShipping,
-                onOnlyFreeShippingChange = { viewModel.setOnlyFreeShipping(it) },
-                onlyInStock = ui.filters.onlyInStock,
-                onOnlyInStockChange = { viewModel.setOnlyInStock(it) },
-                onClear = { viewModel.clearFilters() },
-                onApply = { filterSheetOpen = false }
-            )
-        }
+        FilterSheet(
+            priceMin = ui.filters.priceMin,
+            priceMax = ui.filters.priceMax,
+            onPriceChange = { min, max -> viewModel.setPrice(min, max) },
+            chooseAmazon = ui.filters.chooseAmazon,
+            chooseBestBuy = ui.filters.chooseBestBuy,
+            chooseWalmart = ui.filters.chooseWalmart,
+            onPlatformToggle = { p, checked ->
+                when (p) {
+                    Platform.Amazon -> viewModel.toggleAmazon(checked)
+                    Platform.BestBuy -> viewModel.toggleBestBuy(checked)
+                    Platform.Walmart -> viewModel.toggleWalmart(checked)
+                }
+            },
+            onlyFreeShipping = ui.filters.onlyFreeShipping,
+            onOnlyFreeShippingChange = { viewModel.setOnlyFreeShipping(it) },
+            onlyInStock = ui.filters.onlyInStock,
+            onOnlyInStockChange = { viewModel.setOnlyInStock(it) },
+            onClear = { viewModel.clearFilters() },
+            onApply = { filterSheetOpen = false },
+            onDismiss = { filterSheetOpen = false }
+        )
     }
 
     // Sort Sheet
     if (sortSheetOpen) {
-        ModalBottomSheet(
-            onDismissRequest = { sortSheetOpen = false },
-            sheetState = sortSheetState
-        ) {
-            SortSheetContent(
-                sortField = ui.sort.field,
-                sortOrder = ui.sort.order,
-                onFieldChange = { viewModel.setSortField(it) },
-                onOrderChange = { viewModel.setSortOrder(it) },
-                onDismiss = { sortSheetOpen = false }
-            )
-        }
+        SortSheet(
+            sortField = ui.sort.field,
+            sortOrder = ui.sort.order,
+            onFieldChange = { viewModel.setSortField(it) },
+            onOrderChange = { viewModel.setSortOrder(it) },
+            onDismiss = { sortSheetOpen = false }
+        )
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun FilterSheetContent(
-    priceMin: Float,
-    priceMax: Float,
-    onPriceChange: (Float, Float) -> Unit,
-    chooseAmazon: Boolean,
-    chooseBestBuy: Boolean,
-    onPlatformToggle: (Platform, Boolean) -> Unit,
-    onlyFreeShipping: Boolean,
-    onOnlyFreeShippingChange: (Boolean) -> Unit,
-    onlyInStock: Boolean,
-    onOnlyInStockChange: (Boolean) -> Unit,
-    onClear: () -> Unit,
-    onApply: () -> Unit
-) {
-    Column(Modifier.padding(16.dp)) {
-        Text("Filter", style = MaterialTheme.typography.titleLarge)
-        Spacer(Modifier.height(12.dp))
-
-        // Price Range
-        Text(
-            "Price Range",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold
-        )
-        Spacer(Modifier.height(8.dp))
-
-        var tmpRange by remember { mutableStateOf(priceMin..priceMax) }
-        Text(
-            "$${tmpRange.start.roundToInt()} - $${tmpRange.endInclusive.roundToInt()}",
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(8.dp))
-        RangeSlider(
-            value = tmpRange,
-            onValueChange = { range ->
-                val start = range.start.coerceIn(0f, 2000f)
-                val end = range.endInclusive.coerceIn(0f, 2000f)
-                tmpRange = start..end
-            },
-            valueRange = 0f..2000f,
-            steps = 19
-        )
-
-        Spacer(Modifier.height(16.dp))
-
-        // Platform
-        Text(
-            "Platform",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold
-        )
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(
-                selected = chooseAmazon,
-                onClick = { onPlatformToggle(Platform.Amazon, !chooseAmazon) },
-                label = { Text("Amazon") }
-            )
-            FilterChip(
-                selected = chooseBestBuy,
-                onClick = { onPlatformToggle(Platform.BestBuy, !chooseBestBuy) },
-                label = { Text("BestBuy") }
-            )
-        }
-        Spacer(Modifier.height(16.dp))
-
-        // Free shipping / Stock
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Free Shipping", style = MaterialTheme.typography.titleMedium)
-            Switch(
-                checked = onlyFreeShipping,
-                onCheckedChange = onOnlyFreeShippingChange
-            )
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("In Stock", style = MaterialTheme.typography.titleMedium)
-            Switch(
-                checked = onlyInStock,
-                onCheckedChange = onOnlyInStockChange
-            )
-        }
-
-        Spacer(Modifier.height(24.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
-        ) {
-            TextButton(onClick = onClear) { Text("Clear") }
-            Spacer(Modifier.width(8.dp))
-            Button(onClick = {
-                onPriceChange(tmpRange.start, tmpRange.endInclusive)
-                onApply()
-            }) {
-                Text("Apply")
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SortSheetContent(
-    sortField: SortField,
-    sortOrder: SortOrder,
-    onFieldChange: (SortField) -> Unit,
-    onOrderChange: (SortOrder) -> Unit,
-    onDismiss: () -> Unit
-) {
-    Column(Modifier.padding(16.dp)) {
-        Text("Sort", style = MaterialTheme.typography.titleLarge)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "Choose a field and order",
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(16.dp))
-
-        // Field selection
-        Column {
-            SortField.values().forEach { f ->
-                ListItem(
-                    headlineContent = { Text(f.label) },
-                    trailingContent = {
-                        RadioButton(
-                            selected = (sortField == f),
-                            onClick = { onFieldChange(f) }
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                HorizontalDivider()
-            }
-        }
-
-        Spacer(Modifier.height(12.dp))
-        Text("Order", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(8.dp))
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(
-                selected = (sortOrder == SortOrder.Asc),
-                onClick = { onOrderChange(SortOrder.Asc) },
-                label = { Text("Low to High") },
-                leadingIcon = {
-                    Icon(
-                        Icons.Outlined.ArrowUpward,
-                        contentDescription = null
-                    )
-                }
-            )
-            FilterChip(
-                selected = (sortOrder == SortOrder.Desc),
-                onClick = { onOrderChange(SortOrder.Desc) },
-                label = { Text("High to Low") },
-                leadingIcon = {
-                    Icon(
-                        Icons.Outlined.ArrowDownward,
-                        contentDescription = null
-                    )
-                }
-            )
-        }
-
-        Spacer(Modifier.height(16.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
-        ) {
-            Button(onClick = onDismiss) { Text("Done") }
-        }
-        Spacer(Modifier.height(8.dp))
-    }
-}
+// ===================================
+// 产品卡片（带图片）
+// ===================================
 
 @Composable
 private fun ProductCard(
     product: Product,
     onCompareClick: (Product) -> Unit
 ) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.padding(16.dp)) {
-            // Product image placeholder
-            Box(
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = { onCompareClick(product) }
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // 🖼️ 产品图片
+            ProductImage(
+                imageUrl = product.imageUrl,
+                title = product.title,
+                modifier = Modifier.size(100.dp)
+            )
+
+            // 产品信息
+            Column(
                 modifier = Modifier
-                    .size(72.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFDDEEE0)),
-                contentAlignment = Alignment.Center
+                    .weight(1f)
+                    .fillMaxHeight(),
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.Image,
-                    contentDescription = null
-                )
-            }
-
-            Spacer(Modifier.width(16.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
+                // 标题
                 Text(
-                    product.title,
+                    text = product.title,
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.SemiBold
                     ),
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
 
+                Spacer(Modifier.height(4.dp))
+
+                // 评分
                 StarsRow(rating = product.rating)
 
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(8.dp))
+
+                // 价格
                 Text(
-                    product.priceText,
-                    style = MaterialTheme.typography.titleSmall
+                    text = product.priceText,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
                 )
 
-                // Source information
-                Text(
-                    product.sourceText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                // 来源信息
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // 平台标签
+                    SuggestionChip(
+                        onClick = {},
+                        label = {
+                            Text(
+                                product.platform.name,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                    )
+
+                    // 包邮图标
+                    if (product.freeShipping) {
+                        Icon(
+                            Icons.Outlined.LocalShipping,
+                            contentDescription = "Free Shipping",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    // 有货图标
+                    if (product.inStock) {
+                        Icon(
+                            Icons.Filled.CheckCircle,
+                            contentDescription = "In Stock",
+                            modifier = Modifier.size(16.dp),
+                            tint = Color(0xFF4CAF50)
+                        )
+                    }
+                }
 
                 Spacer(Modifier.height(8.dp))
-                Button(
+
+                // 比较按钮
+                OutlinedButton(
                     onClick = { onCompareClick(product) },
-                    modifier = Modifier.widthIn(min = 120.dp)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("COMPARE")
                 }
@@ -462,32 +342,252 @@ private fun ProductCard(
     }
 }
 
+// ===================================
+// 产品图片组件（支持加载、错误、占位）
+// ===================================
+
 @Composable
-private fun StarsRow(rating: Float, max: Int = 5) {
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        repeat(max) { idx ->
-            val filled = idx < rating.toInt()
-            val iconVector = if (filled) Icons.Filled.Star else Icons.Outlined.StarBorder
+private fun ProductImage(
+    imageUrl: String,
+    title: String,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+        contentAlignment = Alignment.Center
+    ) {
+        if (imageUrl.isNotBlank()) {
+            // 使用 SubcomposeAsyncImage 支持自定义 loading 和 error 状态
+            coil.compose.SubcomposeAsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(imageUrl)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                loading = {
+                    // 加载中显示进度条
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(32.dp),
+                            strokeWidth = 3.dp
+                        )
+                    }
+                },
+                error = {
+                    // 加载失败显示占位图标
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Outlined.BrokenImage,
+                            contentDescription = "Image not available",
+                            modifier = Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            )
+        } else {
+            // 没有图片时显示占位图标
             Icon(
-                imageVector = iconVector,
-                contentDescription = null,
-                tint = if (filled) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.outline,
-                modifier = Modifier.size(16.dp)
+                Icons.Outlined.Image,
+                contentDescription = "No image",
+                modifier = Modifier.size(48.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
 }
 
-@Preview(showBackground = true, widthDp = 420)
+// ===================================
+// 评分星星
+// ===================================
+
 @Composable
-private fun DealsScreenPreview() {
-    val navController = rememberNavController()
-    MaterialTheme {
-        DealsScreen(
-            onCompareClick = { product ->
-                // Preview navigation
-            }
+private fun StarsRow(rating: Float, max: Int = 5) {
+    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        repeat(max) { idx ->
+            val filled = idx < rating.toInt()
+            Icon(
+                imageVector = if (filled) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                contentDescription = null,
+                tint = if (filled) Color(0xFFFFB300) else MaterialTheme.colorScheme.outline,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+        Spacer(Modifier.width(4.dp))
+        Text(
+            text = "%.1f".format(rating),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+// ===================================
+// Filter Sheet（保持不变）
+// ===================================
+
+@Composable
+private fun FilterSheet(
+    priceMin: Float,
+    priceMax: Float,
+    onPriceChange: (Float, Float) -> Unit,
+    chooseAmazon: Boolean,
+    chooseBestBuy: Boolean,
+    chooseWalmart: Boolean,
+    onPlatformToggle: (Platform, Boolean) -> Unit,
+    onlyFreeShipping: Boolean,
+    onOnlyFreeShippingChange: (Boolean) -> Unit,
+    onlyInStock: Boolean,
+    onOnlyInStockChange: (Boolean) -> Unit,
+    onClear: () -> Unit,
+    onApply: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.padding(16.dp)) {
+            Text("Filter", style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.height(12.dp))
+
+            // Price Range
+            Text("Price Range", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+
+            var tmpRange by remember { mutableStateOf(priceMin..priceMax) }
+            Text(
+                "$${tmpRange.start.roundToInt()} - $${tmpRange.endInclusive.roundToInt()}",
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(8.dp))
+            RangeSlider(
+                value = tmpRange,
+                onValueChange = { tmpRange = it.start.coerceIn(0f, 2000f)..it.endInclusive.coerceIn(0f, 2000f) },
+                valueRange = 0f..2000f,
+                steps = 19
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            // Platform
+            Text("Platform", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = chooseAmazon,
+                    onClick = { onPlatformToggle(Platform.Amazon, !chooseAmazon) },
+                    label = { Text("Amazon") }
+                )
+                FilterChip(
+                    selected = chooseBestBuy,
+                    onClick = { onPlatformToggle(Platform.BestBuy, !chooseBestBuy) },
+                    label = { Text("BestBuy") }
+                )
+                FilterChip(
+                    selected = chooseWalmart,
+                    onClick = { onPlatformToggle(Platform.Walmart, !chooseWalmart) },
+                    label = { Text("Walmart") }
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+
+            // Free shipping / Stock
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Free Shipping", style = MaterialTheme.typography.titleMedium)
+                Switch(checked = onlyFreeShipping, onCheckedChange = onOnlyFreeShippingChange)
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("In Stock", style = MaterialTheme.typography.titleMedium)
+                Switch(checked = onlyInStock, onCheckedChange = onOnlyInStockChange)
+            }
+
+            Spacer(Modifier.height(24.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onClear) { Text("Clear") }
+                Spacer(Modifier.width(8.dp))
+                Button(onClick = {
+                    onPriceChange(tmpRange.start, tmpRange.endInclusive)
+                    onApply()
+                }) { Text("Apply") }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+// ===================================
+// Sort Sheet（保持不变）
+// ===================================
+
+@Composable
+private fun SortSheet(
+    sortField: SortField,
+    sortOrder: SortOrder,
+    onFieldChange: (SortField) -> Unit,
+    onOrderChange: (SortOrder) -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.padding(16.dp)) {
+            Text("Sort", style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.height(16.dp))
+
+            Column {
+                SortField.values().forEach { f ->
+                    ListItem(
+                        headlineContent = { Text(f.label) },
+                        trailingContent = {
+                            RadioButton(
+                                selected = (sortField == f),
+                                onClick = { onFieldChange(f) }
+                            )
+                        }
+                    )
+                    HorizontalDivider()
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+            Text("Order", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = (sortOrder == SortOrder.Asc),
+                    onClick = { onOrderChange(SortOrder.Asc) },
+                    label = { Text("Low to High") },
+                    leadingIcon = { Icon(Icons.Outlined.ArrowUpward, null) }
+                )
+                FilterChip(
+                    selected = (sortOrder == SortOrder.Desc),
+                    onClick = { onOrderChange(SortOrder.Desc) },
+                    label = { Text("High to Low") },
+                    leadingIcon = { Icon(Icons.Outlined.ArrowDownward, null) }
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Button(onClick = onDismiss) { Text("Done") }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
     }
 }
