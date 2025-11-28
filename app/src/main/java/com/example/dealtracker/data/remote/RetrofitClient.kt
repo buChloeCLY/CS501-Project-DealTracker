@@ -11,7 +11,6 @@ object RetrofitClient {
     // TODO: 根据实际环境切换base URL
     private const val BASE_URL = "http://10.0.0.133:5001/" // 开发环境
 //    private const val BASE_URL = "http://10.0.0.231:5001/" // cly开发环境
-
     // 懒加载API实例
     val priceApi: PriceApi by lazy {
         createRetrofit().create(PriceApi::class.java)
