@@ -1,81 +1,140 @@
 package com.example.dealtracker.ui.home
 
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardVoice
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import com.example.dealtracker.ui.home.viewmodel.HomeViewModel
 import com.example.dealtracker.ui.navigation.Routes
 import com.example.dealtracker.ui.navigation.navigateToRoot
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(navController: NavHostController) {
+fun HomeScreen(navController: NavHostController, homeViewModel: HomeViewModel = viewModel()) {
+
+    // 监听 ViewModel 的 StateFlow
+    val searchQuery by homeViewModel.searchQuery.collectAsState()
+
+    // 控制是否进入搜索模式
     var isSearchMode by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
+
+    val context = LocalContext.current
+
+    /** ---------- 语音识别 Launcher ---------- */
+    val voiceLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                val text = result.data
+                    ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                    ?.firstOrNull() ?: ""
+                homeViewModel.applyVoiceResult(text)
+            }
+        }
+
+    /** ---------- 回到顶部按钮滚动控制 ---------- */
+    val listState = rememberLazyListState()
+    val showToTop by remember {
+        derivedStateOf { listState.firstVisibleItemIndex > 2 }
+    }
+
+// 用于点击事件中启动协程
+    val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
+        floatingActionButton = {
+            if (showToTop) {
+                FloatingActionButton(
+                    onClick = {
+                        // 在点击事件中使用 coroutineScope.launch
+                        coroutineScope.launch {
+                            listState.animateScrollToItem(0)
+                        }
+                    },
+                    containerColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Text("Top", color = Color.White)
+                }
+            }
+        },
         topBar = {
             TopAppBar(
                 title = {
                     if (!isSearchMode) {
                         Text("Home", fontWeight = FontWeight.Bold)
                     } else {
-                        TextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            placeholder = { Text("Search products...") },
-                            singleLine = true,
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                disabledContainerColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent
+                        /** ---------- 搜索框输入 ---------- */
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            /** ---------- 语音按钮  ---------- */
+                            IconButton(onClick = {
+                                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                    putExtra(
+                                        RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                                        RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+                                    )
+                                }
+                                voiceLauncher.launch(intent)
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardVoice,
+                                    contentDescription = "Voice Search",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+
+                            /** ---------- 输入框 ---------- */
+                            TextField(
+                                value = searchQuery,
+                                onValueChange = { homeViewModel.updateQuery(it) },
+                                modifier = Modifier.weight(1f),
+                                placeholder = { Text("Search products...") },
+                                singleLine = true,
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent,
+                                    disabledContainerColor = Color.Transparent,
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent
+                                )
                             )
-                        )
+                        }
                     }
                 },
                 actions = {
+                    /** 搜索按钮 / 关闭按钮 */
                     IconButton(onClick = {
                         if (isSearchMode && searchQuery.isNotEmpty()) {
+                            // 执行搜索
                             navController.navigateToRoot(Routes.DEALS)
                         } else {
                             isSearchMode = !isSearchMode
-                            if (!isSearchMode) searchQuery = ""
+                            if (!isSearchMode) homeViewModel.updateQuery("")
                         }
                     }) {
                         Icon(
@@ -87,23 +146,30 @@ fun HomeScreen(navController: NavHostController) {
             )
         }
     ) { innerPadding ->
+
+        /** ---------- 列表内容 ---------- */
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                CategorySection(
-                    onCategoryClick = { navController.navigateToRoot(Routes.DEALS) }
-                )
+                CategorySection(onCategoryClick = {
+                    navController.navigateToRoot(Routes.DEALS)
+                })
             }
-            item { DealsOfTheDaySection(navController = navController) }
+
+            item {
+                DealsOfTheDaySection(navController = navController)
+            }
         }
     }
 }
 
+/* ----------------------------- 分类部分 ----------------------------- */
 @Composable
 fun CategorySection(onCategoryClick: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
@@ -112,21 +178,20 @@ fun CategorySection(onCategoryClick: () -> Unit) {
         "Electronics", "Beauty", "Home", "Food", "Fashion", "Sports",
         "Books", "Toys", "Health", "Outdoors", "Office", "Pets"
     )
-
     val displayedCategories = if (expanded) allCategories else allCategories.take(6)
 
     Column {
         Text(
             text = "Categories",
-            style = androidx.compose.material3.MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(Modifier.height(8.dp))
 
-        for (row in displayedCategories.chunked(2)) {
+        displayedCategories.chunked(2).forEach { row ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 row.forEach { category ->
                     CategoryCard(
@@ -142,7 +207,7 @@ fun CategorySection(onCategoryClick: () -> Unit) {
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+            horizontalArrangement = Arrangement.Center
         ) {
             Box(
                 modifier = Modifier
@@ -162,6 +227,7 @@ fun CategorySection(onCategoryClick: () -> Unit) {
     }
 }
 
+/* ----------------------------- 单个分类卡片 ----------------------------- */
 @Composable
 fun CategoryCard(category: String, modifier: Modifier = Modifier) {
     Box(
@@ -170,23 +236,18 @@ fun CategoryCard(category: String, modifier: Modifier = Modifier) {
             .background(Color(0xFFF2F2F2), shape = RoundedCornerShape(12.dp)),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = category,
-            fontWeight = FontWeight.Medium,
-            fontSize = 16.sp
-        )
+        Text(text = category, fontWeight = FontWeight.Medium, fontSize = 16.sp)
     }
 }
 
-//  DealsOfTheDaySection 可点击 iPhone16 进入详情页
+/* ----------------------------- Deals Of The Day ----------------------------- */
 @Composable
 fun DealsOfTheDaySection(navController: NavHostController) {
     Text(
         text = "Deals of the Day",
-        style = androidx.compose.material3.MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
         modifier = Modifier.fillMaxWidth()
     )
-
     Spacer(Modifier.height(8.dp))
 
     val deals = listOf(
@@ -199,7 +260,7 @@ fun DealsOfTheDaySection(navController: NavHostController) {
         Triple("MacBook Air M3", "$1199", "Apple"),
     )
 
-    Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         deals.forEach { (name, price, site) ->
             Row(
                 modifier = Modifier
@@ -227,13 +288,14 @@ fun DealsOfTheDaySection(navController: NavHostController) {
                         .background(Color(0xFFDDEEE0), RoundedCornerShape(8.dp))
                 )
                 Spacer(Modifier.width(12.dp))
-                Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)) {
+
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(name, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                     Text(price, color = Color(0xFF388E3C), fontSize = 15.sp)
                     Text(
                         "Available on $site",
                         color = Color.Gray,
-                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodySmall
                     )
                 }
             }
