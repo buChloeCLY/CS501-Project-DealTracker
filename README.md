@@ -192,7 +192,7 @@ Run `app` in Android Studio.
 
 ---
 
-###  Progress We Made
+###  Progress We've Made
 
 - **Multi-platform price integration**
   - RapidAPI integration for BestBuy and Walmart, in addition to Amazon
@@ -318,6 +318,40 @@ Run `app` in Android Studio.
 ├── WishListModel.kt
 └── WishListViewModel.kt
 ```
+
+## Testing and debugging
+### API debugging
+I first added log statements in the code and inspected both the Android Logcat output and the backend server logs.
+![img1.png](img1.png)
+Then I used the RapidAPI console and Postman to manually test each endpoint to confirm that the backend was parsing and returning fields correctly.
+![img2.png](img2.png)
+Based on these experiments, I drew conclusions from the responses: for example, an HTTP status code `429` indicates that our free quota on RapidAPI has been exhausted and the service stops responding; a timeout error shows that the API is too slow, in which case we should consider removing or relaxing the timeout limit.
+### Backend debugging
+My Deals page started returning a 500 error, and Logcat showed the following messages:
+
+```text
+2025-12-02 10:21:14.158 15681-15716 ProductRepository       com.example.dealtracker              E  API Error: 500 - Internal Server Error
+2025-12-02 10:21:14.225 15681-15681 DealsViewModel          com.example.dealtracker              E  Failed to load products: API Error: 500 - Internal Server Error
+```
+
+This indicated a backend issue. After checking the server logs, I found the following error:
+
+```text
+Get products error: Error: read ECONNRESET
+    at PromisePool.query (C:\Users\JOY\Desktop\CS501\project\CS501-Project-DealTracker\backend\node_modules\mysql2\lib\promise\pool.js:36:22)       
+    at C:\Users\JOY\Desktop\CS501\project\CS501-Project-DealTracker\backend\server.js:900:39
+    ...
+  code: 'ECONNRESET',
+  errno: -4077,
+  sql: undefined,
+  sqlState: undefined,
+  sqlMessage: undefined
+}
+```
+
+`ECONNRESET` means that the database connection was reset, which usually happens when a query takes too long and the database times out. In my case, the `/api/products` route was performing additional joins on the `price` table for every product, making the query too complex and slow. Since the `products` table already stores the current lowest price for each item, I simplified the endpoint by removing the extra `price` lookups, which resolved the timeout and the 500 error.
+
+
 ## commit, code quality
 - all commits of these days are under branch "demo2"
 
