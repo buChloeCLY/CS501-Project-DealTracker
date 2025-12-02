@@ -1,4 +1,4 @@
-package com.example.dealtracker.domain.model
+package com.example.dealtracker.ui.wishlist.viewmodel
 
 import com.google.gson.annotations.SerializedName
 

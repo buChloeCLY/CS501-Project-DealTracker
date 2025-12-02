@@ -1,27 +1,35 @@
 package com.example.dealtracker.data.remote.dto
 
-import com.google.gson.annotations.SerializedName
-
-// 网络价格数据传输对象
+/**
+ * 价格 DTO - 用于 /price/:pid 端点
+ */
 data class PriceDto(
-    @SerializedName("id")
-    val id: Long,
-
-    @SerializedName("pid")
-    val pid: Long,
-
-    @SerializedName("price")
-    val price: Double,
-
-    @SerializedName("date")
-    val date: String,
-
-    @SerializedName("platform")
+    val id: Int,
+    val pid: Int,
     val platform: String,
+    val price: Double,
+    val free_shipping: Boolean,
+    val in_stock: Boolean,
+    val date: String,
+    val link: String?
+)
 
-    @SerializedName("idInPlatform")
-    val idInPlatform: String,
+/**
+ * 🆕 最低价信息 DTO - 用于 /api/products/:pid/lowest-price 端点
+ */
+data class LowestPriceDto(
+    val lowestPrice: Double,
+    val platforms: List<PlatformPriceInfo>,  // 所有最低价平台
+    val allPrices: List<PlatformPriceInfo>   // 所有平台价格
+)
 
-    @SerializedName("link")
-    val link: String
+/**
+ * 平台价格详情
+ */
+data class PlatformPriceInfo(
+    val platform: String,
+    val price: Double,
+    val freeShipping: Boolean,
+    val inStock: Boolean,
+    val link: String?
 )

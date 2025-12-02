@@ -1,9 +1,9 @@
-package com.example.dealtracker.ui.auth
+package com.example.dealtracker.ui.profile
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.dealtracker.data.local.UserPreferences
-import com.example.dealtracker.data.remote.RetrofitClient
+import com.example.dealtracker.data.remote.repository.RetrofitClient
 import com.example.dealtracker.data.remote.api.LoginRequest
 import com.example.dealtracker.data.remote.api.RegisterRequest
 import com.example.dealtracker.domain.UserManager

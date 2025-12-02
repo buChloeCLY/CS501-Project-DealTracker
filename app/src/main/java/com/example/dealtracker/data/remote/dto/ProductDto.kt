@@ -5,35 +5,44 @@ import com.example.dealtracker.domain.model.Platform
 import com.example.dealtracker.domain.model.Product
 
 /**
- * 产品数据传输对象
- * 用于API响应和数据库映射
+ * 产品数据传输对象 v2.0
+ * 支持 short_title 和多平台价格
  */
 data class ProductDTO(
     val pid: Int,
-    val title: String,
-    val price: Double,
-    val rating: Float,
-    val platform: String,        // API返回字符串格式
-    val freeShipping: Boolean,
-    val inStock: Boolean,
-    val information: String?,
-    val category: String,         // API返回字符串格式
-    val imageUrl: String?
+    val short_title: String?,      // 🆕 短标题（关键词提取后）
+    val title: String,              // 完整标题
+    val price: Double,              // 当前最低价
+    val rating: Float,              // 评分（只用 Amazon）
+    val platform: String,           // 当前最低价平台
+    val freeShipping: Boolean,      // 包邮（最低价平台的）
+    val inStock: Boolean,           // 有货（最低价平台的）
+    val information: String?,       // 详细信息
+    val category: String,           // 分类
+    val imageUrl: String?           // 图片 URL
 ) {
     /**
      * 转换为领域模型
      */
     fun toProduct(): Product {
+        // 处理 platform 字段（可能是 "Amazon" 或 "Amazon, Walmart"）
+        val platformList = platform.split(",").map { it.trim() }
+        val primaryPlatform = try {
+            Platform.valueOf(platformList.first())
+        } catch (e: IllegalArgumentException) {
+            Platform.Amazon // 默认平台
+        }
+
         return Product(
             pid = pid,
-            title = title,
+            // 优先使用 short_title，如果为空则使用 title 的前 100 字符
+            title = short_title?.takeIf { it.isNotBlank() }
+                ?: title.take(100) + if (title.length > 100) "..." else "",
+            fullTitle = title,  // 🆕 保留完整标题
             price = price,
             rating = rating,
-            platform = try {
-                Platform.valueOf(platform)
-            } catch (e: IllegalArgumentException) {
-                Platform.Amazon // 默认平台
-            },
+            platform = primaryPlatform,
+            platformList = platformList,  // 🆕 所有最低价平台列表
             freeShipping = freeShipping,
             inStock = inStock,
             information = information,
@@ -48,12 +57,13 @@ data class ProductDTO(
 
     companion object {
         /**
-         * 从领域模型创建DTO
+         * 从领域模型创建 DTO
          */
         fun fromProduct(product: Product): ProductDTO {
             return ProductDTO(
                 pid = product.pid,
-                title = product.title,
+                short_title = product.title,
+                title = product.fullTitle ?: product.title,
                 price = product.price,
                 rating = product.rating,
                 platform = product.platform.name,
@@ -68,7 +78,7 @@ data class ProductDTO(
 }
 
 /**
- * API响应包装类
+ * API 响应包装类
  */
 data class ApiResponse<T>(
     val success: Boolean,

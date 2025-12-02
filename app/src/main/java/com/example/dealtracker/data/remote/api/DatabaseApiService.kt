@@ -13,13 +13,13 @@ interface DatabaseApiService {
     /**
      * 获取所有产品
      */
-    @GET("api/products")
+    @GET("products")
     suspend fun getAllProducts(): Response<List<ProductDTO>>
 
     /**
      * 根据 ID 获取产品
      */
-    @GET("api/products/{pid}")
+    @GET("products/{pid}")
     suspend fun getProductById(@Path("pid") pid: Int): Response<ProductDTO>
 
     /**
@@ -37,7 +37,7 @@ interface DatabaseApiService {
     /**
      * 按价格区间筛选
      */
-    @GET("api/products/price-range")
+    @GET("products/price-range")
     suspend fun getByPriceRange(
         @Query("minPrice") minPrice: Double,
         @Query("maxPrice") maxPrice: Double

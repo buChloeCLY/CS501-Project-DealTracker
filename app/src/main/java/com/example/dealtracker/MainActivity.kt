@@ -2,6 +2,7 @@ package com.example.dealtracker
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -17,15 +18,19 @@ import androidx.navigation.compose.rememberNavController
 import com.example.dealtracker.ui.navigation.*
 import com.example.dealtracker.ui.theme.DealTrackerTheme
 import com.example.dealtracker.data.local.UserPreferences
-import com.example.dealtracker.ui.auth.LoginScreen
-import com.example.dealtracker.ui.auth.RegisterScreen
-
 
 class MainActivity : ComponentActivity() {
 
     // 请求麦克风权限
     private val requestAudioPermission =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* 可选处理结果 */ }
+
+    // ⭐ 新增：请求通知权限（Android 13+）
+    private val requestNotificationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+            // 这里可以根据 isGranted 做一些提示（可选）
+            // if (!isGranted) { Toast.makeText(this, "Notifications disabled", Toast.LENGTH_SHORT).show() }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,9 +44,28 @@ class MainActivity : ComponentActivity() {
             requestAudioPermission.launch(Manifest.permission.RECORD_AUDIO)
         }
 
+        // ⭐ 自动请求通知权限（仅在 Android 13+ 时请求）
+        askNotificationPermission()
+
         setContent {
             DealTrackerTheme {
                 DealTrackerApp()
+            }
+        }
+    }
+
+    /**
+     * Android 13 及以上需要显式请求 POST_NOTIFICATIONS 权限
+     */
+    private fun askNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val hasPermission = ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+
+            if (!hasPermission) {
+                requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
     }

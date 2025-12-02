@@ -1,160 +1,100 @@
 package com.example.dealtracker.ui.wishlist
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import coil.compose.rememberAsyncImagePainter
-import com.example.dealtracker.domain.UserManager
-import com.example.dealtracker.domain.model.WishlistItem
-import kotlinx.coroutines.launch
+import com.example.dealtracker.domain.model.Product
+import com.example.dealtracker.ui.notifications.NotificationHelper
+import com.example.dealtracker.ui.wishlist.viewmodel.WishListViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WishListScreen(
     navController: NavController,
-    uid: Int = 1,  // 添加默认值
-    viewModel: WishlistViewModel = viewModel()
+    currentUserId: Int,
+    viewModel: WishListViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
-    val currentUser by UserManager.currentUser.collectAsState()
-    val isLoggedIn = currentUser != null
+    val wishList by viewModel.wishList.collectAsState()
+    val context = LocalContext.current
 
-    // 使用当前登录用户的 uid，如果没有登录则使用传入的 uid
-    val actualUid = currentUser?.uid ?: uid
+    // 打开页面时检查是否有降价提醒
+    LaunchedEffect(currentUserId) {
+        viewModel.checkAlerts(currentUserId) { alerts ->
+            alerts.forEach { alert ->
+                val title = alert.short_title ?: alert.title ?: "Wishlist item"
+                val current = alert.current_price ?: return@forEach
+                val target = alert.target_price ?: return@forEach
 
-    // 如果是游客模式，显示提示页面
-    if (!isLoggedIn) {
-        GuestWishListScreen(navController)
-        return
-    }
-
-    // 已登录用户的心愿单
-    val wishlist by viewModel.wishlist.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    val error by viewModel.error.collectAsState()
-
-    val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
-
-    // 加载心愿单数据 - 使用 actualUid
-    LaunchedEffect(actualUid) {
-        viewModel.loadWishlist(actualUid)
+                NotificationHelper.showPriceDropNotification(
+                    context = context,
+                    pid = alert.pid,
+                    title = title,
+                    currentPrice = current,
+                    targetPrice = target
+                )
+            }
+        }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("My Wishlist", fontWeight = FontWeight.Bold) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFFFCE4D6)
-                )
+                title = { Text("Wishlist") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
             )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { padding ->
+        }
+    ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
                 .background(Color(0xFFF5F5F5))
+                .padding(innerPadding)
         ) {
-            when {
-                isLoading -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.Center)
-                    )
+            if (wishList.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Your wishlist is empty")
                 }
-
-                error != null -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            Icons.Default.Warning,
-                            contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            tint = Color.Gray
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(wishList, key = { it.pid }) { product ->
+                        WishListItem(
+                            product = product,
+                            onRemove = {
+                                viewModel.removeProduct(currentUserId, product.pid)
+                            },
+                            onTargetPriceConfirm = { targetPrice ->
+                                viewModel.updateTargetPrice(
+                                    uid = currentUserId,
+                                    pid = product.pid,
+                                    targetPrice = targetPrice
+                                )
+                            }
                         )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(error ?: "Unknown error", color = Color.Gray)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = { viewModel.loadWishlist(uid) }) {
-                            Text("Retry")
-                        }
-                    }
-                }
-
-                wishlist.isEmpty() -> {
-                    EmptyWishListView(navController)
-                }
-
-                else -> {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(wishlist, key = { it.wid }) { item ->
-                            WishListItemCard(
-                                item = item,
-                                onUpdate = { wid, targetPrice ->
-                                    viewModel.updateWishlistItem(
-                                        uid = uid,
-                                        wid = wid,
-                                        targetPrice = targetPrice,
-                                        onSuccess = {
-                                            scope.launch {
-                                                snackbarHostState.showSnackbar("Updated successfully")
-                                            }
-                                        },
-                                        onError = { error ->
-                                            scope.launch {
-                                                snackbarHostState.showSnackbar(error)
-                                            }
-                                        }
-                                    )
-                                },
-                                onRemove = { pid, wid ->
-                                    viewModel.removeFromWishlist(
-                                        uid = uid,
-                                        pid = pid,
-                                        wid = wid,
-                                        onSuccess = {
-                                            scope.launch {
-                                                snackbarHostState.showSnackbar("Removed from wishlist")
-                                            }
-                                        },
-                                        onError = { error ->
-                                            scope.launch {
-                                                snackbarHostState.showSnackbar(error)
-                                            }
-                                        }
-                                    )
-                                }
-                            )
-                        }
                     }
                 }
             }
@@ -162,299 +102,95 @@ fun WishListScreen(
     }
 }
 
-/**
- * 游客模式心愿单页面
- */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GuestWishListScreen(navController: NavController) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("My Wishlist", fontWeight = FontWeight.Bold) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFFFCE4D6)
-                )
-            )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .background(Color(0xFFF5F5F5))
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                Icons.Default.Lock,
-                contentDescription = null,
-                modifier = Modifier.size(80.dp),
-                tint = Color.Gray
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Text(
-                "Login Required",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF212121)
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                "Please login to view your wishlist",
-                fontSize = 16.sp,
-                color = Color.Gray
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Button(
-                onClick = { navController.navigate("login") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFFF6B35)
-                ),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("Login", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            OutlinedButton(
-                onClick = { navController.navigate("register") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("Sign Up", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
-
-@Composable
-fun EmptyWishListView(navController: NavController) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            Icons.Default.FavoriteBorder,
-            contentDescription = null,
-            modifier = Modifier.size(80.dp),
-            tint = Color.Gray
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            "Your wishlist is empty",
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.Gray
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            "Start adding items you love!",
-            fontSize = 14.sp,
-            color = Color.Gray
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Button(
-            onClick = { navController.navigate("deals") },
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFFFF6B35)
-            )
-        ) {
-            Text("Browse Products")
-        }
-    }
-}
-
-@Composable
-fun WishListItemCard(
-    item: WishlistItem,
-    onUpdate: (Int, Double?) -> Unit,
-    onRemove: (Int, Int) -> Unit
+private fun WishListItem(
+    product: Product,
+    onRemove: () -> Unit,
+    onTargetPriceConfirm: (Double) -> Unit
 ) {
-    var targetPrice by remember {
-        mutableStateOf(item.target_price?.toString() ?: "")
-    }
-    var showSaveButton by remember { mutableStateOf(false) }
+    var targetPrice by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(
-                elevation = 4.dp,
-                shape = RoundedCornerShape(12.dp),
-                clip = true
-            ),
-        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = if (item.price_met) Color(0xFFE8F5E9) else Color.White
+            containerColor = Color.White
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                // 图片
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFFF5F5F5))
-                        .padding(4.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (!item.image_url.isNullOrEmpty()) {
-                        Image(
-                            painter = rememberAsyncImagePainter(item.image_url),
-                            contentDescription = item.title,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(6.dp))
-                        )
-                    } else {
-                        Icon(
-                            Icons.Default.ShoppingCart,
-                            contentDescription = null,
-                            modifier = Modifier.size(40.dp),
-                            tint = Color.Gray
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(16.dp))
-
-                // 商品信息
                 Column(
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(
-                        text = item.title,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        color = Color(0xFF212121)
+                        text = product.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
                     )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Text(
-                            text = "$${String.format("%.2f", item.current_price)}",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFFF6B35)
-                        )
-
-                        if (item.target_price != null) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Target: $${String.format("%.2f", item.target_price)}",
-                                fontSize = 12.sp,
-                                color = Color.Gray
-                            )
-                        }
-                    }
-
-                    if (item.price_met && item.savings != null && item.savings > 0) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "💰 Save $${String.format("%.2f", item.savings)}!",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF4CAF50)
-                        )
-                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Current price: $${String.format("%.2f", product.price)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF555555)
+                    )
                 }
 
-                Spacer(modifier = Modifier.width(8.dp))
-
-                // 删除按钮
-                IconButton(
-                    onClick = { onRemove(item.pid, item.wid) },
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(
-                            Color(0xFFFFE8E6),
-                            RoundedCornerShape(8.dp)
-                        )
-                ) {
+                IconButton(onClick = onRemove) {
                     Icon(
-                        Icons.Default.Delete,
+                        imageVector = Icons.Default.Delete,
                         contentDescription = "Remove",
-                        tint = Color(0xFFE53935)
+                        tint = Color(0xFFD32F2F)
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
-            Divider(color = Color(0xFFE0E0E0))
-            Spacer(modifier = Modifier.height(12.dp))
 
-            // 目标价格输入
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
             ) {
                 OutlinedTextField(
                     value = targetPrice,
-                    onValueChange = {
-                        targetPrice = it
-                        showSaveButton = true
+                    onValueChange = { newValue ->
+                        if (newValue.isEmpty() || newValue.matches(Regex("^\\d*\\.?\\d*$"))) {
+                            targetPrice = newValue
+                            error = null
+                        }
                     },
-                    label = { Text("Target Price", fontSize = 12.sp) },
-                    placeholder = { Text("Enter target price") },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(56.dp),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.weight(1f),
                     singleLine = true,
-                    shape = RoundedCornerShape(8.dp)
+                    label = { Text("Target price") },
+                    isError = error != null
                 )
 
-                if (showSaveButton) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        onClick = {
-                            val price = targetPrice.toDoubleOrNull()
-                            onUpdate(item.wid, price)
-                            showSaveButton = false
-                        },
-                        modifier = Modifier.height(56.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF4CAF50)
-                        ),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Icon(Icons.Default.Check, contentDescription = "Save")
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Button(
+                    onClick = {
+                        val v = targetPrice.toDoubleOrNull()
+                        if (v == null || v <= 0.0) {
+                            error = "Invalid price"
+                        } else {
+                            onTargetPriceConfirm(v)
+                        }
                     }
+                ) {
+                    Text("Save")
                 }
+            }
+
+            if (error != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = error ?: "",
+                    color = Color.Red,
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
     }

@@ -171,3 +171,16 @@ Amazon's Choice 标识
 │        ↓                                                      │
 │  Data returned back to Android App                            │
 └───────────────────────────────────────────────────────────────┘
+
+12.1
+新的改进简短版：
+1. title做一下关键词提取（不超过10词），不要原来这么长的title，原来的长title当作information；
+2. 根据title导入BestBuy，Walmart的同样产品数据（在RapidAPI），注意要匹配product相关字段，其中，这两个平台的rating字段留空，rating默认只使用Amazon的评分。category还是像原有一样做关键词提取就行，要匹配我们目前的category：enum class Category { Electronics, Beauty, Home, Food, Fashion, Sports, Books, Toys, Health, Outdoors, Office, Pets }
+3. DealsScreen页面现在就要进行价格比较了，哪个平台价格最低，有两个最低就写两个，有三个就把三个平台都写出来。
+4. 改了product和price表
+问题：
+5. 购买升级版api，获得更多查询次数
+6. compare页面里可以显示其他价格高的平台价格做参考
+7. 关键词匹配搜索还需要细化处理，由于api的search返回结果过多可能无法匹配到完全相同的产品
+8. Amazon api还需要处理下 
+9. 图片依旧加载不出来

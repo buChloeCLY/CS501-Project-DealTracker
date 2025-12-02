@@ -35,7 +35,7 @@ import com.example.dealtracker.ui.theme.AppDimens
 import com.example.dealtracker.domain.model.Platform
 import com.example.dealtracker.domain.model.Product
 import com.example.dealtracker.ui.wishlist.WishListHolder
-import com.example.dealtracker.ui.wishlist.WishlistViewModel
+import com.example.dealtracker.ui.wishlist.viewmodel.WishListViewModel
 import kotlinx.coroutines.launch
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -53,7 +53,7 @@ fun ProductDetailScreen(
     uid: Int = 1
 ) {
     val viewModel: ProductViewModel = viewModel()
-    val wishlistViewModel: WishlistViewModel = viewModel()
+    val wishlistViewModel: WishListViewModel = viewModel()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -65,9 +65,9 @@ fun ProductDetailScreen(
     val actualUid = currentUser?.uid ?: uid
 
     // 监听本地心愿单状态（即时更新）
-    val localWishList by WishListHolder.localWishList.collectAsState()
-    val isInWishlist = remember(localWishList, pid) {
-        localWishList.any { it.pid == pid }
+    val wishList by WishListHolder.wishList.collectAsState()
+    val isInWishlist = remember(wishList, pid) {
+        wishList.any { it.pid == pid }
     }
 
     LaunchedEffect(pid) {
@@ -119,21 +119,16 @@ fun ProductDetailScreen(
                             }
                             navController.navigate("wishlist")
                         } else {
-                            wishlistViewModel.addToWishlist(
+                            // 使用 WishListViewModel.addProduct，同步到本地 + 后端
+                            wishlistViewModel.addProduct(
                                 uid = actualUid,
                                 product = product,
-                                targetPrice = price * 0.9,
-                                onSuccess = {
-                                    scope.launch {
-                                        snackbarHostState.showSnackbar("Added to Wish List")
-                                    }
-                                },
-                                onError = { error ->
-                                    scope.launch {
-                                        snackbarHostState.showSnackbar(error)
-                                    }
-                                }
+                                targetPrice = price * 0.9,  // 默认目标价 = 当前价的 9 折
+                                alertEnabled = true
                             )
+                            scope.launch {
+                                snackbarHostState.showSnackbar("Added to Wish List")
+                            }
                         }
                     }) {
                         Icon(

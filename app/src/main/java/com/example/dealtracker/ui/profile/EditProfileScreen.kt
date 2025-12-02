@@ -22,7 +22,7 @@ import com.example.dealtracker.data.remote.api.UserUpdateRequest
 import com.example.dealtracker.domain.UserManager
 import com.example.dealtracker.domain.model.User
 import kotlinx.coroutines.launch
-import com.example.dealtracker.data.remote.RetrofitClient
+import com.example.dealtracker.data.remote.repository.RetrofitClient
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditProfileScreen(navController: NavHostController) {

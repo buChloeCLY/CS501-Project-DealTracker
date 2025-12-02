@@ -13,8 +13,11 @@ import com.example.dealtracker.ui.profile.SettingsScreen
 import com.example.dealtracker.ui.profile.ProfileScreen
 import com.example.dealtracker.ui.profile.HistoryScreen
 import com.example.dealtracker.ui.profile.EditProfileScreen
-import com.example.dealtracker.ui.auth.LoginScreen
-import com.example.dealtracker.ui.auth.RegisterScreen
+import com.example.dealtracker.ui.profile.LoginScreen
+import com.example.dealtracker.ui.profile.RegisterScreen
+import com.example.dealtracker.domain.UserManager
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 
 
 /**
@@ -83,7 +86,25 @@ fun MainNavGraph(
 
         // ============= 收藏页 WishList =============
         composable(Routes.LISTS) {
-            WishListScreen(navController = navController)
+            // 从 UserManager 拿当前用户
+            val currentUser by UserManager.currentUser.collectAsState()
+            val uid = currentUser?.uid ?: 0  // 未登录时为 0，你在 WishListScreen 里可以根据 0 做跳转登录
+
+            WishListScreen(
+                navController = navController,
+                currentUserId = uid
+            )
+        }
+
+        // 兼容 Profile 里使用的硬编码 "wishlist" 路由
+        composable("wishlist") {
+            val currentUser by UserManager.currentUser.collectAsState()
+            val uid = currentUser?.uid ?: 0
+
+            WishListScreen(
+                navController = navController,
+                currentUserId = uid
+            )
         }
 
         // =============  Profile 页面 =============
@@ -96,10 +117,6 @@ fun MainNavGraph(
 
         composable(Routes.SETTINGS) {
             SettingsScreen(navController = navController)
-        }
-
-        composable("wishlist") {
-            WishListScreen(navController = navController)
         }
 
         composable(Routes.EDIT_PROFILE) {

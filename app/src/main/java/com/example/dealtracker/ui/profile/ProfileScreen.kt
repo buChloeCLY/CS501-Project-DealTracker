@@ -175,7 +175,7 @@ fun ProfileScreen(navController: NavHostController) {
                         UserPreferences.clearUser()
 
                         // 清空心愿单数据
-                        WishListHolder.clearAll()
+                        WishListHolder.clear()
 
                         showLogoutDialog = false
 

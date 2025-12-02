@@ -1,6 +1,12 @@
 package com.example.dealtracker.data.remote.api
 
-import com.example.dealtracker.domain.model.*
+import com.example.dealtracker.ui.wishlist.viewmodel.AddWishlistRequest
+import com.example.dealtracker.ui.wishlist.viewmodel.AlertsResponse
+import com.example.dealtracker.ui.wishlist.viewmodel.CheckWishlistResponse
+import com.example.dealtracker.ui.wishlist.viewmodel.UpdateWishlistRequest
+import com.example.dealtracker.ui.wishlist.viewmodel.WishlistItem
+import com.example.dealtracker.ui.wishlist.viewmodel.WishlistResponse
+import com.example.dealtracker.ui.wishlist.viewmodel.WishlistStats
 import retrofit2.http.*
 
 /**
