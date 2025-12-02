@@ -3,32 +3,55 @@ package com.example.dealtracker.data.remote.dto
 import com.example.dealtracker.domain.model.Category
 import com.example.dealtracker.domain.model.Platform
 import com.example.dealtracker.domain.model.Product
+import com.google.gson.annotations.SerializedName
 
 /**
  * 产品数据传输对象 v2.0
  * 支持 short_title 和多平台价格
+ *
+ * 对应后端 /api/products 的 JSON 字段：
+ * {
+ *   "pid": 2,
+ *   "short_title": "...",
+ *   "title": "...",
+ *   "price": 298,
+ *   "rating": 4.5,
+ *   "platform": "Amazon" 或 "Amazon, Walmart",
+ *   "free_shipping": 1,
+ *   "in_stock": 1,
+ *   "information": "...",
+ *   "category": "Electronics",
+ *   "image_url": "..."
+ * }
  */
 data class ProductDTO(
     val pid: Int,
-    val short_title: String?,      // 🆕 短标题（关键词提取后）
-    val title: String,              // 完整标题
-    val price: Double,              // 当前最低价
-    val rating: Float,              // 评分（只用 Amazon）
-    val platform: String,           // 当前最低价平台
-    val freeShipping: Boolean,      // 包邮（最低价平台的）
-    val inStock: Boolean,           // 有货（最低价平台的）
-    val information: String?,       // 详细信息
-    val category: String,           // 分类
-    val imageUrl: String?           // 图片 URL
+    val short_title: String?,      // 短标题（和后端字段名一致）
+    val title: String,             // 完整标题
+    val price: Double,             // 当前最低价
+    val rating: Float,             // 评分（只用 Amazon）
+    val platform: String,          // 当前最低价平台（可能是逗号分隔）
+    @SerializedName("free_shipping")
+    val freeShippingRaw: Int,      // 0 / 1 → Boolean 由 toProduct() 负责转换
+    @SerializedName("in_stock")
+    val inStockRaw: Int,           // 0 / 1 → Boolean 由 toProduct() 负责转换
+    val information: String?,      // 详细信息
+    val category: String,          // 分类（字符串枚举）
+    @SerializedName("image_url")
+    val imageUrl: String?          // 图片 URL
 ) {
     /**
-     * 转换为领域模型
+     * 转换为领域模型 Product
      */
     fun toProduct(): Product {
         // 处理 platform 字段（可能是 "Amazon" 或 "Amazon, Walmart"）
-        val platformList = platform.split(",").map { it.trim() }
+        val platformList = platform
+            .split(",")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+
         val primaryPlatform = try {
-            Platform.valueOf(platformList.first())
+            Platform.valueOf(platformList.firstOrNull() ?: "Amazon")
         } catch (e: IllegalArgumentException) {
             Platform.Amazon // 默认平台
         }
@@ -37,14 +60,14 @@ data class ProductDTO(
             pid = pid,
             // 优先使用 short_title，如果为空则使用 title 的前 100 字符
             title = short_title?.takeIf { it.isNotBlank() }
-                ?: title.take(100) + if (title.length > 100) "..." else "",
-            fullTitle = title,  // 🆕 保留完整标题
+                ?: (if (title.length > 100) title.take(100) + "..." else title),
+            fullTitle = title,
             price = price,
             rating = rating,
             platform = primaryPlatform,
-            platformList = platformList,  // 🆕 所有最低价平台列表
-            freeShipping = freeShipping,
-            inStock = inStock,
+            platformList = if (platformList.isNotEmpty()) platformList else listOf(primaryPlatform.name),
+            freeShipping = (freeShippingRaw == 1),   // ⭐ 0/1 → Boolean
+            inStock = (inStockRaw == 1),             // ⭐ 0/1 → Boolean
             information = information,
             category = try {
                 Category.valueOf(category)
@@ -57,7 +80,7 @@ data class ProductDTO(
 
     companion object {
         /**
-         * 从领域模型创建 DTO
+         * 从领域模型创建 DTO（如果以后需要反向发到后端）
          */
         fun fromProduct(product: Product): ProductDTO {
             return ProductDTO(
@@ -66,9 +89,10 @@ data class ProductDTO(
                 title = product.fullTitle ?: product.title,
                 price = product.price,
                 rating = product.rating,
-                platform = product.platform.name,
-                freeShipping = product.freeShipping,
-                inStock = product.inStock,
+                // 如果有多个平台，用逗号拼起来
+                platform = product.platformList.joinToString(", "),
+                freeShippingRaw = if (product.freeShipping) 1 else 0,
+                inStockRaw = if (product.inStock) 1 else 0,
                 information = product.information,
                 category = product.category.name,
                 imageUrl = product.imageUrl

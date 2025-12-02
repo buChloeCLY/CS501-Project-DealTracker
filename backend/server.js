@@ -1409,12 +1409,12 @@ app.get('/api/wishlist/alerts', async (req, res) => {
 });
 
 // =============================
-// 抽出来的通用函数：同步最低价到 products 表
+// 通用函数：同步最低价到 products 表
 // =============================
 async function syncLowestPrices() {
     console.log('\n🔄 Starting to sync lowest prices to products table...');
 
-    // 1. 获取所有产品
+    // 1) 获取所有产品
     const [products] = await pool.query('SELECT pid FROM products');
     console.log(`📦 Found ${products.length} products to sync`);
 
@@ -1423,30 +1423,37 @@ async function syncLowestPrices() {
 
     for (const product of products) {
         try {
-            // 2. 获取该产品所有平台的最新价格（按价格升序）
-            const [prices] = await pool.query(`
-                SELECT p1.platform, p1.price, p1.free_shipping, p1.in_stock, p1.link
+            // 2) 对每个产品，先拿到「每个平台最新一条价格」，再在这些里面选最低价
+
+            const [rows] = await pool.query(`
+                SELECT p1.platform,
+                       p1.price,
+                       p1.free_shipping,
+                       p1.in_stock,
+                       p1.date,
+                       p1.link
                 FROM price p1
                 INNER JOIN (
                     SELECT platform, MAX(date) AS max_date
                     FROM price
                     WHERE pid = ?
                     GROUP BY platform
-                ) p2 ON p1.platform = p2.platform AND p1.date = p2.max_date
+                ) p2
+                    ON p1.platform = p2.platform AND p1.date = p2.max_date
                 WHERE p1.pid = ?
                 ORDER BY p1.price ASC
             `, [product.pid, product.pid]);
 
-            if (prices.length === 0) {
-                console.log(`⚠️  [PID ${product.pid}] No prices found, skipping...`);
+            if (rows.length === 0) {
+                console.log(`⚠️  [PID ${product.pid}] No price rows, skipped`);
                 skippedCount++;
                 continue;
             }
 
-            // 3. 找到最低价（第一条就是最低价）
-            const lowestPrice = prices[0];
+            // 3) rows[0] 就是「各平台最新价」里最便宜的那一个
+            const best = rows[0];
 
-            // 4. 更新 products 表的 price / platform / free_shipping / in_stock
+            // 4) 把最低价平台的价格 / 平台 / free_shipping / in_stock 同步回 products
             await pool.query(`
                 UPDATE products
                 SET
@@ -1457,29 +1464,29 @@ async function syncLowestPrices() {
                     updated_at = NOW()
                 WHERE pid = ?
             `, [
-                lowestPrice.price,
-                lowestPrice.platform,
-                lowestPrice.free_shipping ? 1 : 0, // 保证是 0/1
-                lowestPrice.in_stock ? 1 : 0,       // 保证是 0/1
+                best.price,
+                best.platform,
+                best.free_shipping ? 1 : 0,
+                best.in_stock ? 1 : 0,
                 product.pid
             ]);
 
             updatedCount++;
-            console.log(`✅ [PID ${product.pid}] Updated: $${lowestPrice.price} from ${lowestPrice.platform} (FS=${lowestPrice.free_shipping}, IS=${lowestPrice.in_stock})`);
+            console.log(
+                `✅ [PID ${product.pid}] -> ${best.platform}, price=$${best.price}, ` +
+                `free_shipping=${best.free_shipping}, in_stock=${best.in_stock}`
+            );
 
-        } catch (error) {
-            console.error(`❌ [PID ${product.pid}] Failed:`, error.message);
+        } catch (err) {
+            console.error(`❌ [PID ${product.pid}] Sync failed:`, err.message);
         }
     }
 
-    console.log(`\n✅ Sync completed: ${updatedCount} updated, ${skippedCount} skipped\n`);
+    console.log(
+        `\n✅ Sync completed: updated=${updatedCount}, skipped=${skippedCount}, total=${products.length}\n`
+    );
 
-    // 返回给调用方使用
-    return {
-        updatedCount,
-        skippedCount,
-        totalProducts: products.length
-    };
+    return { updatedCount, skippedCount, totalProducts: products.length };
 }
 
 // ===================================
@@ -1562,22 +1569,22 @@ cron.schedule('0 3 * * *', async () => {
 });
 
 // ===================================
-// 新增接口：更新 products 表的最低价信息
+// 管理接口：手动触发同步最低价到 products
 // ===================================
 app.post('/api/admin/sync-lowest-prices', async (req, res) => {
     try {
         const result = await syncLowestPrices();
-
         res.json({
             success: true,
             message: `Synced ${result.updatedCount}/${result.totalProducts} products`,
             ...result
         });
     } catch (error) {
-        console.error('Sync failed:', error);
+        console.error('❌ /api/admin/sync-lowest-prices failed:', error);
         res.status(500).json({
+            success: false,
             error: 'Sync failed',
-            details: error.message
+            detail: error.message
         });
     }
 });
