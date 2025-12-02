@@ -524,6 +524,206 @@ app.get('/api/products/:pid', async (req, res) => {
     }
 });
 
+// ===================================
+// API: 心愿单管理 (Wishlist)
+// ===================================
+
+// 获取用户的心愿单
+app.get('/api/wishlist/:uid', async (req, res) => {
+    try {
+        const uid = parseInt(req.params.uid);
+
+        const [rows] = await pool.query(`
+            SELECT
+                w.wid, w.target_price, w.alert_enabled, w.alert_status,
+                w.priority, w.notes, w.created_at,
+                p.pid, p.title, p.price AS current_price, p.rating,
+                p.category, p.image_url, p.in_stock, p.free_shipping,
+                CASE WHEN p.price <= w.target_price THEN 1 ELSE 0 END AS price_met,
+                CASE WHEN w.target_price IS NOT NULL THEN (w.target_price - p.price) ELSE NULL END AS savings
+            FROM wishlist w
+            JOIN products p ON w.pid = p.pid
+            WHERE w.uid = ?
+            ORDER BY w.priority DESC, w.created_at DESC
+        `, [uid]);
+
+        res.json(rows);
+    } catch (error) {
+        console.error('Get wishlist error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 添加商品到心愿单
+app.post('/api/wishlist', async (req, res) => {
+    try {
+        const { uid, pid, target_price, alert_enabled = 1, priority = 2, notes = null } = req.body;
+
+        if (!uid || !pid) {
+            return res.status(400).json({ error: 'uid and pid are required' });
+        }
+
+        const [result] = await pool.query(`
+            INSERT INTO wishlist (uid, pid, target_price, alert_enabled, priority, notes)
+            VALUES (?, ?, ?, ?, ?, ?)
+        `, [uid, pid, target_price, alert_enabled, priority, notes]);
+
+        const [newItem] = await pool.query(`
+            SELECT w.*, p.title, p.price AS current_price, p.image_url
+            FROM wishlist w
+            JOIN products p ON w.pid = p.pid
+            WHERE w.wid = ?
+        `, [result.insertId]);
+
+        res.status(201).json({
+            success: true,
+            message: 'Product added to wishlist',
+            item: newItem[0]
+        });
+
+    } catch (error) {
+        if (error.code === 'ER_DUP_ENTRY') {
+            res.status(409).json({ error: 'Product already in wishlist' });
+        } else {
+            console.error('Add to wishlist error:', error);
+            res.status(500).json({ error: error.message });
+        }
+    }
+});
+
+// 更新心愿单项
+app.put('/api/wishlist/:wid', async (req, res) => {
+    try {
+        const wid = parseInt(req.params.wid);
+        const { target_price, alert_enabled, priority, notes } = req.body;
+
+        const updates = [];
+        const params = [];
+
+        if (target_price !== undefined) {
+            updates.push('target_price = ?');
+            params.push(target_price);
+        }
+        if (alert_enabled !== undefined) {
+            updates.push('alert_enabled = ?');
+            params.push(alert_enabled);
+        }
+        if (priority !== undefined) {
+            updates.push('priority = ?');
+            params.push(priority);
+        }
+        if (notes !== undefined) {
+            updates.push('notes = ?');
+            params.push(notes);
+        }
+
+        if (updates.length === 0) {
+            return res.status(400).json({ error: 'No fields to update' });
+        }
+
+        params.push(wid);
+        await pool.query(`UPDATE wishlist SET ${updates.join(', ')} WHERE wid = ?`, params);
+
+        const [updatedItem] = await pool.query(`
+            SELECT w.*, p.title, p.price AS current_price
+            FROM wishlist w
+            JOIN products p ON w.pid = p.pid
+            WHERE w.wid = ?
+        `, [wid]);
+
+        res.json({ success: true, item: updatedItem[0] });
+
+    } catch (error) {
+        console.error('Update wishlist error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 删除心愿单项
+app.delete('/api/wishlist/:wid', async (req, res) => {
+    try {
+        const wid = parseInt(req.params.wid);
+        const [result] = await pool.query('DELETE FROM wishlist WHERE wid = ?', [wid]);
+
+        if (result.affectedRows > 0) {
+            res.json({ success: true, message: 'Removed from wishlist' });
+        } else {
+            res.status(404).json({ error: 'Wishlist item not found' });
+        }
+    } catch (error) {
+        console.error('Delete wishlist error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 检查商品是否在心愿单中
+app.get('/api/wishlist/check/:uid/:pid', async (req, res) => {
+    try {
+        const uid = parseInt(req.params.uid);
+        const pid = parseInt(req.params.pid);
+
+        const [rows] = await pool.query(
+            'SELECT wid, target_price, alert_enabled FROM wishlist WHERE uid = ? AND pid = ?',
+            [uid, pid]
+        );
+
+        res.json({
+            in_wishlist: rows.length > 0,
+            item: rows[0] || null
+        });
+    } catch (error) {
+        console.error('Check wishlist error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 获取价格提醒
+app.get('/api/wishlist/alerts/:uid', async (req, res) => {
+    try {
+        const uid = parseInt(req.params.uid);
+
+        const [rows] = await pool.query(`
+            SELECT
+                w.wid, w.target_price, w.alert_status,
+                p.pid, p.title, p.price AS current_price, p.image_url,
+                (w.target_price - p.price) AS savings
+            FROM wishlist w
+            JOIN products p ON w.pid = p.pid
+            WHERE w.uid = ? AND w.alert_enabled = 1 AND p.price <= w.target_price
+            ORDER BY savings DESC
+        `, [uid]);
+
+        res.json({ total_alerts: rows.length, alerts: rows });
+    } catch (error) {
+        console.error('Get alerts error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 获取心愿单统计
+app.get('/api/wishlist/stats/:uid', async (req, res) => {
+    try {
+        const uid = parseInt(req.params.uid);
+
+        const [stats] = await pool.query(`
+            SELECT
+                COUNT(*) AS total_items,
+                SUM(CASE WHEN p.price <= w.target_price THEN 1 ELSE 0 END) AS items_on_sale,
+                AVG(p.price) AS avg_price,
+                SUM(CASE WHEN w.target_price IS NOT NULL AND p.price <= w.target_price
+                    THEN (w.target_price - p.price) ELSE 0 END) AS total_savings
+            FROM wishlist w
+            JOIN products p ON w.pid = p.pid
+            WHERE w.uid = ?
+        `, [uid]);
+
+        res.json(stats[0]);
+    } catch (error) {
+        console.error('Get stats error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // 导入初始产品
 app.post('/api/admin/import-initial', async (req, res) => {
     try {
