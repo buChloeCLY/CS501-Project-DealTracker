@@ -13,6 +13,13 @@ class HomeViewModel : ViewModel() {
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
 
+    private val _voiceError = MutableStateFlow<String?>(null)
+    val voiceError: StateFlow<String?> = _voiceError
+
+    fun setVoiceError(msg: String) {
+        _voiceError.value = msg
+    }
+
     /** 更新搜索栏输入 */
     fun updateQuery(newQuery: String) {
         _searchQuery.value = newQuery

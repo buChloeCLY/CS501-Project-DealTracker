@@ -47,13 +47,26 @@ fun HomeScreen(navController: NavHostController, homeViewModel: HomeViewModel = 
     /** ---------- 语音识别 Launcher ---------- */
     val voiceLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            if (result.resultCode == Activity.RESULT_OK) {
-                val text = result.data
-                    ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-                    ?.firstOrNull() ?: ""
-                homeViewModel.applyVoiceResult(text)
+            try {
+                if (result.resultCode == Activity.RESULT_OK) {
+                    val text = result.data
+                        ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                        ?.firstOrNull()
+
+                    if (text.isNullOrBlank()) {
+                        homeViewModel.setVoiceError("Empty voice result")
+                    } else {
+                        homeViewModel.applyVoiceResult(text)
+                    }
+
+                } else {
+                    homeViewModel.setVoiceError("Voice recognition canceled")
+                }
+            } catch (e: Exception) {
+                homeViewModel.setVoiceError("Recognition failed: ${e.message}")
             }
         }
+
 
     /** ---------- 回到顶部按钮滚动控制 ---------- */
     val listState = rememberLazyListState()
@@ -99,7 +112,15 @@ fun HomeScreen(navController: NavHostController, homeViewModel: HomeViewModel = 
                                         RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
                                     )
                                 }
-                                voiceLauncher.launch(intent)
+                                val pm = context.packageManager
+                                val activities = pm.queryIntentActivities(intent, 0)
+
+                                if (activities.isNotEmpty()) {
+                                    voiceLauncher.launch(intent)
+                                } else {
+                                    homeViewModel.setVoiceError("This device does not support speech recognition")
+                                }
+
                             }) {
                                 Icon(
                                     imageVector = Icons.Default.KeyboardVoice,
