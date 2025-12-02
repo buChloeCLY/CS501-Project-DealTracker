@@ -240,7 +240,7 @@ Run `app` in Android Studio.
 
 
 ## Repo organization
-
+```
 ├── MainActivity.kt
 
 ├── data
@@ -392,8 +392,7 @@ Run `app` in Android Studio.
 ├── WishListModel.kt
 
 └── WishListViewModel.kt
-
-
+```
 ## commit, code quality
 - all commits of these days are under branch "demo2"
 
