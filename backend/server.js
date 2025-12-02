@@ -560,7 +560,7 @@ function calculateSimilarity(title1, title2) {
 // ===================================
 
 // 获取用户信息
-app.get('/user/:uid', async (req, res) => {
+app.get('/api/user/:uid', async (req, res) => {
     try {
         const uid = parseInt(req.params.uid);
 
@@ -581,7 +581,7 @@ app.get('/user/:uid', async (req, res) => {
 });
 
 // 用户登录
-app.post('/user/login', async (req, res) => {
+app.post('/api/user/login', async (req, res) => {
     try {
         const { email, password } = req.body;
 
@@ -608,7 +608,7 @@ app.post('/user/login', async (req, res) => {
 });
 
 // 用户注册
-app.post('/user/register', async (req, res) => {
+app.post('/api/user/register', async (req, res) => {
     try {
         const { name, email, password, gender = 'Prefer not to say' } = req.body;
 
@@ -650,7 +650,7 @@ app.post('/user/register', async (req, res) => {
 });
 
 // 更新用户信息
-app.put('/user/:uid', async (req, res) => {
+app.put('/api/user/:uid', async (req, res) => {
     try {
         const uid = parseInt(req.params.uid);
         const { name, email, gender, password } = req.body;
@@ -713,7 +713,7 @@ app.put('/user/:uid', async (req, res) => {
 });
 
 // 删除用户
-app.delete('/user/:uid', async (req, res) => {
+app.delete('/api/user/:uid', async (req, res) => {
     try {
         const uid = parseInt(req.params.uid);
 
@@ -738,7 +738,7 @@ app.delete('/user/:uid', async (req, res) => {
 // ===================================
 
 // 获取产品的最新价格(按平台分组)
-app.get('/price/:pid', async (req, res) => {
+app.get('/api/price/:pid', async (req, res) => {
     try {
         const pid = parseInt(req.params.pid);
 
@@ -763,7 +763,7 @@ app.get('/price/:pid', async (req, res) => {
 });
 
 // 获取产品价格历史
-app.get('/history/:pid', async (req, res) => {
+app.get('/api/history/:pid', async (req, res) => {
     try {
         const pid = parseInt(req.params.pid);
         const days = parseInt(req.query.days) || 7;
@@ -1660,21 +1660,21 @@ app.listen(PORT, () => {
     console.log('='.repeat(70));
     console.log('\n📋 Available Endpoints:');
     console.log('\n👤 User Management:');
-    console.log(`   GET    /user/:uid              - Get user info`);
-    console.log(`   POST   /user/login             - User login`);
-    console.log(`   POST   /user/register          - User registration`);
-    console.log(`   PUT    /user/:uid              - Update user`);
-    console.log(`   DELETE /user/:uid              - Delete user`);
+    console.log(`   GET    /api/user/:uid              - Get user info`);
+    console.log(`   POST   /api/user/login             - User login`);
+    console.log(`   POST   /api/user/register          - User registration`);
+    console.log(`   PUT    /api/user/:uid              - Update user`);
+    console.log(`   DELETE /api/user/:uid              - Delete user`);
     console.log('\n💰 Price API:');
-    console.log(`   GET    /price/:pid             - Get latest prices by platform`);
-    console.log(`   GET    /history/:pid?days=7    - Get price history`);
+    console.log(`   GET    /api/price/:pid             - Get latest prices by platform`);
+    console.log(`   GET    /api/history/:pid?days=7    - Get price history`);
     console.log('\n📦 Product Management:');
     console.log(`   GET    /api/products           - Get all products`);
     console.log(`   GET    /api/products/:pid      - Get single product`);
     console.log(`   POST   /api/admin/import-initial        - Import products (multi-platform)`);
     console.log(`   POST   /api/admin/update-all-prices     - Update all prices (multi-platform)`);
     console.log('\n🔧 System:');
-    console.log(`   GET    /health                 - Health check`);
+    console.log(`   GET    /api/health                 - Health check`);
     console.log(`   GET    /api/test/extract-title - Test title extraction`);
     console.log('\n⏰ Scheduled Tasks:');
     console.log(`   Daily price update at 3:00 AM EST`);
