@@ -242,81 +242,157 @@ Run `app` in Android Studio.
 ## Repo organization
 
 ├── MainActivity.kt
+
 ├── data
+
 │   ├── local
+
 │   │   └── UserPreferences.kt
+
 │   └── remote
+
 │       ├── api
+
 │       │   ├── DatabaseApiService.kt
+
 │       │   ├── PriceApi.kt
+
 │       │   ├── UserApi.kt
+
 │       │   ├── WishListApi.kt
+
 │       │   └── Wishlistapiservice.kt
+
 │       ├── dto
+
 │       │   ├── HistoryPriceDto.kt
+
 │       │   ├── PriceDto.kt
+
 │       │   └── ProductDto.kt
+
 │       └── repository
+
 │           ├── PriceRepositoryImpl.kt
+
 │           ├── ProductRepositoryImpl.kt
+
 │           ├── RetrofitClient.kt
+
 │           ├── UserRepository.kt
+
 │           └── Wishlistrepository.kt
+
 ├── domain
+
 │   ├── UserManager.kt
+
 │   ├── model
+
 │   │   ├── Category.kt
+
 │   │   ├── Platform.kt
+
 │   │   ├── PlatformPrice.kt
+
 │   │   ├── PricePoint.kt
+
 │   │   ├── Product.kt
+
 │   │   └── User.kt
+
 │   └── repository
+
 │       ├── PriceRepository.kt
+
 │       └── ProductRepository.kt
+
 └── ui
+
 ├── deals
+
 │   ├── DealsScreen.kt
+
 │   └── viewmodel
+
 │       ├── DealsViewModel.kt
+
 │       ├── SortField.kt
+
 │       └── SortOrder.kt
+
 ├── detail
+
 │   ├── ProductDetailScreen.kt
+
 │   └── viewmodel
+
 │       ├── HistoryUiState.kt
+
 │       └── ProductViewModel.kt
+
 ├── home
+
 │   ├── HomeScreen.kt
+
 │   └── viewmodel
+
 │       └── HomeViewModel.kt
+
 ├── navigation
+
 │   ├── BottomNavBar.kt
+
 │   ├── MainNavGraph.kt
+
 │   ├── NavExtensions.kt
+
 │   └── Routes.kt
+
 ├── notifications
+
 │   └── NotificationHelper.kt
+
 ├── profile
+
 │   ├── AuthViewModel.kt
+
 │   ├── EditProfileScreen.kt
+
 │   ├── HistoryScreen.kt
+
 │   ├── LoginScreen.kt
+
 │   ├── ProfileScreen.kt
+
 │   ├── RegisterScreen.kt
+
 │   └── SettingScreen.kt
+
 ├── theme
+
 │   ├── AppColors.kt
+
 │   ├── AppDimens.kt
+
 │   ├── Color.kt
+
 │   ├── Theme.kt
+
 │   └── Type.kt
+
 └── wishlist
+
 ├── WishListHolder.kt
+
 ├── WishListScreen.kt
+
 └── viewmodel
+
 ├── WishListModel.kt
+
 └── WishListViewModel.kt
+
 
 ## commit, code quality
 - all commits of these days are under branch "demo2"
