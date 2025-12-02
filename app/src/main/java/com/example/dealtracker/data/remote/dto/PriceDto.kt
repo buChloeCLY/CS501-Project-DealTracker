@@ -8,8 +8,8 @@ data class PriceDto(
     val pid: Int,
     val platform: String,
     val price: Double,
-    val free_shipping: Boolean,
-    val in_stock: Boolean,
+    val free_shipping: Int,
+    val in_stock: Int,
     val date: String,
     val link: String?
 )
