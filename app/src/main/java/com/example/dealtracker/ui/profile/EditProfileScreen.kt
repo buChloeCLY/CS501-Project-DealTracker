@@ -18,12 +18,11 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
-import com.example.dealtracker.data.remote.RetrofitClient
 import com.example.dealtracker.data.remote.api.UserUpdateRequest
 import com.example.dealtracker.domain.UserManager
 import com.example.dealtracker.domain.model.User
 import kotlinx.coroutines.launch
-
+import com.example.dealtracker.data.remote.RetrofitClient
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditProfileScreen(navController: NavHostController) {

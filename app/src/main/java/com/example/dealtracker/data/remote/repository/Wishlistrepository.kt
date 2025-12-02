@@ -1,22 +1,15 @@
 package com.example.dealtracker.data.remote.repository
 
-import com.example.dealtracker.data.remote.api.WishlistApiService
+import com.example.dealtracker.data.remote.RetrofitClient
 import com.example.dealtracker.domain.model.*
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
 
+/**
+ * 心愿单数据仓库
+ * 使用统一的 RetrofitClient
+ */
 class WishlistRepository {
 
-    private val api: WishlistApiService
-
-    init {
-        val retrofit = Retrofit.Builder()
-            .baseUrl("http://10.0.2.2:8080/")
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-
-        api = retrofit.create(WishlistApiService::class.java)
-    }
+    private val api = RetrofitClient.wishlistApi
 
     suspend fun getWishlist(uid: Int): Result<List<WishlistItem>> {
         return try {
@@ -40,7 +33,7 @@ class WishlistRepository {
                 uid = uid,
                 pid = pid,
                 target_price = targetPrice,
-                alert_enabled = if (alertEnabled) 1 else 0,  // 只在这里转换
+                alert_enabled = if (alertEnabled) 1 else 0,
                 priority = priority,
                 notes = notes
             )
@@ -61,7 +54,7 @@ class WishlistRepository {
         return try {
             val request = UpdateWishlistRequest(
                 target_price = targetPrice,
-                alert_enabled = alertEnabled?.let { if (it) 1 else 0 },  // 只在这里转换
+                alert_enabled = alertEnabled?.let { if (it) 1 else 0 },
                 priority = priority,
                 notes = notes
             )

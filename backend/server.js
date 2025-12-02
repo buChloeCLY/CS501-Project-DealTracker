@@ -1017,7 +1017,7 @@ app.listen(PORT, () => {
     console.log(`   GET    /price/:pid             - Get latest prices by platform`);
     console.log(`   GET    /history/:pid?days=7    - Get price history`);
     console.log('\n📦 Product Management:');
-    console.log(`   GET    /api/products           - Get all products`);
+    console.log(`   GET    /products           - Get all products`);
     console.log(`   GET    /api/products/:pid      - Get single product`);
     console.log(`   POST   /api/admin/import-initial        - Import 20 products`);
     console.log(`   POST   /api/admin/update-all-prices     - Update all prices`);

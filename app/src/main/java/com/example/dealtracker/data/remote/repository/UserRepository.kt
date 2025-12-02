@@ -1,11 +1,10 @@
 package com.example.dealtracker.data.remote.repository
 
-import com.example.dealtracker.data.remote.RetrofitClient
 import com.example.dealtracker.data.remote.api.*
 import com.example.dealtracker.domain.model.User
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-
+import com.example.dealtracker.data.remote.RetrofitClient
 class UserRepository {
 
     suspend fun getUser(uid: Int): Result<User> = withContext(Dispatchers.IO) {

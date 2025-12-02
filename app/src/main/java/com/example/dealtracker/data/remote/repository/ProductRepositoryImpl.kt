@@ -5,12 +5,12 @@ import com.example.dealtracker.domain.model.Product
 import com.example.dealtracker.domain.repository.ProductRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-
+import com.example.dealtracker.data.remote.RetrofitClient
 /**
  * 产品仓库实现
  * 负责从后端 API 获取数据
  */
-class ProductRepositoryImpl : ProductRepository {
+class ProductRepositoryImpl: ProductRepository {
 
     private val api = RetrofitClient.api
     private val TAG = "ProductRepository"
