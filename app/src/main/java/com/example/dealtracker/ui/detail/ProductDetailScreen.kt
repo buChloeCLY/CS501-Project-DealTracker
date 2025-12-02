@@ -7,12 +7,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -33,6 +35,7 @@ import com.example.dealtracker.ui.theme.AppDimens
 import com.example.dealtracker.domain.model.Platform
 import com.example.dealtracker.domain.model.Product
 import com.example.dealtracker.ui.wishlist.WishListHolder
+import com.example.dealtracker.ui.wishlist.viewmodel.WishListViewModel
 import kotlinx.coroutines.launch
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -46,17 +49,26 @@ fun ProductDetailScreen(
     name: String,
     price: Double,
     rating: Float,
-    navController: NavController
+    navController: NavController,
+    uid: Int = 1
 ) {
     val viewModel: ProductViewModel = viewModel()
+    val wishlistViewModel: WishListViewModel = viewModel()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
     val platformPricesState = viewModel.platformPrices.collectAsState()
     val priceHistoryState = viewModel.priceHistory.collectAsState()
 
-    // 收藏列表实时监听（防止状态不同步）
+    // 获取当前登录用户
+    val currentUser by com.example.dealtracker.domain.UserManager.currentUser.collectAsState()
+    val actualUid = currentUser?.uid ?: uid
+
+    // 监听本地心愿单状态（即时更新）
     val wishList by WishListHolder.wishList.collectAsState()
+    val isInWishlist = remember(wishList, pid) {
+        wishList.any { it.pid == pid }
+    }
 
     LaunchedEffect(pid) {
         viewModel.loadPlatformPrices(pid = pid)
@@ -80,6 +92,15 @@ fun ProductDetailScreen(
                 },
                 actions = {
                     IconButton(onClick = {
+                        // 检查是否登录
+                        if (currentUser == null) {
+                            scope.launch {
+                                snackbarHostState.showSnackbar("Please login first")
+                            }
+                            navController.navigate("login")
+                            return@IconButton
+                        }
+
                         val product = Product(
                             pid = pid,
                             title = name,
@@ -92,19 +113,29 @@ fun ProductDetailScreen(
                             category = Category.Electronics
                         )
 
-                        if (wishList.any { it.pid == pid }) {
-                            // 已存在于收藏夹
+                        if (isInWishlist) {
                             scope.launch {
                                 snackbarHostState.showSnackbar("Already in Wish List")
                             }
+                            navController.navigate("wishlist")
                         } else {
-                            WishListHolder.add(product)
+                            // 使用 WishListViewModel.addProduct，同步到本地 + 后端
+                            wishlistViewModel.addProduct(
+                                uid = actualUid,
+                                product = product,
+                                targetPrice = price * 0.9,  // 默认目标价 = 当前价的 9 折
+                                alertEnabled = true
+                            )
                             scope.launch {
                                 snackbarHostState.showSnackbar("Added to Wish List")
                             }
                         }
                     }) {
-                        Icon(Icons.Filled.Add, contentDescription = "Add to WishList")
+                        Icon(
+                            if (isInWishlist) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                            contentDescription = "Add to WishList",
+                            tint = if (isInWishlist) Color.Red else AppColors.PrimaryText
+                        )
                     }
                 }
             )
@@ -313,7 +344,7 @@ private fun PriceHistoryChart(
                 drawIntoCanvas { cnv ->
                     val nc = cnv.nativeCanvas
                     if (xLabelTilted) {
-                        nc.save()  // 添加这一行！
+                        nc.save()
                         nc.rotate(-45f, xx, baseY)
                     }
                     nc.drawText(p.date, xx, baseY + 20f, xLabelPaint)
@@ -367,7 +398,6 @@ private fun PlatformPriceCardList(
     }
 }
 
-// --------- Utility ---------
 private data class AxisInfo(val min: Double, val max: Double, val step: Double)
 
 private fun niceAxis(minVal: Double, maxVal: Double, tickCount: Int): AxisInfo {

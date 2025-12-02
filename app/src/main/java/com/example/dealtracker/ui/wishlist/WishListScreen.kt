@@ -1,97 +1,99 @@
 package com.example.dealtracker.ui.wishlist
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.Image
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import coil.compose.rememberAsyncImagePainter
 import com.example.dealtracker.domain.model.Product
-import com.example.dealtracker.ui.theme.AppColors
+import com.example.dealtracker.ui.notifications.NotificationHelper
+import com.example.dealtracker.ui.wishlist.viewmodel.WishListViewModel
 
-
-/**
- * 愿望清单页面
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WishListScreen(navController: NavController) {
-    val wishList by WishListHolder.wishList.collectAsState()
+fun WishListScreen(
+    navController: NavController,
+    currentUserId: Int,
+    viewModel: WishListViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+) {
+    val wishList by viewModel.wishList.collectAsState()
+    val context = LocalContext.current
+
+    // 打开页面时检查是否有降价提醒
+    LaunchedEffect(currentUserId) {
+        viewModel.checkAlerts(currentUserId) { alerts ->
+            alerts.forEach { alert ->
+                val title = alert.short_title ?: alert.title ?: "Wishlist item"
+                val current = alert.current_price ?: return@forEach
+                val target = alert.target_price ?: return@forEach
+
+                NotificationHelper.showPriceDropNotification(
+                    context = context,
+                    pid = alert.pid,
+                    title = title,
+                    currentPrice = current,
+                    targetPrice = target
+                )
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        "My Wish List",
-                        fontWeight = FontWeight.Bold,
-                        color = AppColors.PrimaryText
-                    )
-                },
+                title = { Text("Wishlist") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(
-                            Icons.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = AppColors.PrimaryText
-                        )
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
-                },
-                actions = {
-                    if (wishList.isNotEmpty()) {
-                        IconButton(onClick = { WishListHolder.clear() }) {
-                            Icon(
-                                Icons.Filled.DeleteSweep,
-                                contentDescription = "Clear All",
-                                tint = AppColors.Accent
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White,
-                    titleContentColor = AppColors.PrimaryText
-                )
+                }
             )
-        },
-        containerColor = Color(0xFFF8F9FA)
+        }
     ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF8F9FA))
+                .background(Color(0xFFF5F5F5))
                 .padding(innerPadding)
         ) {
             if (wishList.isEmpty()) {
-                EmptyWishList(navController)
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Your wishlist is empty")
+                }
             } else {
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(wishList, key = { it.pid }) { product ->
                         WishListItem(
                             product = product,
-                            onRemove = { WishListHolder.remove(it.pid) }
+                            onRemove = {
+                                viewModel.removeProduct(currentUserId, product.pid)
+                            },
+                            onTargetPriceConfirm = { targetPrice ->
+                                viewModel.updateTargetPrice(
+                                    uid = currentUserId,
+                                    pid = product.pid,
+                                    targetPrice = targetPrice
+                                )
+                            }
                         )
                     }
                 }
@@ -100,203 +102,94 @@ fun WishListScreen(navController: NavController) {
     }
 }
 
-/**
- * 空收藏列表提示
- */
 @Composable
-fun EmptyWishList(navController: NavController) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF8F9FA))
-            .padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Icon(
-            Icons.Default.Image,
-            contentDescription = "Empty wishlist",
-            modifier = Modifier.size(64.dp),
-            tint = AppColors.SecondaryText
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "Your Wish List is Empty",
-            fontWeight = FontWeight.Bold,
-            color = AppColors.PrimaryText,
-            style = MaterialTheme.typography.titleLarge
-        )
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Button(
-            onClick = { navController.navigate("home") },
-            colors = ButtonDefaults.buttonColors(
-                containerColor = AppColors.Accent
-            )
-        ) {
-            Text("Browse Products", fontWeight = FontWeight.Medium)
-        }
-    }
-}
-
-/**
- * 单个收藏商品项
- */
-@Composable
-fun WishListItem(
+private fun WishListItem(
     product: Product,
-    onRemove: (Product) -> Unit
+    onRemove: () -> Unit,
+    onTargetPriceConfirm: (Double) -> Unit
 ) {
-    var targetPrice by remember { mutableStateOf(product.price.toString()) }
+    var targetPrice by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(
-                elevation = 4.dp,
-                shape = RoundedCornerShape(12.dp),
-                clip = true
-            ),
-        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = Color.White
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // 图片部分
-            Box(
-                modifier = Modifier
-                    .size(80.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFFF5F5F5))
-                    .padding(4.dp),
-                contentAlignment = Alignment.Center
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                if (product.imageUrl.isNotEmpty()) {
-                    Image(
-                        painter = rememberAsyncImagePainter(product.imageUrl),
-                        contentDescription = product.title,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(RoundedCornerShape(6.dp))
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = product.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
                     )
-                } else {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Current price: $${String.format("%.2f", product.price)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF555555)
+                    )
+                }
+
+                IconButton(onClick = onRemove) {
                     Icon(
-                        Icons.Default.Image,
-                        contentDescription = "No image",
-                        tint = AppColors.SecondaryText,
-                        modifier = Modifier.size(32.dp)
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Remove",
+                        tint = Color(0xFFD32F2F)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // 商品信息和价格部分
-            Column(
-                modifier = Modifier
-                    .weight(1f)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                // 商品标题
-                Text(
-                    product.title,
-                    fontWeight = FontWeight.SemiBold,
-                    color = AppColors.PrimaryText,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.titleSmall
+                OutlinedTextField(
+                    value = targetPrice,
+                    onValueChange = { newValue ->
+                        if (newValue.isEmpty() || newValue.matches(Regex("^\\d*\\.?\\d*$"))) {
+                            targetPrice = newValue
+                            error = null
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    label = { Text("Target price") },
+                    isError = error != null
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.width(8.dp))
 
-                // 当前价格
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
+                Button(
+                    onClick = {
+                        val v = targetPrice.toDoubleOrNull()
+                        if (v == null || v <= 0.0) {
+                            error = "Invalid price"
+                        } else {
+                            onTargetPriceConfirm(v)
+                        }
+                    }
                 ) {
-                    Text(
-                        "Current: ",
-                        color = AppColors.SecondaryText,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        "$${"%.2f".format(product.price)}",
-                        color = AppColors.PrimaryText,
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // 目标价格输入
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        "Target Price:",
-                        color = AppColors.SecondaryText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.width(90.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    // 目标价格输入框
-                    OutlinedTextField(
-                        value = targetPrice,
-                        onValueChange = { newValue ->
-                            if (newValue.isEmpty() || newValue.matches(Regex("^\\d*\\.?\\d*$"))) {
-                                targetPrice = newValue
-                            }
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(60.dp),
-                        singleLine = true,
-                        textStyle = LocalTextStyle.current.copy(
-                            color = AppColors.PrimaryText,
-                            fontWeight = FontWeight.Medium
-                        ),
-                        placeholder = {
-                            Text(
-                                "Set target",
-                                color = AppColors.SecondaryText
-                            )
-                        },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = AppColors.Accent,
-                            unfocusedBorderColor = AppColors.Outline,
-                            cursorColor = AppColors.Accent,
-                            focusedTextColor = AppColors.PrimaryText,
-                            unfocusedTextColor = AppColors.PrimaryText
-                        )
-                    )
+                    Text("Save")
                 }
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
-
-            // 删除按钮
-            IconButton(
-                onClick = { onRemove(product) },
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(
-                        Color(0xFFFFE8E6),
-                        RoundedCornerShape(8.dp)
-                    )
-            ) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "Remove from wishlist",
-                    tint = Color(0xFFD32F2F),
-                    modifier = Modifier.size(24.dp)
+            if (error != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = error ?: "",
+                    color = Color.Red,
+                    style = MaterialTheme.typography.bodySmall
                 )
             }
         }

@@ -5,6 +5,7 @@
 
     <!-- ✅ 必须在 application 之前 -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:usesCleartextTraffic="true"

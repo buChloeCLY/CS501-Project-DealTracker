@@ -1,6 +1,5 @@
 package com.example.dealtracker.ui.profile
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -8,11 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,27 +19,25 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import com.example.dealtracker.data.local.UserPreferences
 import com.example.dealtracker.domain.UserManager
-import com.example.dealtracker.domain.model.User
+import com.example.dealtracker.ui.wishlist.WishListHolder
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(navController: NavHostController) {
-    // 初始化测试用户数据
+    val currentUser by UserManager.currentUser.collectAsState()
+    var showLogoutDialog by remember { mutableStateOf(false) }
+
+    // 初始化时从持久化存储加载用户
     LaunchedEffect(Unit) {
         if (UserManager.getUser() == null) {
-            UserManager.setUser(
-                User(
-                    uid = 1,
-                    name = "John Doe",
-                    email = "john.doe@email.com",
-                    gender = "Male"
-                )
-            )
+            val savedUser = UserPreferences.getUser()
+            if (savedUser != null) {
+                UserManager.setUser(savedUser)
+            }
         }
     }
-
-    val currentUser by UserManager.currentUser.collectAsState()
 
     Scaffold(
         topBar = {
@@ -79,9 +72,9 @@ fun ProfileScreen(navController: NavHostController) {
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Profile Avatar and Name
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Profile Avatar
             Box(
                 modifier = Modifier
                     .size(120.dp)
@@ -100,6 +93,7 @@ fun ProfileScreen(navController: NavHostController) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // User Info
             Text(
                 text = currentUser?.name ?: "Guest",
                 fontSize = 24.sp,
@@ -116,28 +110,90 @@ fun ProfileScreen(navController: NavHostController) {
             Spacer(modifier = Modifier.height(32.dp))
 
             // Menu Items
-            ProfileMenuItem(
-                icon = Icons.Default.List,
-                title = "Lists",
-                onClick = { navController.navigate("wishlist") }
-            )
+            if (currentUser != null) {
+                // Logged in menu
+                ProfileMenuItem(
+                    icon = Icons.Default.List,
+                    title = "Lists",
+                    onClick = { navController.navigate("wishlist") }
+                )
 
-            Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-            ProfileMenuItem(
-                icon = Icons.Default.History,
-                title = "History",
-                onClick = { navController.navigate("history") }
-            )
+                ProfileMenuItem(
+                    icon = Icons.Default.History,
+                    title = "History",
+                    onClick = { navController.navigate("history") }
+                )
 
-            Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-            ProfileMenuItem(
-                icon = Icons.Default.Settings,
-                title = "Setting",
-                onClick = { navController.navigate("settings") }
-            )
+                ProfileMenuItem(
+                    icon = Icons.Default.Settings,
+                    title = "Setting",
+                    onClick = { navController.navigate("settings") }
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                ProfileMenuItem(
+                    icon = Icons.Default.ExitToApp,
+                    title = "Logout",
+                    textColor = Color(0xFFE53935),
+                    onClick = { showLogoutDialog = true }
+                )
+            } else {
+                // Guest menu
+                ProfileMenuItem(
+                    icon = Icons.Default.Login,
+                    title = "Login",
+                    onClick = { navController.navigate("login") }
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                ProfileMenuItem(
+                    icon = Icons.Default.PersonAdd,
+                    title = "Sign Up",
+                    onClick = { navController.navigate("register") }
+                )
+            }
         }
+    }
+
+    // Logout Confirmation Dialog
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            title = { Text("Logout") },
+            text = { Text("Are you sure you want to logout?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        // 清除用户信息
+                        UserManager.logout()
+                        UserPreferences.clearUser()
+
+                        // 清空心愿单数据
+                        WishListHolder.clear()
+
+                        showLogoutDialog = false
+
+                        // 跳转到登录页
+                        navController.navigate("login") {
+                            popUpTo("profile") { inclusive = true }
+                        }
+                    }
+                ) {
+                    Text("Logout", color = Color(0xFFE53935))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
@@ -145,6 +201,7 @@ fun ProfileScreen(navController: NavHostController) {
 fun ProfileMenuItem(
     icon: ImageVector,
     title: String,
+    textColor: Color = Color(0xFF212121),
     onClick: () -> Unit
 ) {
     Card(
@@ -168,7 +225,7 @@ fun ProfileMenuItem(
             Icon(
                 imageVector = icon,
                 contentDescription = title,
-                tint = Color(0xFF616161),
+                tint = if (textColor == Color(0xFF212121)) Color(0xFF616161) else textColor,
                 modifier = Modifier.size(24.dp)
             )
 
@@ -178,7 +235,7 @@ fun ProfileMenuItem(
                 text = title,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Medium,
-                color = Color(0xFF212121),
+                color = textColor,
                 modifier = Modifier.weight(1f)
             )
 

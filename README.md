@@ -26,7 +26,6 @@ cd CS501-Project-DealTracker
 - Sync Gradle and wait for dependencies to resolve.
 - For physical device testing, replace localhost with your computer's actual IP in:
   - Node.js Backend Client: data/remote/repository/RetrofitClient.kt
-  - Flask Backend Client: data/remote/RetrofitClient.kt
 
 #### 2. Node.js Backend Setup
 
@@ -53,23 +52,7 @@ Import Initial Data
 curl -X POST http://localhost:8080/api/admin/import-initial
 ```
 
-#### 3. Flask Backend Setup
-
-Used to serve mock historical price data for detail screen.
-
-```
-cd backend
-pip install flask flask-cors pymysql
-python app.py
-```
-
-Expected Output
-
-```
-* Running on http://0.0.0.0:5001
-```
-
-#### 4. Run Application
+#### 3. Run Application
 
 Run `app` in Android Studio.
 
@@ -86,6 +69,18 @@ Run `app` in Android Studio.
 - Automated price monitoring updates product data daily.
 
 #### Application Features
+| Feature                          | Status      | Notes                                                       |
+|----------------------------------|-------------|-------------------------------------------------------------|
+| Multi-platform price integration | Completed   | Amazon /Walmart, but more platforms will be added in future |
+| Wishlist API                     | Completed   | Alerts endpoint implemented                                 |
+| Cron daily price update          | In Progress | Testing scheduled job                                       |
+| User login & register            | Completed   | SHA-256 password hash                                       |
+| Historical price chart           | Completed     |                                                             | |
+| Basic MVVM                       |  Completed     | Architecture implemented for scalability                    |
+| Price Comparison                 | Completed      | Supports multiple platforms; more platforms to be added     |
+| Sensor Integration               |  Completed     | Sensors data collected and processed                        |
+| AI Recommendation                |  Not Implemented | Planned for future release                                  |
+| Price Alert / Wishlist           | In Progress    | Alerts endpoint implemented; testing ongoing                |
 
 #### 1. Home Screen
 
@@ -118,6 +113,107 @@ Run `app` in Android Studio.
 - Manage user account information and preferences.
 - Access wishlist and browsing history using mock data.
 - Font size adjustment and dark mode toggle interfaces implemented in UI.
+- Log out
+
+#### 6. Login and Register Screen
+
+- Input account and password to login
+- Register new account
+
+## API references
+
+### a) User Management (`/api/user/...`)
+
+| Method | Endpoint | Description |
+|--------|---------|-------------|
+| GET | `/api/user/:uid` | Fetch basic user profile (uid, name, email, gender, timestamps) |
+| POST | `/api/user/login` | Log in with email + password (hashed with SHA-256), returns user info on success |
+| POST | `/api/user/register` | Register a new user, checks duplicate email, stores hashed password |
+| PUT | `/api/user/:uid` | Update user fields (name, email, gender, password) |
+| DELETE | `/api/user/:uid` | Delete a user by UID |
+
+---
+
+### b) Price & History APIs
+
+| Method | Endpoint | Description |
+|--------|---------|-------------|
+| GET | `/api/price/:pid` | Returns the latest price per platform for a product (price, free_shipping, in_stock, link) |
+| GET | `/api/history/:pid?days=N` | Returns daily minimum price history for the last N days |
+| GET | `/api/products/:pid/lowest-price` | Computes current lowest price across platforms and returns: <br> - `lowestPrice` – minimum price <br> - `platforms` – platforms sharing lowest price <br> - `allPrices` – latest price from every platform |
+
+---
+
+### c) Product Management (`/api/products/...`)
+
+| Method | Endpoint | Description |
+|--------|---------|-------------|
+| GET | `/api/products` | Returns product list with optional filters: category, search, min_price, max_price, in_stock, free_shipping |
+| GET | `/api/products/:pid` | Returns a single product from the products table |
+
+---
+
+### d) Wishlist APIs
+
+| Method | Endpoint | Description |
+|--------|---------|-------------|
+| GET | `/api/wishlist?uid=UID` | Returns wishlist items for a user: pid, target_price, product info, current_price |
+| POST | `/api/wishlist` | Add or update wishlist entry (`uid`, `pid`, `target_price`) |
+| DELETE | `/api/wishlist` | Remove wishlist item by `uid` + `pid` |
+| GET | `/api/wishlist/alerts?uid=UID` | Returns wishlist items where current lowest price <= target_price for notifications |
+
+---
+
+### e) Admin / Maintenance APIs
+
+| Method | Endpoint | Description |
+|--------|---------|-------------|
+| POST | `/api/admin/import-initial` | Imports seed products from Amazon, then adds BestBuy/Walmart prices |
+| POST | `/api/admin/update-all-prices` | Fetches fresh prices for all products from all platforms |
+| POST | `/api/admin/sync-lowest-prices` | Computes the cheapest platform for each product and updates the `products` table |
+
+---
+
+### f) Scheduled Job
+
+- A cron job runs **daily at 3:00 AM (America/New_York)**:
+  - Fetches new prices from Amazon / BestBuy / Walmart for all products
+  - Inserts new rows into `price` table
+  - Calls `syncLowestPrices()` to update the `products` table to the latest lowest prices
+
+---
+
+### g) System / Test Endpoints
+
+| Method | Endpoint | Description |
+|--------|---------|-------------|
+| GET | `/api/health` | Health check: database connection, API key configuration, platform key status |
+| GET | `/api/test/extract-title` | Test short title extraction logic on sample titles |
+
+---
+
+###  Progress We've Made
+
+- **Multi-platform price integration**
+  - RapidAPI integration for BestBuy and Walmart, in addition to Amazon
+  - Multiple price records per product (price, free_shipping, in_stock, link)
+
+- **Smarter Product Modeling**
+  - `extractShortTitle()` generates concise, user-friendly short titles
+  - Title similarity logic chooses best Walmart match from multiple results
+
+- **Richer Admin Workflows**
+  - `/api/admin/import-initial` imports products and attaches multi-platform prices
+  - `/api/admin/update-all-prices` refreshes all existing products’ prices
+  - `/api/admin/sync-lowest-prices` centralizes cheapest platform calculation
+
+- **Wishlist Support**
+  - New `/api/wishlist` and `/api/wishlist/alerts` endpoints
+  - Alerts endpoint encapsulates logic for notifications
+
+- **Daily Scheduled Multi-Platform Update**
+  - Cron job fetches fresh prices from all platforms
+  - Automatically syncs products table to the newest lowest prices
 
 
 
@@ -134,12 +230,138 @@ Run `app` in Android Studio.
 
 #### Backend
 - **Primary:** Node.js + Express.js
-- **Testing (Legacy):** Flask (Python) - for initial database connection testing
 - **Data Source:** RapidAPI (Real-Time Amazon Data API)
-- **Scheduler:** node-cron
+- **Scheduler:** Everyday it will update new prices from different platforms
 
 #### Database
 - **Platform:** AWS RDS MySQL
 - **Host:** database-1.cjw0amswcib4.us-east-2.rds.amazonaws.com
 - **Engine:** MySQL 8.0
 
+
+## Repo organization
+```
+├── MainActivity.kt
+├── data
+│   ├── local
+│   │   └── UserPreferences.kt
+│   └── remote
+│       ├── api
+│       │   ├── DatabaseApiService.kt
+│       │   ├── PriceApi.kt
+│       │   ├── UserApi.kt
+│       │   ├── WishListApi.kt
+│       │   └── Wishlistapiservice.kt
+│       ├── dto
+│       │   ├── HistoryPriceDto.kt
+│       │   ├── PriceDto.kt
+│       │   └── ProductDto.kt
+│       └── repository
+│           ├── PriceRepositoryImpl.kt
+│           ├── ProductRepositoryImpl.kt
+│           ├── RetrofitClient.kt
+│           ├── UserRepository.kt
+│           └── Wishlistrepository.kt
+├── domain
+│   ├── UserManager.kt
+│   ├── model
+│   │   ├── Category.kt
+│   │   ├── Platform.kt
+│   │   ├── PlatformPrice.kt
+│   │   ├── PricePoint.kt
+│   │   ├── Product.kt
+│   │   └── User.kt
+│   └── repository
+│       ├── PriceRepository.kt
+│       └── ProductRepository.kt
+└── ui
+├── deals
+│   ├── DealsScreen.kt
+│   └── viewmodel
+│       ├── DealsViewModel.kt
+│       ├── SortField.kt
+│       └── SortOrder.kt
+├── detail
+│   ├── ProductDetailScreen.kt
+│   └── viewmodel
+│       ├── HistoryUiState.kt
+│       └── ProductViewModel.kt
+├── home
+│   ├── HomeScreen.kt
+│   └── viewmodel
+│       └── HomeViewModel.kt
+├── navigation
+│   ├── BottomNavBar.kt
+│   ├── MainNavGraph.kt
+│   ├── NavExtensions.kt
+│   └── Routes.kt
+├── notifications
+│   └── NotificationHelper.kt
+├── profile
+│   ├── AuthViewModel.kt
+│   ├── EditProfileScreen.kt
+│   ├── HistoryScreen.kt
+│   ├── LoginScreen.kt
+│   ├── ProfileScreen.kt
+│   ├── RegisterScreen.kt
+│   └── SettingScreen.kt
+├── theme
+│   ├── AppColors.kt
+│   ├── AppDimens.kt
+│   ├── Color.kt
+│   ├── Theme.kt
+│   └── Type.kt
+└── wishlist
+├── WishListHolder.kt
+├── WishListScreen.kt
+└── viewmodel
+├── WishListModel.kt
+└── WishListViewModel.kt
+```
+
+## Testing and debugging
+### API debugging
+I first added log statements in the code and inspected both the Android Logcat output and the backend server logs.
+![img1.png](img1.png)
+Then I used the RapidAPI console and Postman to manually test each endpoint to confirm that the backend was parsing and returning fields correctly.
+![img2.png](img2.png)
+Based on these experiments, I drew conclusions from the responses: for example, an HTTP status code `429` indicates that our free quota on RapidAPI has been exhausted and the service stops responding; a timeout error shows that the API is too slow, in which case we should consider removing or relaxing the timeout limit.
+### Backend debugging
+My Deals page started returning a 500 error, and Logcat showed the following messages:
+
+```text
+2025-12-02 10:21:14.158 15681-15716 ProductRepository       com.example.dealtracker              E  API Error: 500 - Internal Server Error
+2025-12-02 10:21:14.225 15681-15681 DealsViewModel          com.example.dealtracker              E  Failed to load products: API Error: 500 - Internal Server Error
+```
+
+This indicated a backend issue. After checking the server logs, I found the following error:
+
+```text
+Get products error: Error: read ECONNRESET
+    at PromisePool.query (C:\Users\JOY\Desktop\CS501\project\CS501-Project-DealTracker\backend\node_modules\mysql2\lib\promise\pool.js:36:22)       
+    at C:\Users\JOY\Desktop\CS501\project\CS501-Project-DealTracker\backend\server.js:900:39
+    ...
+  code: 'ECONNRESET',
+  errno: -4077,
+  sql: undefined,
+  sqlState: undefined,
+  sqlMessage: undefined
+}
+```
+
+`ECONNRESET` means that the database connection was reset, which usually happens when a query takes too long and the database times out. In my case, the `/api/products` route was performing additional joins on the `price` table for every product, making the query too complex and slow. Since the `products` table already stores the current lowest price for each item, I simplified the endpoint by removing the extra `price` lookups, which resolved the timeout and the 500 error.
+
+
+## commit, code quality
+- all commits of these days are under branch "demo2"
+
+- Follow project coding standards and use linting/formatting tools (e.g., Kotlin style guidelines).
+
+- Avoid duplicated logic (abort flask backend, merge 2 backends).
+
+- Use defensive programming: handle errors, timeouts, and nullability safely.
+
+
+## AI use
+- AI tools are be used to speed up development
+- All AI-generated code are reviewed, tested, and verified by the developer.

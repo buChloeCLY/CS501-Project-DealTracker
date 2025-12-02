@@ -1,6 +1,5 @@
 package com.example.dealtracker.data.remote.repository
 
-import com.example.dealtracker.data.remote.RetrofitClient
 import com.example.dealtracker.data.remote.api.*
 import com.example.dealtracker.domain.model.User
 import kotlinx.coroutines.Dispatchers

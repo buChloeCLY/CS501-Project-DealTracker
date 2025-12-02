@@ -1,6 +1,5 @@
 package com.example.dealtracker.data.remote.repository
 
-import com.example.dealtracker.data.remote.RetrofitClient
 import com.example.dealtracker.data.remote.dto.HistoryPriceDto
 import com.example.dealtracker.data.remote.dto.PriceDto
 import com.example.dealtracker.domain.model.PlatformPrice
@@ -10,7 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 // 价格仓库实现类
-class PriceRepositoryImpl : PriceRepository {
+class PriceRepositoryImpl: PriceRepository {
 
     private val api = RetrofitClient.priceApi
 
