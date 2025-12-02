@@ -60,6 +60,10 @@ fun ProductDetailScreen(
     val platformPricesState = viewModel.platformPrices.collectAsState()
     val priceHistoryState = viewModel.priceHistory.collectAsState()
 
+    // 获取当前登录用户
+    val currentUser by com.example.dealtracker.domain.UserManager.currentUser.collectAsState()
+    val actualUid = currentUser?.uid ?: uid
+
     // 监听本地心愿单状态（即时更新）
     val localWishList by WishListHolder.localWishList.collectAsState()
     val isInWishlist = remember(localWishList, pid) {
@@ -88,6 +92,15 @@ fun ProductDetailScreen(
                 },
                 actions = {
                     IconButton(onClick = {
+                        // 检查是否登录
+                        if (currentUser == null) {
+                            scope.launch {
+                                snackbarHostState.showSnackbar("Please login first")
+                            }
+                            navController.navigate("login")
+                            return@IconButton
+                        }
+
                         val product = Product(
                             pid = pid,
                             title = name,
@@ -107,7 +120,7 @@ fun ProductDetailScreen(
                             navController.navigate("wishlist")
                         } else {
                             wishlistViewModel.addToWishlist(
-                                uid = uid,
+                                uid = actualUid,
                                 product = product,
                                 targetPrice = price * 0.9,
                                 onSuccess = {

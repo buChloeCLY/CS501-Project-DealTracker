@@ -42,6 +42,14 @@ object WishListHolder {
     }
 
     /**
+     * 清空所有数据（退出登录时使用）
+     */
+    fun clearAll() {
+        _localWishList.value = emptyList()
+        _remoteWishList.value = emptyList()
+    }
+
+    /**
      * 检查商品是否在本地缓存中
      */
     fun isInLocal(pid: Int): Boolean {

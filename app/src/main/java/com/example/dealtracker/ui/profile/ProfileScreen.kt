@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.example.dealtracker.data.local.UserPreferences
 import com.example.dealtracker.domain.UserManager
+import com.example.dealtracker.ui.wishlist.WishListHolder
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -170,7 +171,11 @@ fun ProfileScreen(navController: NavHostController) {
                 TextButton(
                     onClick = {
                         // 清除用户信息
+                        UserManager.logout()
                         UserPreferences.clearUser()
+
+                        // 清空心愿单数据
+                        WishListHolder.clearAll()
 
                         showLogoutDialog = false
 
