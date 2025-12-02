@@ -13,6 +13,8 @@ import com.example.dealtracker.ui.profile.SettingsScreen
 import com.example.dealtracker.ui.profile.ProfileScreen
 import com.example.dealtracker.ui.profile.HistoryScreen
 import com.example.dealtracker.ui.profile.EditProfileScreen
+import com.example.dealtracker.ui.auth.LoginScreen
+import com.example.dealtracker.ui.auth.RegisterScreen
 
 
 /**
@@ -103,6 +105,15 @@ fun MainNavGraph(
         composable(Routes.EDIT_PROFILE) {
             EditProfileScreen(navController = navController)
         }
+
+        composable("login") {
+            LoginScreen(navController)
+        }
+
+        composable("register") {
+            RegisterScreen(navController)
+        }
+
     }
 
 }

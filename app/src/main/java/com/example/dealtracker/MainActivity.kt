@@ -16,6 +16,9 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.dealtracker.ui.navigation.*
 import com.example.dealtracker.ui.theme.DealTrackerTheme
+import com.example.dealtracker.data.local.UserPreferences
+import com.example.dealtracker.ui.auth.LoginScreen
+import com.example.dealtracker.ui.auth.RegisterScreen
 
 
 class MainActivity : ComponentActivity() {
@@ -26,7 +29,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
+        UserPreferences.init(this)
         // 自动请求麦克风权限
         if (ContextCompat.checkSelfPermission(
                 this,
