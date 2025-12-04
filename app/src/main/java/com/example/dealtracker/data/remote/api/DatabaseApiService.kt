@@ -1,6 +1,7 @@
 package com.example.dealtracker.data.remote.api
 
 import com.example.dealtracker.data.remote.dto.ProductDTO
+import com.example.dealtracker.data.remote.dto.SearchResponseDTO
 import retrofit2.Response
 import retrofit2.http.*
 
@@ -23,10 +24,15 @@ interface DatabaseApiService {
     suspend fun getProductById(@Path("pid") pid: Int): Response<ProductDTO>
 
     /**
-     * 搜索产品（按标题）
+     * 搜索产品（模糊搜索 + 分页）
      */
     @GET("products/search")
-    suspend fun searchProducts(@Query("query") query: String): Response<List<ProductDTO>>
+    suspend fun searchProducts(
+        @Query("query") query: String,
+        @Query("page") page: Int = 1,
+        @Query("size") size: Int = 10
+    ): Response<SearchResponseDTO>
+
 
     /**
      * 按平台筛选

@@ -152,7 +152,9 @@ fun HomeScreen(navController: NavHostController, homeViewModel: HomeViewModel = 
                     IconButton(onClick = {
                         if (isSearchMode && searchQuery.isNotEmpty()) {
                             // 执行搜索
-                            navController.navigateToRoot(Routes.DEALS)
+                            navController.navigateToRoot(
+                                Routes.dealsWithQuery(searchQuery)
+                            )
                         } else {
                             isSearchMode = !isSearchMode
                             if (!isSearchMode) homeViewModel.updateQuery("")
