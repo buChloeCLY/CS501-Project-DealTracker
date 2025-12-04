@@ -19,37 +19,47 @@ import com.example.dealtracker.domain.UserManager
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 
-
 /**
  * 主导航图配置
- *
- * 管理应用的页面跳转关系，基于 Navigation Compose。
- * 每个 composable() 定义一个路由对应的页面。
+ * 管理应用的页面跳转关系
  */
 @Composable
 fun MainNavGraph(
     navController: NavHostController,
     modifier: Modifier = Modifier
 ) {
-    // NavHost：设置起始页（Home）
+
     NavHost(
         navController = navController,
         startDestination = Routes.HOME,
         modifier = modifier
     ) {
 
-        // ============= 首页 Home =============
+        // ------------------------ Home ------------------------
         composable(Routes.HOME) {
-            HomeScreen(navController = navController)
+            HomeScreen(
+                navController = navController,
+                //  在 HomeScreen 输入搜索词时跳转：
+                // navController.navigate("deals?query=$query")
+            )
         }
 
-        // ============= Deals 页面 =============
-        composable(Routes.DEALS) {
+        // ------------------------ Deals（支持 query 参数） ------------------------
+        composable(
+            route = "deals?query={query}"
+        ) { backStackEntry ->
+
+            //  读取从 HomeScreen 传来的 search query
+            val query = backStackEntry.arguments?.getString("query")
+
             DealsScreen(
                 showBack = navController.previousBackStackEntry != null,
                 onBack = { navController.popBackStack() },
+
+                // 传到 DealsScreen 进行搜索分页加载
+                searchQuery = query,
+
                 onCompareClick = { product ->
-                    // 跳转到详情页（带参数）
                     navController.navigate(
                         Routes.detailRoute(
                             pid = product.pid,
@@ -62,19 +72,17 @@ fun MainNavGraph(
             )
         }
 
-        // ============= 商品详情页（带参数） =============
+        // ------------------------ Product Detail ------------------------
         composable(
             route = Routes.DETAIL_BASE +
                     "?pid={pid}&name={name}&price={price}&rating={rating}"
         ) { backStackEntry ->
 
-            // 从路由参数中解析数据
             val pid = backStackEntry.arguments?.getString("pid")?.toIntOrNull() ?: 1
             val name = backStackEntry.arguments?.getString("name") ?: ""
             val price = backStackEntry.arguments?.getString("price")?.toDoubleOrNull() ?: 0.0
             val rating = backStackEntry.arguments?.getString("rating")?.toFloatOrNull() ?: 0f
 
-            // 渲染详情页（含历史价格图表 + 平台信息）
             ProductDetailScreen(
                 pid = pid,
                 name = name,
@@ -84,11 +92,10 @@ fun MainNavGraph(
             )
         }
 
-        // ============= 收藏页 WishList =============
+        // ------------------------ Wishlist ------------------------
         composable(Routes.LISTS) {
-            // 从 UserManager 拿当前用户
             val currentUser by UserManager.currentUser.collectAsState()
-            val uid = currentUser?.uid ?: 0  // 未登录时为 0，你在 WishListScreen 里可以根据 0 做跳转登录
+            val uid = currentUser?.uid ?: 0
 
             WishListScreen(
                 navController = navController,
@@ -96,7 +103,6 @@ fun MainNavGraph(
             )
         }
 
-        // 兼容 Profile 里使用的硬编码 "wishlist" 路由
         composable("wishlist") {
             val currentUser by UserManager.currentUser.collectAsState()
             val uid = currentUser?.uid ?: 0
@@ -107,10 +113,11 @@ fun MainNavGraph(
             )
         }
 
-        // =============  Profile 页面 =============
-         composable(Routes.PROFILE) {
-             ProfileScreen(navController = navController)
-         }
+        // ------------------------ Profile ------------------------
+        composable(Routes.PROFILE) {
+            ProfileScreen(navController = navController)
+        }
+
         composable(Routes.HISTORY) {
             HistoryScreen(navController = navController)
         }
@@ -130,7 +137,5 @@ fun MainNavGraph(
         composable("register") {
             RegisterScreen(navController)
         }
-
     }
-
 }

@@ -856,10 +856,17 @@ app.get('/api/products/:pid/lowest-price', async (req, res) => {
 });
 
 // ===================================
-// API: 产品管理
+// API: 产品管理（最终修复版）
 // ===================================
 
-// 获取所有产品
+// 🛑 过滤 Chrome 自动请求避免 pid = 'favicon.ico'
+app.get('/api/products/favicon.ico', (req, res) => res.status(204).end());
+
+
+// ===================================
+// 🔍 1. 获取所有产品
+// GET /api/products
+// ===================================
 app.get('/api/products', async (req, res) => {
     try {
         const { category, search, min_price, max_price, in_stock, free_shipping } = req.query;
@@ -873,7 +880,7 @@ app.get('/api/products', async (req, res) => {
         }
 
         if (search) {
-            query += ' AND title LIKE ?';  // 只搜索 title
+            query += ' AND title LIKE ?';
             params.push(`%${search}%`);
         }
 
@@ -887,43 +894,109 @@ app.get('/api/products', async (req, res) => {
             params.push(parseFloat(max_price));
         }
 
-        if (in_stock === 'true') {
-            query += ' AND in_stock = 1';
-        }
-
-        if (free_shipping === 'true') {
-            query += ' AND free_shipping = 1';
-        }
+        if (in_stock === 'true') query += ' AND in_stock = 1';
+        if (free_shipping === 'true') query += ' AND free_shipping = 1';
 
         query += ' ORDER BY created_at DESC';
 
         const [products] = await pool.query(query, params);
-
-        // 直接返回，不查询 price 表
         res.json(products);
 
     } catch (error) {
-        console.error('Get products error:', error);
+        console.error('[Get products error]:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// 获取单个产品
-app.get('/api/products/:pid', async (req, res) => {
+
+// ===================================
+// 🔍 2. 搜索产品（分页）
+// GET /api/products/search?query=iPhone&page=1&size=10
+// ===================================
+app.get('/api/products/search', async (req, res) => {
     try {
-        const pid = parseInt(req.params.pid);
-        const [rows] = await pool.query('SELECT * FROM products WHERE pid = ?', [pid]);
+        const query = req.query.query?.trim() || "";
+        const page = parseInt(req.query.page || "1");
+        const size = parseInt(req.query.size || "10");
+
+        if (!query) {
+            return res.json({
+                products: [],
+                page: 1,
+                totalPages: 1
+            });
+        }
+
+        const offset = (page - 1) * size;
+
+        // 总数
+        const [countRows] = await pool.query(
+            `SELECT COUNT(*) AS total
+             FROM products
+             WHERE title LIKE ? OR short_title LIKE ?`,
+            [`%${query}%`, `%${query}%`]
+        );
+
+        const total = countRows[0].total;
+        const totalPages = Math.max(1, Math.ceil(total / size));
+
+        // 分页结果
+        const [rows] = await pool.query(
+            `SELECT *
+             FROM products
+             WHERE title LIKE ? OR short_title LIKE ?
+             ORDER BY created_at DESC
+             LIMIT ? OFFSET ?`,
+            [`%${query}%`, `%${query}%`, size, offset]
+        );
+
+        res.json({
+            query,
+            products: rows,
+            page,
+            size,
+            total,
+            totalPages
+        });
+
+    } catch (error) {
+        console.error('[Search products error]:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
+// ===================================
+// 🔍 3. 获取单个产品（修复 NaN 崩溃）
+// GET /api/products/:pid
+// ===================================
+app.get('/api/products/:pid', async (req, res) => {
+    const pid = Number(req.params.pid);
+
+    // 🚫 pid 不是数字 → 禁止执行 SQL
+    if (!Number.isInteger(pid) || pid <= 0) {
+        console.warn(`⚠️  Invalid PID received: ${req.params.pid}`);
+        return res.status(400).json({ error: "Invalid product ID" });
+    }
+
+    try {
+        const [rows] = await pool.query(
+            'SELECT * FROM products WHERE pid = ?',
+            [pid]
+        );
 
         if (rows.length > 0) {
             res.json(rows[0]);
         } else {
             res.status(404).json({ error: 'Product not found' });
         }
+
     } catch (error) {
-        console.error('Get product error:', error);
+        console.error('[Get product error]:', error);
         res.status(500).json({ error: error.message });
     }
 });
+
 
 // 🆕 导入初始产品（支持多平台）
 app.post('/api/admin/import-initial', async (req, res) => {

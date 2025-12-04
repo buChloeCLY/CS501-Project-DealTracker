@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,18 +36,14 @@ import com.example.dealtracker.domain.model.Product
 import com.example.dealtracker.ui.deals.viewmodel.DealsViewModel
 import com.example.dealtracker.ui.deals.viewmodel.SortField
 import com.example.dealtracker.ui.deals.viewmodel.SortOrder
-import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
-
-// ===================================
-// 主屏幕
-// ===================================
 
 @Composable
 fun DealsScreen(
-    showBack: Boolean = false,
-    onBack: () -> Unit = {},
-    onCompareClick: (Product) -> Unit = {},
+    showBack: Boolean,
+    onBack: () -> Unit,
+    searchQuery: String? = null,
+    onCompareClick: (Product) -> Unit,
     viewModel: DealsViewModel = viewModel()
 ) {
     val ui by viewModel.uiState.collectAsState()
@@ -56,6 +53,13 @@ fun DealsScreen(
 
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+
+    // ---- 当 Home 传来 searchQuery 时应用一次 ----
+    LaunchedEffect(searchQuery) {
+        if (searchQuery != null) {
+            viewModel.applySearch(searchQuery)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -76,7 +80,7 @@ fun DealsScreen(
                 .padding(innerPadding)
                 .fillMaxSize()
         ) {
-            // 加载状态
+            // Loading 视图
             if (ui.isLoading) {
                 Column(
                     modifier = Modifier.align(Alignment.Center),
@@ -84,10 +88,10 @@ fun DealsScreen(
                 ) {
                     CircularProgressIndicator()
                     Spacer(Modifier.height(16.dp))
-                    Text("Loading products from database...")
+                    Text("Loading...")
                 }
             }
-            // 错误状态
+            // 错误视图
             else if (ui.error != null) {
                 Column(
                     modifier = Modifier.align(Alignment.Center),
@@ -95,40 +99,61 @@ fun DealsScreen(
                 ) {
                     Icon(
                         Icons.Filled.Error,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Text(
-                        "Failed to load products",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.error
+                        null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(48.dp)
                     )
                     Spacer(Modifier.height(8.dp))
-                    Text(
-                        ui.error ?: "Unknown error",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 32.dp)
-                    )
+                    Text("Error: ${ui.error}", color = MaterialTheme.colorScheme.error)
                     Spacer(Modifier.height(16.dp))
                     Button(onClick = { viewModel.refreshProducts() }) {
                         Icon(Icons.Filled.Refresh, null)
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(6.dp))
                         Text("Retry")
                     }
                 }
             }
-            // 产品列表
+            // 主内容
             else {
                 Column(Modifier.fillMaxSize()) {
-                    // Filter / Sort 按钮
+
+                    // ---------------- 搜索状态 + 分页指示 ----------------
+                    if (ui.searchQuery.isNotBlank()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                "Searching: \"${ui.searchQuery}\" (Page ${ui.currentPage} / ${ui.totalPages})",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
+                    // 若当前页没有搜到内容
+                    if (ui.searchQuery.isNotBlank() && ui.products.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "No results for \"${ui.searchQuery}\"",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        return@Box
+                    }
+
+                    // ---------------- Filter / Sort / Refresh ----------------
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            .padding(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         AssistChip(
@@ -148,54 +173,82 @@ fun DealsScreen(
                         )
                     }
 
-                    // 产品列表
+                    // ---------------- Product 列表 ----------------
                     LazyColumn(
+                        state = listState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                        state = listState
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // 产品数量提示
+
+                        // 数量提示
                         item {
                             Text(
-                                "${ui.filteredSorted.size} products found",
+                                "${ui.filteredSorted.size} products",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
-                        items(ui.filteredSorted) { product ->
+                        items(ui.filteredSorted) { p ->
                             ProductCard(
-                                product = product,
+                                product = p,
                                 onCompareClick = onCompareClick
                             )
+                        }
+
+                        // ---------------- 分页控件 ----------------
+                        if (ui.searchQuery.isNotBlank()) {
+                            item {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    OutlinedButton(
+                                        onClick = { viewModel.loadPrevPage() },
+                                        enabled = ui.currentPage > 1
+                                    ) {
+                                        Text("Prev")
+                                    }
+
+                                    OutlinedButton(
+                                        onClick = { viewModel.loadNextPage() },
+                                        enabled = ui.currentPage < ui.totalPages
+                                    ) {
+                                        Text("Next")
+                                    }
+                                }
+                            }
                         }
                     }
                 }
 
-                // 置顶按钮
+                // ---------------- Back to Top ----------------
                 val showScrollTop by remember {
                     derivedStateOf { listState.firstVisibleItemIndex > 4 }
                 }
+
                 AnimatedVisibility(
                     visible = showScrollTop,
                     enter = fadeIn(),
                     exit = fadeOut(),
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(end = 16.dp, bottom = 16.dp)
+                        .padding(16.dp)
                 ) {
                     SmallFloatingActionButton(
                         onClick = { scope.launch { listState.animateScrollToItem(0) } }
                     ) {
-                        Icon(Icons.Filled.KeyboardArrowUp, "Back to top")
+                        Icon(Icons.Filled.KeyboardArrowUp, "Top")
                     }
                 }
             }
         }
     }
 
-    // Filter Sheet
+    // ---------------- BottomSheet: Filter ----------------
     if (filterSheetOpen) {
         FilterSheet(
             priceMin = ui.filters.priceMin,
@@ -221,7 +274,7 @@ fun DealsScreen(
         )
     }
 
-    // Sort Sheet
+    // ---------------- BottomSheet: Sort ----------------
     if (sortSheetOpen) {
         SortSheet(
             sortField = ui.sort.field,
@@ -232,7 +285,6 @@ fun DealsScreen(
         )
     }
 }
-
 // ===================================
 // 产品卡片（带图片）
 // ===================================
