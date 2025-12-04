@@ -5,6 +5,8 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import com.example.dealtracker.ui.deals.DealsScreen
 import com.example.dealtracker.ui.detail.ProductDetailScreen
 import com.example.dealtracker.ui.home.HomeScreen
@@ -18,6 +20,7 @@ import com.example.dealtracker.ui.profile.RegisterScreen
 import com.example.dealtracker.domain.UserManager
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+
 
 
 /**
@@ -43,13 +46,44 @@ fun MainNavGraph(
             HomeScreen(navController = navController)
         }
 
-        // ============= Deals 页面 =============
+// ============= Deals 页面（普通进入） =============
         composable(Routes.DEALS) {
             DealsScreen(
                 showBack = navController.previousBackStackEntry != null,
                 onBack = { navController.popBackStack() },
+                searchQuery = null,
                 onCompareClick = { product ->
-                    // 跳转到详情页（带参数）
+                    navController.navigate(
+                        Routes.detailRoute(
+                            pid = product.pid,
+                            name = product.title,
+                            price = product.price,
+                            rating = product.rating
+                        )
+                    )
+                }
+            )
+        }
+
+// ============= Deals 页面（搜索进入） =============
+        composable(
+            route = "deals?query={query}",
+            arguments = listOf(
+                navArgument("query") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+
+            val query = backStackEntry.arguments?.getString("query")
+
+            DealsScreen(
+                showBack = navController.previousBackStackEntry != null,
+                onBack = { navController.popBackStack() },
+                searchQuery = query,
+                onCompareClick = { product ->
                     navController.navigate(
                         Routes.detailRoute(
                             pid = product.pid,
