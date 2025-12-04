@@ -4,6 +4,7 @@ import com.example.dealtracker.data.remote.api.DatabaseApiService
 import com.example.dealtracker.data.remote.api.PriceApi
 import com.example.dealtracker.data.remote.api.UserApi
 import com.example.dealtracker.data.remote.api.WishlistApi
+import com.example.dealtracker.data.remote.api.HistoryApi
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -68,5 +69,8 @@ object RetrofitClient {
      */
     val wishlistApi: WishlistApi by lazy {
         retrofit.create(WishlistApi::class.java)
+    }
+    val historyApi: HistoryApi by lazy {
+        retrofit.create(HistoryApi::class.java)
     }
 }

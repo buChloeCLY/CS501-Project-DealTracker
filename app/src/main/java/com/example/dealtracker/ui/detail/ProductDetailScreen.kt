@@ -36,6 +36,7 @@ import com.example.dealtracker.domain.model.Platform
 import com.example.dealtracker.domain.model.Product
 import com.example.dealtracker.ui.wishlist.WishListHolder
 import com.example.dealtracker.ui.wishlist.viewmodel.WishListViewModel
+import com.example.dealtracker.data.remote.repository.HistoryRepository
 import kotlinx.coroutines.launch
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -54,6 +55,7 @@ fun ProductDetailScreen(
 ) {
     val viewModel: ProductViewModel = viewModel()
     val wishlistViewModel: WishListViewModel = viewModel()
+    val historyRepository = remember { HistoryRepository() }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -68,6 +70,21 @@ fun ProductDetailScreen(
     val wishList by WishListHolder.wishList.collectAsState()
     val isInWishlist = remember(wishList, pid) {
         wishList.any { it.pid == pid }
+    }
+
+    // 记录浏览历史（仅在用户已登录时）
+    LaunchedEffect(pid, currentUser) {
+        currentUser?.let { user ->
+            // 用户已登录，记录浏览历史
+            scope.launch {
+                try {
+                    historyRepository.addHistory(user.uid, pid)
+                } catch (e: Exception) {
+                    // 静默失败，不影响用户体验
+                    android.util.Log.e("ProductDetail", "Failed to record history", e)
+                }
+            }
+        }
     }
 
     LaunchedEffect(pid) {

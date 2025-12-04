@@ -130,6 +130,9 @@ fun MainNavGraph(
         composable("register") {
             RegisterScreen(navController)
         }
+        composable("history") {
+            HistoryScreen(navController = navController)
+        }
 
     }
 

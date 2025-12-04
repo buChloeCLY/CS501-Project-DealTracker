@@ -1624,6 +1624,150 @@ app.get('/health', async (req, res) => {
     }
 });
 
+// ==================== View History API (浏览历史) ====================
+
+/**
+ * 获取用户浏览历史（包含产品信息）
+ * GET /api/view-history/:uid
+ */
+app.get('/api/view-history/:uid', async (req, res) => {
+  const { uid } = req.params;
+
+  try {
+    const query = `
+      SELECT
+        h.hid,
+        h.uid,
+        h.pid,
+        p.title as product_title,
+        p.image_url as product_image,
+        p.price as product_price,
+        p.platform as product_platform,
+        h.viewed_at
+      FROM history h
+      INNER JOIN products p ON h.pid = p.pid
+      WHERE h.uid = ?
+      ORDER BY h.viewed_at DESC
+      LIMIT 100
+    `;
+
+    const [rows] = await pool.query(query, [uid]);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching view history:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch view history'
+    });
+  }
+});
+
+/**
+ * 添加浏览记录
+ * POST /api/view-history
+ * Body: { uid, pid }
+ */
+app.post('/api/view-history', async (req, res) => {
+  const { uid, pid } = req.body;
+
+  if (!uid || !pid) {
+    return res.status(400).json({
+      success: false,
+      message: 'uid and pid are required'
+    });
+  }
+
+  try {
+    // 检查产品是否存在
+    const [productCheck] = await pool.query(
+      'SELECT pid FROM products WHERE pid = ?',
+      [pid]
+    );
+
+    if (productCheck.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    // 插入历史记录
+    const query = `
+      INSERT INTO history (uid, pid, viewed_at)
+      VALUES (?, ?, NOW())
+    `;
+
+    const [result] = await pool.query(query, [uid, pid]);
+
+    res.json({
+      success: true,
+      message: 'View history recorded',
+      hid: result.insertId
+    });
+  } catch (error) {
+    console.error('Error adding view history:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to add view history'
+    });
+  }
+});
+
+/**
+ * 删除单条历史记录
+ * DELETE /api/view-history/:hid
+ */
+app.delete('/api/view-history/:hid', async (req, res) => {
+  const { hid } = req.params;
+
+  try {
+    const query = 'DELETE FROM history WHERE hid = ?';
+    const [result] = await pool.query(query, [hid]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'History record not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'View history deleted'
+    });
+  } catch (error) {
+    console.error('Error deleting view history:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete view history'
+    });
+  }
+});
+
+/**
+ * 清空用户所有历史记录
+ * DELETE /api/view-history/user/:uid
+ */
+app.delete('/api/view-history/user/:uid', async (req, res) => {
+  const { uid } = req.params;
+
+  try {
+    const query = 'DELETE FROM history WHERE uid = ?';
+    const [result] = await pool.query(query, [uid]);
+
+    res.json({
+      success: true,
+      message: `Deleted ${result.affectedRows} view history records`
+    });
+  } catch (error) {
+    console.error('Error clearing view history:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to clear view history'
+    });
+  }
+});
+
 // 🆕 测试标题提取
 app.get('/api/test/extract-title', (req, res) => {
     const testTitles = [
