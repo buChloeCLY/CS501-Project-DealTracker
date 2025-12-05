@@ -3,8 +3,10 @@ package com.example.dealtracker.ui.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import com.example.dealtracker.ui.deals.DealsScreen
 import com.example.dealtracker.ui.detail.ProductDetailScreen
 import com.example.dealtracker.ui.home.HomeScreen
@@ -92,7 +94,7 @@ fun MainNavGraph(
             )
         }
 
-        // ------------------------ Wishlist ------------------------
+        // ------------------------ Wishlist（Lists 标签页） ------------------------
         composable(Routes.LISTS) {
             val currentUser by UserManager.currentUser.collectAsState()
             val uid = currentUser?.uid ?: 0
@@ -103,9 +105,28 @@ fun MainNavGraph(
             )
         }
 
+        // ⭐ 添加：通用 wishlist 路由（不带参数）
         composable("wishlist") {
             val currentUser by UserManager.currentUser.collectAsState()
             val uid = currentUser?.uid ?: 0
+
+            WishListScreen(
+                navController = navController,
+                currentUserId = uid
+            )
+        }
+
+        // ⭐ 添加：带 uid 参数的 wishlist 路由（用于通知点击跳转）
+        composable(
+            route = "wishlist/{uid}",
+            arguments = listOf(
+                navArgument("uid") {
+                    type = NavType.IntType
+                    defaultValue = 0
+                }
+            )
+        ) { backStackEntry ->
+            val uid = backStackEntry.arguments?.getInt("uid") ?: 0
 
             WishListScreen(
                 navController = navController,
