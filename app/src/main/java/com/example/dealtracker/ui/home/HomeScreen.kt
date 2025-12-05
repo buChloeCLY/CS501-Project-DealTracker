@@ -180,8 +180,8 @@ fun HomeScreen(navController: NavHostController, homeViewModel: HomeViewModel = 
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                CategorySection(onCategoryClick = {
-                    navController.navigateToRoot(Routes.DEALS)
+                CategorySection(onCategoryClick = { category ->
+                    navController.navigate("deals/$category")
                 })
             }
 
@@ -194,7 +194,7 @@ fun HomeScreen(navController: NavHostController, homeViewModel: HomeViewModel = 
 
 /* ----------------------------- 分类部分 ----------------------------- */
 @Composable
-fun CategorySection(onCategoryClick: () -> Unit) {
+fun CategorySection(onCategoryClick: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
 
     val allCategories = listOf(
@@ -221,7 +221,7 @@ fun CategorySection(onCategoryClick: () -> Unit) {
                         category = category,
                         modifier = Modifier
                             .weight(1f)
-                            .clickable { onCategoryClick() }
+                            .clickable { onCategoryClick(category) }
                     )
                 }
             }

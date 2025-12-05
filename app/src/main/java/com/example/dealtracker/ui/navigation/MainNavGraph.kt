@@ -52,6 +52,35 @@ fun MainNavGraph(
                 showBack = navController.previousBackStackEntry != null,
                 onBack = { navController.popBackStack() },
                 searchQuery = null,
+                category = null,
+                        onCompareClick = { product ->
+                    navController.navigate(
+                        Routes.detailRoute(
+                            pid = product.pid,
+                            name = product.title,
+                            price = product.price,
+                            rating = product.rating
+                        )
+                    )
+                }
+            )
+        }
+
+// ============= Deals 页面（分类进入） =============
+        composable(
+            route = "deals/{category}",
+            arguments = listOf(
+                navArgument("category") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+
+            val category = backStackEntry.arguments?.getString("category")
+
+            DealsScreen(
+                showBack = navController.previousBackStackEntry != null,
+                onBack = { navController.popBackStack() },
+                searchQuery = null, // 不走搜索
+                category = category, // 分类专用参数
                 onCompareClick = { product ->
                     navController.navigate(
                         Routes.detailRoute(
@@ -64,6 +93,7 @@ fun MainNavGraph(
                 }
             )
         }
+
 
 // ============= Deals 页面（搜索进入） =============
         composable(
@@ -83,6 +113,7 @@ fun MainNavGraph(
                 showBack = navController.previousBackStackEntry != null,
                 onBack = { navController.popBackStack() },
                 searchQuery = query,
+                category = null,  // 搜索时分类为空
                 onCompareClick = { product ->
                     navController.navigate(
                         Routes.detailRoute(

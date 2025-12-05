@@ -122,6 +122,52 @@ class DealsViewModel : ViewModel() {
         }
     }
 
+    // ---------------- 主页传入分类时调用 ----------------
+    fun applyCategory(categoryName: String) {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isLoading = true,
+                    error = null,
+                    searchQuery = categoryName, // 仅用于显示用途
+                    currentPage = 1,
+                    totalPages = 1
+                )
+            }
+
+            // 这里直接拿全部商品再本地按分类过滤
+            repository.getAllProducts()
+                .onSuccess { list ->
+                    val filtered = list.filter { product ->
+                        // product.category 是 Category（枚举/类），用 toString() 再忽略大小写比较
+                        product.category
+                            .toString()
+                            .equals(categoryName, ignoreCase = true)
+                    }
+
+                    _uiState.update { old ->
+                        recompute(
+                            old.copy(
+                                products = filtered,
+                                isLoading = false,
+                                error = null
+                            )
+                        )
+                    }
+                }
+                .onFailure { e ->
+                    Log.e(TAG, "Failed to load products for category", e)
+                    _uiState.update { old ->
+                        old.copy(
+                            isLoading = false,
+                            error = e.message ?: "Unknown error"
+                        )
+                    }
+                }
+        }
+    }
+
+
     // ---------------- 主页传入搜索词时调用 ----------------
     fun applySearch(query: String?) {
         if (query.isNullOrBlank()) {

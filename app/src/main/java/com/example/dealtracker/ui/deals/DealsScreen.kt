@@ -42,7 +42,8 @@ import kotlin.math.roundToInt
 fun DealsScreen(
     showBack: Boolean,
     onBack: () -> Unit,
-    searchQuery: String? = null,
+    category: String? = null,      // 分类点击过来的
+    searchQuery: String? = null,   // 搜索框过来的
     onCompareClick: (Product) -> Unit,
     viewModel: DealsViewModel = viewModel()
 ) {
@@ -54,12 +55,17 @@ fun DealsScreen(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
-    // ---- 当 Home 传来 searchQuery 时应用一次 ----
-    LaunchedEffect(searchQuery) {
-        if (searchQuery != null) {
-            viewModel.applySearch(searchQuery)
+    // 有 category → 按分类过滤
+    // 没 category 有 searchQuery → 走搜索 API
+    // 都没有 → 加载全部
+    LaunchedEffect(searchQuery, category) {
+        when {
+            category != null -> viewModel.applyCategory(category)
+            searchQuery != null -> viewModel.applySearch(searchQuery)
+            else -> viewModel.loadProducts()
         }
     }
+
 
     Scaffold(
         topBar = {
