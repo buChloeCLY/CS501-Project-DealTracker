@@ -30,31 +30,47 @@ data class WishlistUpsertRequest(
     val priority: Int? = 2
 )
 
+data class WishlistUpsertResponse(
+    val success: Boolean,
+    val priceReached: Boolean? = null,
+    val currentPrice: Double? = null
+)
+
 interface WishlistApi {
 
-    // 对应 server.js 里的 app.get('/api/wishlist', ...)
-    // BASE_URL = http://10.0.2.2:8080/api/，这里写 "wishlist"
+    // 获取用户 wishlist
     @GET("wishlist")
     suspend fun getWishlist(
         @Query("uid") uid: Int
     ): Response<List<WishlistItemResponse>>
 
-    // 对应 app.post('/api/wishlist', ...)
+    // 添加/更新 wishlist 项
     @POST("wishlist")
     suspend fun upsertWishlist(
         @Body body: WishlistUpsertRequest
-    ): Response<Map<String, Any>>
+    ): Response<WishlistUpsertResponse>
 
-    // 对应 app.delete('/api/wishlist', ...)
-    // 这里使用有 body 的 DELETE
+    // 删除 wishlist 项
     @HTTP(method = "DELETE", path = "wishlist", hasBody = true)
     suspend fun deleteWishlist(
         @Body body: Map<String, Int>
     ): Response<Map<String, Any>>
 
-    // 对应 app.get('/api/wishlist/alerts', ...)
+    // 获取需要推送的提醒
     @GET("wishlist/alerts")
     suspend fun getAlerts(
         @Query("uid") uid: Int
     ): Response<List<WishlistItemResponse>>
+
+    // ⭐ 标记为"已推送"
+    @POST("wishlist/mark-notified")
+    suspend fun markNotified(
+        @Body body: Map<String, Int>
+    ): Response<Map<String, Any>>
+
+    // ⭐ 标记为"已读"（点击通知后调用）
+    @POST("wishlist/mark-read")
+    suspend fun markRead(
+        @Body body: Map<String, Int>
+    ): Response<Map<String, Any>>
 }

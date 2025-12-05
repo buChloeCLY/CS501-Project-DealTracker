@@ -1,5 +1,12 @@
 package com.example.dealtracker.ui.wishlist
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import android.util.Log
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -15,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import com.example.dealtracker.domain.model.Product
 import com.example.dealtracker.ui.notifications.NotificationHelper
@@ -28,10 +36,15 @@ fun WishListScreen(
     viewModel: WishListViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
     val wishList by viewModel.wishList.collectAsState()
+    val targetPrices by viewModel.targetPrices.collectAsState()  // ⭐ 获取 target prices
     val context = LocalContext.current
 
-    // 打开页面时检查是否有降价提醒
+    // ⭐ 页面打开时加载 wishlist
     LaunchedEffect(currentUserId) {
+        Log.d("WishListScreen", "🔄 Loading wishlist for uid=$currentUserId")
+        viewModel.loadWishlist(currentUserId)
+
+        // 同时检查降价提醒
         viewModel.checkAlerts(currentUserId) { alerts ->
             alerts.forEach { alert ->
                 val title = alert.short_title ?: alert.title ?: "Wishlist item"
@@ -40,12 +53,56 @@ fun WishListScreen(
 
                 NotificationHelper.showPriceDropNotification(
                     context = context,
+                    uid = currentUserId,
                     pid = alert.pid,
                     title = title,
                     currentPrice = current,
                     targetPrice = target
                 )
             }
+        }
+    }
+
+    // ⭐ 添加权限请求 Launcher
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        Log.d("WishListScreen", "📱 Notification permission result: $isGranted")
+
+        if (isGranted) {
+            Toast.makeText(
+                context,
+                "✅ Notification enabled! You'll receive price alerts.",
+                Toast.LENGTH_LONG
+            ).show()
+        } else {
+            Toast.makeText(
+                context,
+                "⚠️ Notification disabled. Enable in Settings for price alerts.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    // ⭐ 检查通知权限
+    fun checkNotificationPermission(): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val hasPermission = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+
+            Log.d("WishListScreen", "📱 Notification permission status: $hasPermission")
+            return hasPermission
+        }
+        return true // Android 12 及以下不需要运行时权限
+    }
+
+    // ⭐ 请求通知权限
+    fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Log.d("WishListScreen", "⚠️ Requesting notification permission...")
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 
@@ -84,14 +141,73 @@ fun WishListScreen(
                     items(wishList, key = { it.pid }) { product ->
                         WishListItem(
                             product = product,
+                            targetPrice = targetPrices[product.pid],  // ⭐ 传递 target price
                             onRemove = {
                                 viewModel.removeProduct(currentUserId, product.pid)
                             },
                             onTargetPriceConfirm = { targetPrice ->
+                                Log.d("WishListScreen", "💾 Save button clicked: targetPrice=$targetPrice")
+
+                                // ⭐ 第一步：检查权限
+                                val hasPermission = checkNotificationPermission()
+
+                                if (!hasPermission) {
+                                    Toast.makeText(
+                                        context,
+                                        "📢 Notification permission needed for price alerts",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    requestNotificationPermission()
+                                }
+
+                                // ⭐ 第二步：保存目标价格
                                 viewModel.updateTargetPrice(
                                     uid = currentUserId,
                                     pid = product.pid,
-                                    targetPrice = targetPrice
+                                    targetPrice = targetPrice,
+                                    onSuccess = { priceReached ->
+                                        Log.d("WishListScreen", "📊 Save result: priceReached=$priceReached")
+
+                                        val message = if (priceReached) {
+                                            "✅ Target saved! Price already reached. Checking notifications... 🔔"
+                                        } else {
+                                            "✅ Target price saved: $${"%.2f".format(targetPrice)}"
+                                        }
+
+                                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+
+                                        // ⭐ 第三步：如果价格达标且有权限，显示通知
+                                        if (priceReached && hasPermission) {
+                                            Log.d("WishListScreen", "🎯 Price reached + Permission granted, showing notification...")
+
+                                            viewModel.checkAlerts(currentUserId) { alerts ->
+                                                alerts.forEach { alert ->
+                                                    if (alert.pid == product.pid) {
+                                                        val title = alert.short_title ?: alert.title ?: "Wishlist item"
+                                                        val current = alert.current_price ?: return@forEach
+                                                        val target = alert.target_price ?: return@forEach
+
+                                                        NotificationHelper.showPriceDropNotification(
+                                                            context = context,
+                                                            uid = currentUserId,
+                                                            pid = alert.pid,
+                                                            title = title,
+                                                            currentPrice = current,
+                                                            targetPrice = target
+                                                        )
+
+                                                        Log.d("WishListScreen", "✅ Notification posted!")
+                                                    }
+                                                }
+                                            }
+                                        } else if (priceReached && !hasPermission) {
+                                            Toast.makeText(
+                                                context,
+                                                "💡 Enable notifications to receive price alerts!",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                    }
                                 )
                             }
                         )
@@ -105,10 +221,11 @@ fun WishListScreen(
 @Composable
 private fun WishListItem(
     product: Product,
+    targetPrice: Double?,  // ⭐ 接收 target price
     onRemove: () -> Unit,
     onTargetPriceConfirm: (Double) -> Unit
 ) {
-    var targetPrice by remember { mutableStateOf("") }
+    var inputTargetPrice by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
 
     Card(
@@ -137,6 +254,21 @@ private fun WishListItem(
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color(0xFF555555)
                     )
+
+                    // ⭐ 显示 target price
+                    if (targetPrice != null) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Target price: $${String.format("%.2f", targetPrice)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (product.price <= targetPrice) {
+                                Color(0xFF4CAF50)  // 绿色：已达标
+                            } else {
+                                Color(0xFFFF9800)  // 橙色：未达标
+                            },
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
 
                 IconButton(onClick = onRemove) {
@@ -155,16 +287,22 @@ private fun WishListItem(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 OutlinedTextField(
-                    value = targetPrice,
+                    value = inputTargetPrice,
                     onValueChange = { newValue ->
                         if (newValue.isEmpty() || newValue.matches(Regex("^\\d*\\.?\\d*$"))) {
-                            targetPrice = newValue
+                            inputTargetPrice = newValue
                             error = null
                         }
                     },
                     modifier = Modifier.weight(1f),
                     singleLine = true,
                     label = { Text("Target price") },
+                    placeholder = {
+                        Text(
+                            if (targetPrice != null) "Update: $${String.format("%.2f", targetPrice)}"
+                            else "e.g., 45.99"
+                        )
+                    },
                     isError = error != null
                 )
 
@@ -172,15 +310,17 @@ private fun WishListItem(
 
                 Button(
                     onClick = {
-                        val v = targetPrice.toDoubleOrNull()
+                        val v = inputTargetPrice.toDoubleOrNull()
                         if (v == null || v <= 0.0) {
                             error = "Invalid price"
                         } else {
                             onTargetPriceConfirm(v)
+                            inputTargetPrice = ""  // 清空输入框
+                            error = null
                         }
                     }
                 ) {
-                    Text("Save")
+                    Text(if (targetPrice != null) "Update" else "Save")
                 }
             }
 

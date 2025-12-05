@@ -140,7 +140,6 @@ fun ProductDetailScreen(
                             wishlistViewModel.addProduct(
                                 uid = actualUid,
                                 product = product,
-                                targetPrice = price * 0.9,  // 默认目标价 = 当前价的 9 折
                                 alertEnabled = true
                             )
                             scope.launch {

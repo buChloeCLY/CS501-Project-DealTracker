@@ -1323,11 +1323,12 @@ app.post('/api/admin/add-walmart-prices', async (req, res) => {
 });
 
 // ===================================
-// API: Wishlist
-// 需求：
-//  1) 记录用户想要关注的商品 + target_price
+// API: Wishlist 管理
+// 功能：
+//  1) 添加/更新 wishlist 项
 //  2) 返回当前用户的 wishlist 列表（带当前最低价）
 //  3) 返回当前用户触发降价条件的商品列表（用于 App 推送）
+//  4) 标记通知为已读
 // ===================================
 
 // 获取用户的 wishlist 列表
@@ -1341,9 +1342,15 @@ app.get('/api/wishlist', async (req, res) => {
         // 对每个 wishlist 项，查出商品基本信息 + 当前最低价
         const [rows] = await pool.query(`
             SELECT
+                w.wid,
                 w.uid,
                 w.pid,
                 w.target_price,
+                w.alert_enabled,
+                w.alert_status,
+                w.last_alert_time,
+                w.notes,
+                w.priority,
                 p.short_title,
                 p.title,
                 p.rating,
@@ -1364,7 +1371,7 @@ app.get('/api/wishlist', async (req, res) => {
             FROM wishlist w
             JOIN products p ON w.pid = p.pid
             WHERE w.uid = ?
-            ORDER BY w.created_at DESC
+            ORDER BY w.priority DESC, w.created_at DESC
         `, [uid]);
 
         res.json(rows);
@@ -1374,31 +1381,67 @@ app.get('/api/wishlist', async (req, res) => {
     }
 });
 
-// 添加或更新 wishlist 项（插入或更新 target_price）
+// 添加或更新 wishlist 项
 app.post('/api/wishlist', async (req, res) => {
     try {
-        const { uid, pid, target_price } = req.body;
+        const { uid, pid, target_price = null, alert_enabled = true, notes = null, priority = 2 } = req.body;
 
-        if (!uid || !pid || target_price == null) {
-            return res.status(400).json({ error: 'uid, pid and target_price are required' });
+        // ⭐ 修改：uid 和 pid 必填，target_price 可选
+        if (!uid || !pid) {
+            return res.status(400).json({ error: 'uid and pid are required' });
         }
 
-        // 确保 target_price 是数字
-        const tp = parseFloat(target_price);
-        if (isNaN(tp) || tp <= 0) {
-            return res.status(400).json({ error: 'Invalid target_price' });
+        let tp = null;
+        let isPriceReached = false;
+        let currentPrice = null;
+        let initialAlertStatus = 0;
+
+        // ⭐ 只有提供了 target_price 时才验证和检查
+        if (target_price != null) {
+            // 确保 target_price 是数字
+            tp = parseFloat(target_price);
+            if (isNaN(tp) || tp <= 0) {
+                return res.status(400).json({ error: 'Invalid target_price' });
+            }
+
+            // ⭐ 检查当前价格是否已经达标
+            const [currentPrices] = await pool.query(`
+                SELECT MIN(p1.price) as current_price
+                FROM price p1
+                INNER JOIN (
+                    SELECT platform, MAX(date) AS max_date
+                    FROM price
+                    WHERE pid = ?
+                    GROUP BY platform
+                ) p2 ON p1.platform = p2.platform AND p1.date = p2.max_date
+                WHERE p1.pid = ?
+            `, [pid, pid]);
+
+            currentPrice = currentPrices[0]?.current_price;
+            isPriceReached = currentPrice && currentPrice <= tp;
+
+            // ⭐ 如果价格已达标，设置 alert_status = 1（待推送）
+            initialAlertStatus = (isPriceReached && alert_enabled) ? 1 : 0;
         }
 
-        // 插入或更新（uid+pid 唯一）
+        // ⭐ 插入或更新（uid+pid 唯一）
         await pool.query(`
-            INSERT INTO wishlist (uid, pid, target_price)
-            VALUES (?, ?, ?)
+            INSERT INTO wishlist (uid, pid, target_price, alert_enabled, alert_status, notes, priority)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 target_price = VALUES(target_price),
+                alert_enabled = VALUES(alert_enabled),
+                alert_status = VALUES(alert_status),
+                notes = VALUES(notes),
+                priority = VALUES(priority),
                 updated_at = CURRENT_TIMESTAMP
-        `, [uid, pid, tp]);
+        `, [uid, pid, tp, alert_enabled ? 1 : 0, initialAlertStatus, notes, priority]);
 
-        res.json({ success: true });
+        res.json({
+            success: true,
+            priceReached: isPriceReached,
+            currentPrice: currentPrice
+        });
     } catch (error) {
         console.error('Add/Update wishlist error:', error);
         res.status(500).json({ error: error.message });
@@ -1430,7 +1473,7 @@ app.delete('/api/wishlist', async (req, res) => {
     }
 });
 
-// 获取“已触发降价条件”的商品，用于 App 端推送
+// ⭐ 获取"需要推送通知"的商品列表
 app.get('/api/wishlist/alerts', async (req, res) => {
     try {
         const uid = parseInt(req.query.uid);
@@ -1438,14 +1481,18 @@ app.get('/api/wishlist/alerts', async (req, res) => {
             return res.status(400).json({ error: 'uid is required' });
         }
 
-        // 逻辑：
-//   1. 对当前 uid 的所有 wishlist 项，算出该 pid 的当前最低价 current_price
-//   2. 如果 current_price <= target_price，则返回这条记录
+        // 查询条件：
+        // 1. alert_enabled = 1（开启提醒）
+        // 2. current_price <= target_price（价格达标）
+        // 3. alert_status = 1（待推送）或 alert_status = 2 且距离上次推送 > 6 小时
         const [rows] = await pool.query(`
             SELECT
+                w.wid,
                 w.uid,
                 w.pid,
                 w.target_price,
+                w.alert_status,
+                w.last_alert_time,
                 p.short_title,
                 p.title,
                 p.category,
@@ -1470,13 +1517,69 @@ app.get('/api/wishlist/alerts', async (req, res) => {
                 GROUP BY w2.pid
             ) lp ON lp.pid = w.pid
             WHERE w.uid = ?
+              AND w.alert_enabled = 1
               AND lp.current_price IS NOT NULL
               AND lp.current_price <= w.target_price
+              AND (
+                  w.alert_status = 1  -- 待推送（第一次或重置）
+                  OR (
+                      w.alert_status = 2  -- 已推送
+                      AND w.last_alert_time IS NOT NULL
+                      AND TIMESTAMPDIFF(HOUR, w.last_alert_time, NOW()) >= 6  -- 距离上次 >= 6 小时
+                  )
+              )
         `, [uid, uid]);
 
         res.json(rows);
     } catch (error) {
         console.error('Get wishlist alerts error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ⭐ 标记通知为"已推送"
+app.post('/api/wishlist/mark-notified', async (req, res) => {
+    try {
+        const { uid, pid } = req.body;
+
+        if (!uid || !pid) {
+            return res.status(400).json({ error: 'uid and pid are required' });
+        }
+
+        // 更新 alert_status = 2（已推送），记录推送时间
+        await pool.query(`
+            UPDATE wishlist
+            SET alert_status = 2,
+                last_alert_time = NOW()
+            WHERE uid = ? AND pid = ?
+        `, [uid, pid]);
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Mark notified error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ⭐ 标记通知为"已读"（点击通知后调用）
+app.post('/api/wishlist/mark-read', async (req, res) => {
+    try {
+        const { uid, pid } = req.body;
+
+        if (!uid || !pid) {
+            return res.status(400).json({ error: 'uid and pid are required' });
+        }
+
+        // 更新 alert_status = 3（已读/已处理）
+        await pool.query(`
+            UPDATE wishlist
+            SET alert_status = 3
+            WHERE uid = ? AND pid = ?
+        `, [uid, pid]);
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Mark read error:', error);
         res.status(500).json({ error: error.message });
     }
 });
