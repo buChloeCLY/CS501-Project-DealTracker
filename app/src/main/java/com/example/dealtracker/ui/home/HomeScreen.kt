@@ -17,6 +17,10 @@ import androidx.compose.material.icons.filled.KeyboardVoice
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -58,7 +62,6 @@ fun HomeScreen(navController: NavHostController, homeViewModel: HomeViewModel = 
                     } else {
                         homeViewModel.applyVoiceResult(text)
                     }
-
                 } else {
                     homeViewModel.setVoiceError("Voice recognition canceled")
                 }
@@ -95,16 +98,30 @@ fun HomeScreen(navController: NavHostController, homeViewModel: HomeViewModel = 
         },
         topBar = {
             TopAppBar(
+                navigationIcon = {
+                    if (isSearchMode) {
+                        IconButton(onClick = {
+                            isSearchMode = false
+                            homeViewModel.updateQuery("")
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "Exit search"
+                            )
+                        }
+                    }
+                },
+
                 title = {
                     if (!isSearchMode) {
                         Text("Home", fontWeight = FontWeight.Bold)
                     } else {
-                        /** ---------- 搜索框输入 ---------- */
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            /** ---------- 语音按钮  ---------- */
+
+                            /** 🎤 Voice input */
                             IconButton(onClick = {
                                 val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                                     putExtra(
@@ -112,6 +129,7 @@ fun HomeScreen(navController: NavHostController, homeViewModel: HomeViewModel = 
                                         RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
                                     )
                                 }
+
                                 val pm = context.packageManager
                                 val activities = pm.queryIntentActivities(intent, 0)
 
@@ -120,7 +138,6 @@ fun HomeScreen(navController: NavHostController, homeViewModel: HomeViewModel = 
                                 } else {
                                     homeViewModel.setVoiceError("This device does not support speech recognition")
                                 }
-
                             }) {
                                 Icon(
                                     imageVector = Icons.Default.KeyboardVoice,
@@ -129,7 +146,7 @@ fun HomeScreen(navController: NavHostController, homeViewModel: HomeViewModel = 
                                 )
                             }
 
-                            /** ---------- 输入框 ---------- */
+                            /** 输入框 */
                             TextField(
                                 value = searchQuery,
                                 onValueChange = { homeViewModel.updateQuery(it) },
@@ -142,28 +159,53 @@ fun HomeScreen(navController: NavHostController, homeViewModel: HomeViewModel = 
                                     disabledContainerColor = Color.Transparent,
                                     focusedIndicatorColor = Color.Transparent,
                                     unfocusedIndicatorColor = Color.Transparent
+                                ),
+                                keyboardOptions = KeyboardOptions(
+                                    imeAction = ImeAction.Search
+                                ),
+                                keyboardActions = KeyboardActions(
+                                    onSearch = {
+                                        if (searchQuery.isNotBlank()) {
+                                            navController.navigateToRoot(
+                                                Routes.dealsWithQuery(searchQuery)
+                                            )
+                                        }
+                                    }
                                 )
                             )
+
+                            /** ✕ 清除按钮（有字时才显示） */
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { homeViewModel.updateQuery("") }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Clear text"
+                                    )
+                                }
+                            }
                         }
                     }
                 },
+
                 actions = {
-                    /** 搜索按钮 / 关闭按钮 */
-                    IconButton(onClick = {
-                        if (isSearchMode && searchQuery.isNotEmpty()) {
-                            // 执行搜索
-                            navController.navigateToRoot(
-                                Routes.dealsWithQuery(searchQuery)
+                    if (!isSearchMode) {
+                        IconButton(onClick = { isSearchMode = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Enter search mode"
                             )
-                        } else {
-                            isSearchMode = !isSearchMode
-                            if (!isSearchMode) homeViewModel.updateQuery("")
                         }
-                    }) {
-                        Icon(
-                            imageVector = if (!isSearchMode) Icons.Default.Search else Icons.Default.Close,
-                            contentDescription = "Search"
-                        )
+                    } else {
+                        IconButton(onClick = {
+                            if (searchQuery.isNotBlank()) {
+                                navController.navigateToRoot(Routes.dealsWithQuery(searchQuery))
+                            }
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search"
+                            )
+                        }
                     }
                 }
             )
