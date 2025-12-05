@@ -5,6 +5,12 @@ import android.content.Intent
 import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.SmallFloatingActionButton
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -33,8 +39,6 @@ import androidx.navigation.NavHostController
 import com.example.dealtracker.ui.home.viewmodel.HomeViewModel
 import com.example.dealtracker.ui.navigation.Routes
 import com.example.dealtracker.ui.navigation.navigateToRoot
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,10 +46,8 @@ fun HomeScreen(navController: NavHostController, homeViewModel: HomeViewModel = 
 
     // 监听 ViewModel 的 StateFlow
     val searchQuery by homeViewModel.searchQuery.collectAsState()
-
     // 控制是否进入搜索模式
     var isSearchMode by remember { mutableStateOf(false) }
-
     val context = LocalContext.current
 
     /** ---------- 语音识别 Launcher ---------- */
@@ -70,29 +72,26 @@ fun HomeScreen(navController: NavHostController, homeViewModel: HomeViewModel = 
             }
         }
 
-
     /** ---------- 回到顶部按钮滚动控制 ---------- */
     val listState = rememberLazyListState()
-    val showToTop by remember {
-        derivedStateOf { listState.firstVisibleItemIndex > 2 }
-    }
+    val scope = rememberCoroutineScope()
 
-// 用于点击事件中启动协程
-    val coroutineScope = rememberCoroutineScope()
+     // 超过 5 个 item 显示按钮
+    val showScrollTop by remember {
+        derivedStateOf { listState.firstVisibleItemIndex > 4 }
+    }
 
     Scaffold(
         floatingActionButton = {
-            if (showToTop) {
-                FloatingActionButton(
-                    onClick = {
-                        // 在点击事件中使用 coroutineScope.launch
-                        coroutineScope.launch {
-                            listState.animateScrollToItem(0)
-                        }
-                    },
-                    containerColor = MaterialTheme.colorScheme.primary
+            AnimatedVisibility(
+                visible = showScrollTop,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                SmallFloatingActionButton(
+                    onClick = { scope.launch { listState.animateScrollToItem(0) } }
                 ) {
-                    Text("Top", color = Color.White)
+                    Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Top")
                 }
             }
         },
@@ -121,7 +120,7 @@ fun HomeScreen(navController: NavHostController, homeViewModel: HomeViewModel = 
                             modifier = Modifier.fillMaxWidth()
                         ) {
 
-                            /** 🎤 Voice input */
+                            /** Voice input */
                             IconButton(onClick = {
                                 val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                                     putExtra(
@@ -145,7 +144,6 @@ fun HomeScreen(navController: NavHostController, homeViewModel: HomeViewModel = 
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }
-
                             /** 输入框 */
                             TextField(
                                 value = searchQuery,
@@ -211,7 +209,6 @@ fun HomeScreen(navController: NavHostController, homeViewModel: HomeViewModel = 
             )
         }
     ) { innerPadding ->
-
         /** ---------- 列表内容 ---------- */
         LazyColumn(
             state = listState,
@@ -226,9 +223,44 @@ fun HomeScreen(navController: NavHostController, homeViewModel: HomeViewModel = 
                     navController.navigate("deals/$category")
                 })
             }
-
             item {
-                DealsOfTheDaySection(navController = navController)
+                Text(
+                    text = "Deals of the Day",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                )
+            }
+//            item { Spacer(Modifier.height(8.dp)) }
+            /** DealsOfTheDay 列表内容 */
+            val deals = listOf(
+                Triple("iPhone 16", "$999", "Amazon"),
+                Triple("Dyson Hair Dryer", "$399", "BestBuy"),
+                Triple("Sony Headphones", "$249", "Walmart"),
+                Triple("Nike Running Shoes", "$120", "Nike"),
+                Triple("Apple Watch", "$349", "Target"),
+                Triple("Samsung TV 65", "$799", "BestBuy"),
+                Triple("MacBook Air M3", "$1199", "Apple"),
+            )
+
+            items(deals.size) { index ->
+                val (name, price, site) = deals[index]
+
+                DealItem(
+                    name = name,
+                    price = price,
+                    site = site,
+                    onClick = {
+                        if (name == "iPhone 16") {
+                            navController.navigate(
+                                Routes.detailRoute(
+                                    pid = 1,
+                                    name = name,
+                                    price = price.removePrefix("$").toDouble(),
+                                    rating = 4.8f
+                                )
+                            )
+                        }
+                    }
+                )
             }
         }
     }
@@ -305,65 +337,33 @@ fun CategoryCard(category: String, modifier: Modifier = Modifier) {
     }
 }
 
-/* ----------------------------- Deals Of The Day ----------------------------- */
+/** 一个可复用的 Deal Item */
 @Composable
-fun DealsOfTheDaySection(navController: NavHostController) {
-    Text(
-        text = "Deals of the Day",
-        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-        modifier = Modifier.fillMaxWidth()
-    )
-    Spacer(Modifier.height(8.dp))
+fun DealItem(name: String, price: String, site: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(90.dp)
+            .background(Color(0xFFF7F7F7), shape = RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp)
+            .clickable { onClick() },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(60.dp)
+                .background(Color(0xFFDDEEE0), RoundedCornerShape(8.dp))
+        )
+        Spacer(Modifier.width(12.dp))
 
-    val deals = listOf(
-        Triple("iPhone 16", "$999", "Amazon"),
-        Triple("Dyson Hair Dryer", "$399", "BestBuy"),
-        Triple("Sony Headphones", "$249", "Walmart"),
-        Triple("Nike Running Shoes", "$120", "Nike"),
-        Triple("Apple Watch", "$349", "Target"),
-        Triple("Samsung TV 65", "$799", "BestBuy"),
-        Triple("MacBook Air M3", "$1199", "Apple"),
-    )
-
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        deals.forEach { (name, price, site) ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(90.dp)
-                    .background(Color(0xFFF7F7F7), shape = RoundedCornerShape(12.dp))
-                    .padding(horizontal = 12.dp)
-                    .clickable {
-                        if (name == "iPhone 16") {
-                            navController.navigate(
-                                Routes.detailRoute(
-                                    pid = 1,
-                                    name = name,
-                                    price = price.removePrefix("$").toDouble(),
-                                    rating = 4.8f
-                                )
-                            )
-                        }
-                    },
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(60.dp)
-                        .background(Color(0xFFDDEEE0), RoundedCornerShape(8.dp))
-                )
-                Spacer(Modifier.width(12.dp))
-
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(name, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-                    Text(price, color = Color(0xFF388E3C), fontSize = 15.sp)
-                    Text(
-                        "Available on $site",
-                        color = Color.Gray,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(name, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Text(price, color = Color(0xFF388E3C), fontSize = 15.sp)
+            Text(
+                "Available on $site",
+                color = Color.Gray,
+                style = MaterialTheme.typography.bodySmall
+            )
         }
     }
 }
