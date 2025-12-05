@@ -18,12 +18,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import com.example.dealtracker.data.local.UserPreferences
+import kotlinx.coroutines.flow.collectLatest
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(navController: NavHostController) {
-    var darkMode by remember { mutableStateOf(false) }
-    var fontSize by remember { mutableStateOf(1f) } // 0.85f = Small, 1f = Medium, 1.15f = Large
+
+    // ⭐ 从 Flow 读取（Compose 会自动刷新）
+    val darkMode by UserPreferences.darkModeFlow.collectAsState()
+    val fontSize by UserPreferences.fontScaleFlow.collectAsState()
 
     Scaffold(
         topBar = {
@@ -57,7 +61,6 @@ fun SettingsScreen(navController: NavHostController) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            Spacer(modifier = Modifier.height(8.dp))
 
             // Edit Profile
             SettingsCard {
@@ -109,7 +112,6 @@ fun SettingsScreen(navController: NavHostController) {
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Font size slider
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
@@ -123,7 +125,9 @@ fun SettingsScreen(navController: NavHostController) {
 
                         Slider(
                             value = fontSize,
-                            onValueChange = { fontSize = it },
+                            onValueChange = { newScale ->
+                                UserPreferences.setFontScale(newScale)
+                            },
                             valueRange = 0.85f..1.15f,
                             steps = 1,
                             modifier = Modifier
@@ -153,7 +157,9 @@ fun SettingsScreen(navController: NavHostController) {
                     title = "Dark Mode",
                     subtitle = "Enable dark theme",
                     checked = darkMode,
-                    onCheckedChange = { darkMode = it }
+                    onCheckedChange = { enabled ->
+                        UserPreferences.setDarkMode(enabled)
+                    }
                 )
             }
 

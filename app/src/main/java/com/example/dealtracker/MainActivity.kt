@@ -13,7 +13,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -34,18 +38,18 @@ class MainActivity : ComponentActivity() {
     private val requestAudioPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
-    // ⭐ 保存通知点击的信息
+    // 保存通知点击的信息
     private var notificationUid: Int = -1
     private var notificationPid: Int = -1
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // ⭐ 第 1 步：初始化 UserPreferences
+        // 第 1 步：初始化 UserPreferences
         UserPreferences.init(this)
         Log.d(TAG, "✅ UserPreferences initialized")
 
-        // ⭐ 第 2 步：从 SharedPreferences 恢复用户登录状态
+        // 第 2 步：从 SharedPreferences 恢复用户登录状态
         lifecycleScope.launch {
             val savedUser = UserPreferences.getUser()
             if (savedUser != null) {
@@ -56,15 +60,30 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // ⭐ 第 3 步：处理通知点击
+        // 第 3 步：处理通知点击
         handleNotificationClick(intent)
 
         setContent {
-            DealTrackerTheme {
-                DealTrackerApp(
-                    notificationUid = notificationUid,
-                    notificationPid = notificationPid
+            // 使用 Flow → Compose 自动监听并刷新 UI
+            val darkMode by UserPreferences.darkModeFlow.collectAsState()
+            val fontScale by UserPreferences.fontScaleFlow.collectAsState()
+            CompositionLocalProvider(
+                // 应用全局字体缩放
+                LocalDensity provides Density(
+                    LocalDensity.current.density,
+                    fontScale
                 )
+            ) {
+                // 应用主题（darkMode 实时变化）
+                DealTrackerTheme(
+                    darkTheme = darkMode,
+                    dynamicColor = false //避免动态色覆盖 darkMode 设置
+                ) {
+                    DealTrackerApp(
+                        notificationUid = notificationUid,
+                        notificationPid = notificationPid
+                    )
+                }
             }
         }
 
@@ -79,7 +98,7 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * ⭐ 处理通知点击
+     * 处理通知点击
      */
     private fun handleNotificationClick(intent: Intent) {
         val extras = intent.extras
@@ -90,11 +109,11 @@ class MainActivity : ComponentActivity() {
             if (uid > 0 && pid > 0) {
                 Log.d(TAG, "✅ Notification clicked: uid=$uid, pid=$pid")
 
-                // ⭐ 保存信息用于导航
+                //  保存信息用于导航
                 notificationUid = uid
                 notificationPid = pid
 
-                // ⭐ 标记为已读
+                //  标记为已读
                 markNotificationAsRead(uid, pid)
             }
         }
@@ -130,14 +149,14 @@ fun DealTrackerApp(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route ?: Routes.HOME
 
-    // ⭐ 修复：在导航图初始化后再导航
+    //  修复：在导航图初始化后再导航
     LaunchedEffect(notificationUid) {
         if (notificationUid > 0 && notificationPid > 0) {
             Log.d("DealTrackerApp", "🔔 Navigating to Wishlist: uid=$notificationUid")
 
-            // ⭐ 等待导航图初始化后再导航
+            // 等待导航图初始化后再导航
             try {
-                // ⭐ 使用带 uid 参数的路由
+                //  使用带 uid 参数的路由
                 navController.navigate("wishlist/$notificationUid") {
                     popUpTo(Routes.HOME) { inclusive = false }
                 }
