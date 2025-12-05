@@ -8,47 +8,81 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.SmallFloatingActionButton
-import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.KeyboardVoice
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import coil.compose.AsyncImage
+import com.example.dealtracker.data.local.UserPreferences
+import com.example.dealtracker.data.remote.repository.HistoryRepository
+import com.example.dealtracker.data.remote.repository.ProductRepositoryImpl
+import com.example.dealtracker.domain.model.Product
+import com.example.dealtracker.domain.repository.RecommendationRepository
 import com.example.dealtracker.ui.home.viewmodel.HomeViewModel
+import com.example.dealtracker.ui.home.viewmodel.HomeViewModelFactory
 import com.example.dealtracker.ui.navigation.Routes
 import com.example.dealtracker.ui.navigation.navigateToRoot
+import kotlinx.coroutines.launch
+import androidx.lifecycle.viewmodel.compose.viewModel
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(navController: NavHostController, homeViewModel: HomeViewModel = viewModel()) {
+fun HomeScreen(navController: NavHostController) {
 
-    // 监听 ViewModel 的 StateFlow
-    val searchQuery by homeViewModel.searchQuery.collectAsState()
-    // 控制是否进入搜索模式
-    var isSearchMode by remember { mutableStateOf(false) }
     val context = LocalContext.current
+
+    // 自动初始化 SharedPreferences
+    UserPreferences.init(context)
+
+    val user = UserPreferences.getUser()
+    val userId = user?.uid ?: -1     // ← 自动读取登录用户ID（未登录 = -1）
+    // 浏览历史仓库
+    val historyRepository = remember { HistoryRepository() }
+    // ProductRepository 实现
+    val productRepository = remember { ProductRepositoryImpl() }
+
+    // 推荐仓库
+    val recommendationRepository = remember {
+        RecommendationRepository(
+            historyRepository = historyRepository,
+            productRepository = productRepository
+        )
+    }
+
+    // ViewModel（用 Factory 注入 userId）
+    val homeViewModel: HomeViewModel = viewModel(
+        factory = HomeViewModelFactory(
+            recommendationRepository = recommendationRepository,
+            userId = userId
+        )
+    )
+
+    // ------------------ UI 状态监听 ------------------
+    val searchQuery by homeViewModel.searchQuery.collectAsState()
+    // 推荐产品
+    val recommended by homeViewModel.recommendedProducts.collectAsState()
+    var isSearchMode by remember { mutableStateOf(false) }
+    /** ---------- 回到顶部按钮滚动控制 ---------- */
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
 
     /** ---------- 语音识别 Launcher ---------- */
     val voiceLauncher =
@@ -58,7 +92,6 @@ fun HomeScreen(navController: NavHostController, homeViewModel: HomeViewModel = 
                     val text = result.data
                         ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
                         ?.firstOrNull()
-
                     if (text.isNullOrBlank()) {
                         homeViewModel.setVoiceError("Empty voice result")
                     } else {
@@ -72,17 +105,12 @@ fun HomeScreen(navController: NavHostController, homeViewModel: HomeViewModel = 
             }
         }
 
-    /** ---------- 回到顶部按钮滚动控制 ---------- */
-    val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
-
-     // 超过 5 个 item 显示按钮
-    val showScrollTop by remember {
-        derivedStateOf { listState.firstVisibleItemIndex > 4 }
-    }
-
     Scaffold(
         floatingActionButton = {
+            // 超过 5 个 item 显示按钮
+            val showScrollTop by remember {
+                derivedStateOf { listState.firstVisibleItemIndex > 4 }
+            }
             AnimatedVisibility(
                 visible = showScrollTop,
                 enter = fadeIn(),
@@ -158,10 +186,10 @@ fun HomeScreen(navController: NavHostController, homeViewModel: HomeViewModel = 
                                     focusedIndicatorColor = Color.Transparent,
                                     unfocusedIndicatorColor = Color.Transparent
                                 ),
-                                keyboardOptions = KeyboardOptions(
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                                     imeAction = ImeAction.Search
                                 ),
-                                keyboardActions = KeyboardActions(
+                                keyboardActions = androidx.compose.foundation.text.KeyboardActions(
                                     onSearch = {
                                         if (searchQuery.isNotBlank()) {
                                             navController.navigateToRoot(
@@ -229,36 +257,19 @@ fun HomeScreen(navController: NavHostController, homeViewModel: HomeViewModel = 
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                 )
             }
-//            item { Spacer(Modifier.height(8.dp)) }
-            /** DealsOfTheDay 列表内容 */
-            val deals = listOf(
-                Triple("iPhone 16", "$999", "Amazon"),
-                Triple("Dyson Hair Dryer", "$399", "BestBuy"),
-                Triple("Sony Headphones", "$249", "Walmart"),
-                Triple("Nike Running Shoes", "$120", "Nike"),
-                Triple("Apple Watch", "$349", "Target"),
-                Triple("Samsung TV 65", "$799", "BestBuy"),
-                Triple("MacBook Air M3", "$1199", "Apple"),
-            )
-
-            items(deals.size) { index ->
-                val (name, price, site) = deals[index]
-
+            /** ---------- 推荐商品列表 ---------- */
+            items(recommended) { product ->
                 DealItem(
-                    name = name,
-                    price = price,
-                    site = site,
+                    product = product,
                     onClick = {
-                        if (name == "iPhone 16") {
-                            navController.navigate(
-                                Routes.detailRoute(
-                                    pid = 1,
-                                    name = name,
-                                    price = price.removePrefix("$").toDouble(),
-                                    rating = 4.8f
-                                )
+                        navController.navigate(
+                            Routes.detailRoute(
+                                pid = product.pid,
+                                name = product.title,
+                                price = product.price,
+                                rating = product.rating
                             )
-                        }
+                        )
                     }
                 )
             }
@@ -337,33 +348,33 @@ fun CategoryCard(category: String, modifier: Modifier = Modifier) {
     }
 }
 
-/** 一个可复用的 Deal Item */
+/* ======================== 单个商品 Item ======================== */
+
 @Composable
-fun DealItem(name: String, price: String, site: String, onClick: () -> Unit) {
+fun DealItem(product: Product, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(90.dp)
             .background(Color(0xFFF7F7F7), shape = RoundedCornerShape(12.dp))
-            .padding(horizontal = 12.dp)
+            .padding(12.dp)
             .clickable { onClick() },
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
+        AsyncImage(
+            model = product.imageUrl,
+            contentDescription = product.title,
             modifier = Modifier
                 .size(60.dp)
-                .background(Color(0xFFDDEEE0), RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(8.dp))
         )
+
         Spacer(Modifier.width(12.dp))
 
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(name, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-            Text(price, color = Color(0xFF388E3C), fontSize = 15.sp)
-            Text(
-                "Available on $site",
-                color = Color.Gray,
-                style = MaterialTheme.typography.bodySmall
-            )
+        Column {
+            Text(product.title, fontWeight = FontWeight.SemiBold)
+            Text(product.priceText, color = Color(0xFF388E3C))
+            Text("Best from ${product.platform}", color = Color.Gray, fontSize = 12.sp)
         }
     }
 }
