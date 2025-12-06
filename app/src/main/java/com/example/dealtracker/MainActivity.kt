@@ -42,6 +42,9 @@ class MainActivity : ComponentActivity() {
     private var notificationUid: Int = -1
     private var notificationPid: Int = -1
 
+    // ⭐ 保存 Deep Link 的产品 ID
+    private var deepLinkPid: Int = -1
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -63,7 +66,16 @@ class MainActivity : ComponentActivity() {
         // 第 3 步：处理通知点击
         handleNotificationClick(intent)
 
+        // ⭐ 第 4 步：处理 Deep Link
+        handleDeepLink(intent)
+
         setContent {
+            DealTrackerTheme {
+                DealTrackerApp(
+                    notificationUid = notificationUid,
+                    notificationPid = notificationPid,
+                    deepLinkPid = deepLinkPid
+                )
             // 使用 Flow → Compose 自动监听并刷新 UI
             val darkMode by UserPreferences.darkModeFlow.collectAsState()
             val fontScale by UserPreferences.fontScaleFlow.collectAsState()
@@ -119,6 +131,24 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * ⭐ 处理 Deep Link
+     */
+    private fun handleDeepLink(intent: Intent?) {
+        val data = intent?.data
+        if (data != null && data.scheme == "dealtracker") {
+            Log.d(TAG, "✅ Deep Link detected: $data")
+
+            if (data.host == "product") {
+                val pid = data.lastPathSegment?.toIntOrNull()
+                if (pid != null && pid > 0) {
+                    Log.d(TAG, "✅ Deep Link to product: pid=$pid")
+                    deepLinkPid = pid
+                }
+            }
+        }
+    }
+
     private fun markNotificationAsRead(uid: Int, pid: Int) {
         CoroutineScope(Dispatchers.IO).launch {
             val repository = WishlistRepository()
@@ -136,13 +166,15 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleNotificationClick(intent)
+        handleDeepLink(intent)
     }
 }
 
 @Composable
 fun DealTrackerApp(
     notificationUid: Int = -1,
-    notificationPid: Int = -1
+    notificationPid: Int = -1,
+    deepLinkPid: Int = -1
 ) {
     val navController = rememberNavController()
 
@@ -162,6 +194,22 @@ fun DealTrackerApp(
                 }
             } catch (e: Exception) {
                 Log.e("DealTrackerApp", "Navigation failed: ${e.message}")
+            }
+        }
+    }
+
+    // ⭐ Deep Link 导航
+    LaunchedEffect(deepLinkPid) {
+        if (deepLinkPid > 0) {
+            Log.d("DealTrackerApp", "🔗 Deep Link navigation to product: pid=$deepLinkPid")
+
+            try {
+                navController.navigate("detail/$deepLinkPid") {
+                    popUpTo(Routes.HOME) { inclusive = false }
+                }
+                Log.d("DealTrackerApp", "✅ Navigating to product detail: pid=$deepLinkPid")
+            } catch (e: Exception) {
+                Log.e("DealTrackerApp", "❌ Deep Link navigation failed: ${e.message}")
             }
         }
     }

@@ -9,6 +9,7 @@ import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import com.example.dealtracker.ui.deals.DealsScreen
 import com.example.dealtracker.ui.detail.ProductDetailScreen
+import com.example.dealtracker.ui.detail.ProductDetailScreenWithPid
 import com.example.dealtracker.ui.home.HomeScreen
 import com.example.dealtracker.ui.wishlist.WishListScreen
 import com.example.dealtracker.ui.profile.SettingsScreen
@@ -127,7 +128,23 @@ fun MainNavGraph(
             )
         }
 
-        // ============= 商品详情页（带参数） =============
+        // ============= ⭐ 商品详情页（仅 pid - 用于 Deep Link 和通知） =============
+        composable(
+            route = "detail/{pid}",
+            arguments = listOf(
+                navArgument("pid") { type = NavType.IntType }
+            )
+        ) { backStackEntry ->
+            val pid = backStackEntry.arguments?.getInt("pid") ?: 1
+
+            // ⭐ 使用新组件，会自动从 API 加载产品信息
+            ProductDetailScreenWithPid(
+                pid = pid,
+                navController = navController
+            )
+        }
+
+        // ============= 商品详情页（完整参数 - 向后兼容） =============
         composable(
             route = Routes.DETAIL_BASE +
                     "?pid={pid}&name={name}&price={price}&rating={rating}"

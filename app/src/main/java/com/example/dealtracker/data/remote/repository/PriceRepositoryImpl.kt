@@ -21,7 +21,8 @@ class PriceRepositoryImpl: PriceRepository {
                     PlatformPrice(
                         platformName = dto.platform,
                         platformIcon = mapPlatformToIcon(dto.platform), // 平台图标映射
-                        price = dto.price
+                        price = dto.price,
+                        link = dto.link  // ⭐ 添加 link 字段
                     )
                 }
             } catch (e: Exception) {
