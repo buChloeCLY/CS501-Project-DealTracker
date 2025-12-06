@@ -70,15 +70,10 @@ class MainActivity : ComponentActivity() {
         handleDeepLink(intent)
 
         setContent {
-            DealTrackerTheme {
-                DealTrackerApp(
-                    notificationUid = notificationUid,
-                    notificationPid = notificationPid,
-                    deepLinkPid = deepLinkPid
-                )
             // 使用 Flow → Compose 自动监听并刷新 UI
             val darkMode by UserPreferences.darkModeFlow.collectAsState()
             val fontScale by UserPreferences.fontScaleFlow.collectAsState()
+
             CompositionLocalProvider(
                 // 应用全局字体缩放
                 LocalDensity provides Density(
@@ -89,11 +84,12 @@ class MainActivity : ComponentActivity() {
                 // 应用主题（darkMode 实时变化）
                 DealTrackerTheme(
                     darkTheme = darkMode,
-                    dynamicColor = false //避免动态色覆盖 darkMode 设置
+                    dynamicColor = false // 避免动态色覆盖 darkMode 设置
                 ) {
                     DealTrackerApp(
                         notificationUid = notificationUid,
-                        notificationPid = notificationPid
+                        notificationPid = notificationPid,
+                        deepLinkPid = deepLinkPid
                     )
                 }
             }
@@ -121,11 +117,11 @@ class MainActivity : ComponentActivity() {
             if (uid > 0 && pid > 0) {
                 Log.d(TAG, "✅ Notification clicked: uid=$uid, pid=$pid")
 
-                //  保存信息用于导航
+                // 保存信息用于导航
                 notificationUid = uid
                 notificationPid = pid
 
-                //  标记为已读
+                // 标记为已读
                 markNotificationAsRead(uid, pid)
             }
         }
@@ -181,14 +177,12 @@ fun DealTrackerApp(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route ?: Routes.HOME
 
-    //  修复：在导航图初始化后再导航
+    // 通知点击导航
     LaunchedEffect(notificationUid) {
         if (notificationUid > 0 && notificationPid > 0) {
             Log.d("DealTrackerApp", "🔔 Navigating to Wishlist: uid=$notificationUid")
 
-            // 等待导航图初始化后再导航
             try {
-                //  使用带 uid 参数的路由
                 navController.navigate("wishlist/$notificationUid") {
                     popUpTo(Routes.HOME) { inclusive = false }
                 }
