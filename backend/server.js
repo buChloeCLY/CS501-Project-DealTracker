@@ -69,36 +69,265 @@ function parseRating(ratingStr) {
 }
 
 /**
- * 🆕 计算两个字符串的相似度（Levenshtein距离）
- * 返回 0-1 之间的值，1表示完全相同
+ * 🆕 精确标题匹配算法（优化版）
+ *
+ * 匹配策略：
+ * 1. 品牌匹配（Apple, Samsung, Sony 等）
+ * 2. 型号匹配（iPhone 11, Galaxy S23 等）
+ * 3. 关键规格匹配（64GB, 256GB, Pro Max 等）
+ * 4. 颜色匹配（Red, Black, Blue 等）
+ * 5. Levenshtein 距离（编辑距离）
+ *
+ * 返回：0-1 之间的相似度分数，1 表示完全匹配
  */
 function calculateSimilarity(str1, str2) {
     if (!str1 || !str2) return 0;
 
-    // 转为小写并移除多余空格
-    const s1 = str1.toLowerCase().trim();
-    const s2 = str2.toLowerCase().trim();
+    // 转为小写并移除多余符号
+    const clean1 = cleanTitle(str1);
+    const clean2 = cleanTitle(str2);
 
-    if (s1 === s2) return 1;
+    // 完全匹配
+    if (clean1 === clean2) return 1.0;
 
-    // 简单的相似度算法：计算公共词数量
-    const words1 = s1.split(/\s+/);
-    const words2 = s2.split(/\s+/);
+    // 提取关键信息
+    const info1 = extractKeyInfo(str1);
+    const info2 = extractKeyInfo(str2);
 
-    let matchCount = 0;
-    for (const word1 of words1) {
-        if (word1.length > 2) { // 只计算长度>2的词
-            for (const word2 of words2) {
-                if (word1 === word2) {
-                    matchCount++;
-                    break;
-                }
-            }
+    // 计算各项匹配分数
+    let score = 0;
+    let weights = 0;
+
+    // 1. 品牌匹配（权重 30%）
+    if (info1.brand && info2.brand) {
+        if (info1.brand === info2.brand) {
+            score += 0.3;
+        }
+        weights += 0.3;
+    }
+
+    // 2. 型号匹配（权重 40%）
+    if (info1.model && info2.model) {
+        const modelSimilarity = compareModels(info1.model, info2.model);
+        score += modelSimilarity * 0.4;
+        weights += 0.4;
+    }
+
+    // 3. 关键规格匹配（权重 20%）
+    const specScore = compareSpecs(info1, info2);
+    score += specScore * 0.2;
+    weights += 0.2;
+
+    // 4. 词汇重叠度（权重 10%）
+    const wordScore = compareWords(clean1, clean2);
+    score += wordScore * 0.1;
+    weights += 0.1;
+
+    // 归一化分数
+    const finalScore = weights > 0 ? score / weights : 0;
+
+    console.log(`📊 Similarity: "${str1.substring(0, 40)}" vs "${str2.substring(0, 40)}" = ${(finalScore * 100).toFixed(1)}%`);
+
+    return finalScore;
+}
+
+/**
+ * 清理标题 - 移除营销词汇和多余符号
+ */
+function cleanTitle(title) {
+    return title
+        .toLowerCase()
+        .replace(/\(.*?\)/g, '')  // 移除括号内容
+        .replace(/[-–—]/g, ' ')  // 替换连字符为空格
+        .replace(/[,;:]/g, ' ')  // 替换标点为空格
+        .replace(/\s+/g, ' ')    // 合并多个空格
+        .trim();
+}
+
+/**
+ * 提取关键信息（品牌、型号、规格）
+ */
+function extractKeyInfo(title) {
+    const lower = title.toLowerCase();
+    const info = {
+        brand: null,
+        model: null,
+        storage: null,
+        color: null,
+        specs: []
+    };
+
+    // 品牌匹配（常见品牌）
+    const brands = [
+        'apple', 'samsung', 'google', 'sony', 'lg', 'motorola', 'oneplus',
+        'dell', 'hp', 'lenovo', 'asus', 'acer', 'microsoft',
+        'bose', 'beats', 'jbl', 'airpods',
+        'nike', 'adidas', 'puma'
+    ];
+
+    for (const brand of brands) {
+        if (lower.includes(brand)) {
+            info.brand = brand;
+            break;
         }
     }
 
-    const maxWords = Math.max(words1.length, words2.length);
-    return matchCount / maxWords;
+    // 型号匹配（iPhone, Galaxy, Pixel 等）
+    const modelPatterns = [
+        /iphone\s*(\d+\s*pro\s*max|\d+\s*pro|\d+\s*plus|\d+)/i,
+        /galaxy\s*s\d+\s*(ultra|plus)?/i,
+        /pixel\s*\d+\s*(pro|xl)?/i,
+        /macbook\s*(pro|air)/i,
+        /ipad\s*(pro|air|mini)?/i,
+        /airpods\s*(pro|max)?/i,
+        /echo\s*(dot|show|studio)?/i,
+        /kindle\s*(paperwhite|oasis)?/i
+    ];
+
+    for (const pattern of modelPatterns) {
+        const match = title.match(pattern);
+        if (match) {
+            info.model = match[0].toLowerCase().trim();
+            break;
+        }
+    }
+
+    // 存储容量匹配
+    const storageMatch = title.match(/(\d+)\s*(gb|tb)/i);
+    if (storageMatch) {
+        info.storage = storageMatch[0].toLowerCase();
+        info.specs.push(info.storage);
+    }
+
+    // 颜色匹配
+    const colors = [
+        'red', 'black', 'white', 'blue', 'green', 'yellow', 'purple',
+        'silver', 'gold', 'rose gold', 'space gray', 'midnight', 'starlight'
+    ];
+
+    for (const color of colors) {
+        if (lower.includes(color)) {
+            info.color = color;
+            info.specs.push(color);
+            break;
+        }
+    }
+
+    // 其他关键规格
+    const specPatterns = [
+        /pro max/i, /pro/i, /plus/i, /mini/i, /ultra/i,
+        /unlocked/i, /renewed/i, /refurbished/i,
+        /5g/i, /wifi/i, /cellular/i
+    ];
+
+    for (const pattern of specPatterns) {
+        const match = title.match(pattern);
+        if (match) {
+            info.specs.push(match[0].toLowerCase());
+        }
+    }
+
+    return info;
+}
+
+/**
+ * 比较型号相似度
+ */
+function compareModels(model1, model2) {
+    if (model1 === model2) return 1.0;
+
+    // 移除空格后比较
+    const m1 = model1.replace(/\s+/g, '');
+    const m2 = model2.replace(/\s+/g, '');
+
+    if (m1 === m2) return 0.95;
+
+    // 使用 Levenshtein 距离
+    const distance = levenshteinDistance(m1, m2);
+    const maxLen = Math.max(m1.length, m2.length);
+    const similarity = 1 - (distance / maxLen);
+
+    return Math.max(0, similarity);
+}
+
+/**
+ * 比较规格相似度
+ */
+function compareSpecs(info1, info2) {
+    let matchCount = 0;
+    let totalSpecs = 0;
+
+    // 存储容量
+    if (info1.storage && info2.storage) {
+        matchCount += info1.storage === info2.storage ? 1 : 0;
+        totalSpecs++;
+    }
+
+    // 颜色
+    if (info1.color && info2.color) {
+        matchCount += info1.color === info2.color ? 1 : 0;
+        totalSpecs++;
+    }
+
+    // 其他规格
+    const specs1 = new Set(info1.specs);
+    const specs2 = new Set(info2.specs);
+    const commonSpecs = [...specs1].filter(s => specs2.has(s));
+
+    if (specs1.size > 0 || specs2.size > 0) {
+        const specSimilarity = commonSpecs.length / Math.max(specs1.size, specs2.size);
+        matchCount += specSimilarity;
+        totalSpecs++;
+    }
+
+    return totalSpecs > 0 ? matchCount / totalSpecs : 0;
+}
+
+/**
+ * 比较词汇重叠度
+ */
+function compareWords(str1, str2) {
+    const words1 = str1.split(/\s+/).filter(w => w.length > 2);
+    const words2 = str2.split(/\s+/).filter(w => w.length > 2);
+
+    if (words1.length === 0 || words2.length === 0) return 0;
+
+    const set1 = new Set(words1);
+    const set2 = new Set(words2);
+
+    const intersection = [...set1].filter(w => set2.has(w));
+    const union = new Set([...set1, ...set2]);
+
+    return intersection.length / union.size;  // Jaccard 相似度
+}
+
+/**
+ * Levenshtein 距离（编辑距离）
+ */
+function levenshteinDistance(str1, str2) {
+    const len1 = str1.length;
+    const len2 = str2.length;
+
+    // 创建矩阵
+    const matrix = Array(len1 + 1).fill(null).map(() => Array(len2 + 1).fill(0));
+
+    // 初始化第一行和第一列
+    for (let i = 0; i <= len1; i++) matrix[i][0] = i;
+    for (let j = 0; j <= len2; j++) matrix[0][j] = j;
+
+    // 填充矩阵
+    for (let i = 1; i <= len1; i++) {
+        for (let j = 1; j <= len2; j++) {
+            const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+            matrix[i][j] = Math.min(
+                matrix[i - 1][j] + 1,      // 删除
+                matrix[i][j - 1] + 1,      // 插入
+                matrix[i - 1][j - 1] + cost // 替换
+            );
+        }
+    }
+
+    return matrix[len1][len2];
 }
 
 /**
@@ -115,6 +344,16 @@ function extractShortTitle(fullTitle) {
         .replace(/[-–—]\s*(Unlocked|GSM|CDMA|Certified|Refurbished|Pre-Owned|Factory|International|US Version).*/gi, '')
         .replace(/\s*,\s*(Free Shipping|Fast Delivery|Best Price|Top Rated|Best Seller).*/gi, '')
         .replace(/\s+(with|for|by)\s+.*/gi, '')  // 移除 "with accessories" 之类
+        .replace(/\b(Limited Edition|Special Edition|Exclusive)\b/gi, '')
+        // 移除运营商信息（保留 Unlocked）
+        .replace(/\b(Verizon|AT&T|T-Mobile|Sprint|US Cellular)\b(?!\s*Unlocked)/gi, '')
+        // 移除版本信息（除非是关键配置）
+        .replace(/\b(US Version|International Version|Global Version)\b/gi, '')
+        // 移除多余符号
+        .replace(/[•●○▪▫]/g, ' ')
+        .replace(/[-–—]/g, ' ')
+        .replace(/[,;:]/g, ' ')
+        .replace(/\s+/g, ' ')
         .trim();
 
     // 分词，过滤无意义词汇
@@ -123,26 +362,298 @@ function extractShortTitle(fullTitle) {
         !/^(the|and|or|with|for|by|in|on|at|to|from|of)$/i.test(w)
     );
 
-    // 限制最多 10 个词
-    const maxWords = 10;
-    const shortWords = words.slice(0, maxWords);
+    // 限制最多 15 个词
+    const maxWords = 15;
+    let shortWords = words.slice(0, maxWords);
 
-    // 如果有内存/存储信息，确保包含（如果还没超过 10 词）
-    const storageMatch = fullTitle.match(/\b(\d+\s*(?:GB|TB|MB))\b/i);
-    if (storageMatch && shortWords.length < maxWords && !shortWords.join(' ').includes(storageMatch[1])) {
-        shortWords.push(storageMatch[1]);
+    // ⭐ 新增：提取并确保包含颜色（多词颜色优先）
+    const color = extractColorDetailed(fullTitle);
+    if (color && shortWords.length < maxWords) {
+        const colorWords = color.split(/\s+/);
+        const colorInTitle = colorWords.every(cw =>
+            shortWords.some(sw => sw.toLowerCase() === cw.toLowerCase())
+        );
+
+        if (!colorInTitle) {
+            // 如果颜色不在短标题中，添加它
+            if (shortWords.length + colorWords.length <= maxWords) {
+                shortWords.push(...colorWords);
+            }
+        }
+    }
+
+    // ⭐ 优化：提取所有存储信息（包括内存）
+    const storageMatches = [...fullTitle.matchAll(/\b(\d+)\s*(GB|TB|MB)(?:\s*RAM)?\b/gi)];
+    const storageInfo = [];
+
+    for (const match of storageMatches) {
+        const value = match[1];
+        const unit = match[2].toUpperCase();
+        const isRAM = match[0].toLowerCase().includes('ram');
+
+        const storageStr = isRAM ? `${value}${unit} RAM` : `${value}${unit}`;
+
+        // 检查是否已在短标题中
+        const alreadyIncluded = shortWords.some(w =>
+            w.toLowerCase().includes(value.toLowerCase()) &&
+            w.toLowerCase().includes(unit.toLowerCase())
+        );
+
+        if (!alreadyIncluded && shortWords.length < maxWords) {
+            storageInfo.push(storageStr);
+        }
+    }
+
+    // 添加存储信息（去重）
+    const uniqueStorage = [...new Set(storageInfo)];
+    for (const storage of uniqueStorage) {
+        if (shortWords.length < maxWords) {
+            const storageWords = storage.split(/\s+/);
+            if (shortWords.length + storageWords.length <= maxWords) {
+                shortWords.push(...storageWords);
+            }
+        }
+    }
+
+    // ⭐ 新增：提取并添加关键配置
+    const configs = extractConfigs(fullTitle);
+    for (const config of configs) {
+        if (shortWords.length < maxWords) {
+            const configWords = config.split(/\s+/);
+
+            // 检查配置是否已在短标题中
+            const configInTitle = configWords.every(cw =>
+                shortWords.some(sw => sw.toLowerCase() === cw.toLowerCase())
+            );
+
+            if (!configInTitle && shortWords.length + configWords.length <= maxWords) {
+                shortWords.push(...configWords);
+            }
+        }
     }
 
     const result = shortWords.join(' ');
 
-    // 限制长度不超过 150 字符
-    return result.length > 150 ? result.substring(0, 147) + '...' : result;
+    // 限制长度不超过 250 字符
+    return result.length > 250 ? result.substring(0, 247) + '...' : result;
 }
 
 /**
- * 智能分类 - 根据产品标题自动分类
+ * ⭐ 提取颜色（详细版，包含多词颜色）
  */
-function categorizeProduct(title) {
+function extractColorDetailed(title) {
+    // 多词颜色（优先匹配）
+    const multiWordColors = [
+        'Natural Titanium', 'Blue Titanium', 'White Titanium', 'Black Titanium',
+        'Space Gray', 'Space Black', 'Rose Gold', 'Midnight Green', 'Pacific Blue',
+        'Sierra Blue', 'Alpine Green', 'Deep Purple', 'Starlight', 'Midnight',
+        'Product Red', 'Jet Black', 'Matte Black', 'Graphite Black'
+    ];
+
+    for (const color of multiWordColors) {
+        const regex = new RegExp(`\\b${color}\\b`, 'i');
+        if (regex.test(title)) {
+            return color;
+        }
+    }
+
+    // 单词颜色
+    const singleWordColors = [
+        'Red', 'Black', 'White', 'Blue', 'Green', 'Yellow', 'Purple',
+        'Pink', 'Orange', 'Gray', 'Grey', 'Silver', 'Gold', 'Bronze',
+        'Titanium', 'Graphite', 'Coral', 'Lavender'
+    ];
+
+    for (const color of singleWordColors) {
+        const regex = new RegExp(`\\b${color}\\b`, 'i');
+        if (regex.test(title)) {
+            return color;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * ⭐ 提取关键配置
+ */
+function extractConfigs(title) {
+    const configs = [];
+
+    const keywords = [
+        'Unlocked', '5G', '4G', 'LTE', 'WiFi', 'Wi-Fi', 'WiFi 6', 'Bluetooth',
+        'Dual SIM', 'eSIM', 'Touchscreen', 'Retina', 'OLED', 'AMOLED',
+        'Water Resistant', 'Waterproof', 'Wireless Charging', 'Fast Charging',
+        'Noise Cancelling', 'Active Noise Cancelling', 'ANC'
+    ];
+
+    for (const keyword of keywords) {
+        const regex = new RegExp(`\\b${keyword}\\b`, 'i');
+        if (regex.test(title)) {
+            configs.push(keyword);
+        }
+    }
+
+    // 限制配置数量（最多 3 个，避免超过 15 词）
+    return configs.slice(0, 3);
+}
+
+/**
+ * 🆕 优化版：智能分类函数
+ *
+ * 优先级：
+ * 1. 使用 Amazon 的 category_path（最准确）
+ * 2. 回退到标题关键词匹配（兼容其他平台）
+ *
+ * @param {string} title - 产品标题
+ * @param {Object} apiProduct - 完整的 API 响应对象（可选）
+ * @returns {string} - 分类名称
+ */
+function categorizeProduct(title, apiProduct = null) {
+    // ⭐ 优先级 1：使用 Amazon 的 category_path
+    if (apiProduct && apiProduct.category_path && Array.isArray(apiProduct.category_path)) {
+        const mappedCategory = mapAmazonCategory(apiProduct.category_path);
+        if (mappedCategory) {
+            console.log(`📂 [Category] Using Amazon path: ${mappedCategory}`);
+            return mappedCategory;
+        }
+    }
+
+    // ⭐ 优先级 2：回退到标题关键词匹配
+    console.log(`📂 [Category] Fallback to keyword matching`);
+    return categorizeByKeywords(title);
+}
+
+/**
+ * 🆕 映射 Amazon category_path 到我们的分类系统
+ *
+ * Amazon category_path 示例：
+ * [
+ *   { id: "2335752011", name: "Cell Phones & Accessories" },
+ *   { id: "7072561011", name: "Cell Phones" }
+ * ]
+ */
+function mapAmazonCategory(categoryPath) {
+    // 从最后一个分类开始检查（最具体的分类）
+    for (let i = categoryPath.length - 1; i >= 0; i--) {
+        const category = categoryPath[i];
+        const categoryName = category.name.toLowerCase();
+
+        // Electronics 相关
+        if (categoryName.includes('cell phone') ||
+            categoryName.includes('smartphone') ||
+            categoryName.includes('electronics') ||
+            categoryName.includes('computer') ||
+            categoryName.includes('tablet') ||
+            categoryName.includes('laptop') ||
+            categoryName.includes('camera') ||
+            categoryName.includes('tv') ||
+            categoryName.includes('audio') ||
+            categoryName.includes('headphone') ||
+            categoryName.includes('wearable') ||
+            categoryName.includes('smart home') ||
+            categoryName.includes('video game')) {
+            return 'Electronics';
+        }
+
+        // Beauty 相关
+        if (categoryName.includes('beauty') ||
+            categoryName.includes('makeup') ||
+            categoryName.includes('skincare') ||
+            categoryName.includes('cosmetic') ||
+            categoryName.includes('fragrance') ||
+            categoryName.includes('personal care')) {
+            return 'Beauty';
+        }
+
+        // Home 相关
+        if (categoryName.includes('home') ||
+            categoryName.includes('kitchen') ||
+            categoryName.includes('furniture') ||
+            categoryName.includes('bedding') ||
+            categoryName.includes('appliance') ||
+            categoryName.includes('garden') ||
+            categoryName.includes('patio')) {
+            return 'Home';
+        }
+
+        // Food 相关
+        if (categoryName.includes('grocery') ||
+            categoryName.includes('food') ||
+            categoryName.includes('beverage') ||
+            categoryName.includes('snack') ||
+            categoryName.includes('gourmet')) {
+            return 'Food';
+        }
+
+        // Fashion 相关
+        if (categoryName.includes('clothing') ||
+            categoryName.includes('shoes') ||
+            categoryName.includes('fashion') ||
+            categoryName.includes('jewelry') ||
+            categoryName.includes('watch') ||
+            categoryName.includes('accessories') ||
+            categoryName.includes('handbag') ||
+            categoryName.includes('luggage')) {
+            return 'Fashion';
+        }
+
+        // Sports 相关
+        if (categoryName.includes('sport') ||
+            categoryName.includes('fitness') ||
+            categoryName.includes('outdoor') ||
+            categoryName.includes('exercise') ||
+            categoryName.includes('athletic')) {
+            return 'Sports';
+        }
+
+        // Books 相关
+        if (categoryName.includes('book') ||
+            categoryName.includes('kindle') ||
+            categoryName.includes('magazine') ||
+            categoryName.includes('textbook')) {
+            return 'Books';
+        }
+
+        // Toys 相关
+        if (categoryName.includes('toy') ||
+            categoryName.includes('game') ||
+            categoryName.includes('puzzle')) {
+            return 'Toys';
+        }
+
+        // Health 相关
+        if (categoryName.includes('health') ||
+            categoryName.includes('medical') ||
+            categoryName.includes('vitamin') ||
+            categoryName.includes('supplement') ||
+            categoryName.includes('wellness')) {
+            return 'Health';
+        }
+
+        // Office 相关
+        if (categoryName.includes('office') ||
+            categoryName.includes('school') ||
+            categoryName.includes('stationery')) {
+            return 'Office';
+        }
+
+        // Pets 相关
+        if (categoryName.includes('pet') ||
+            categoryName.includes('dog') ||
+            categoryName.includes('cat') ||
+            categoryName.includes('animal')) {
+            return 'Pets';
+        }
+    }
+
+    return null; // 未找到匹配，返回 null 触发回退
+}
+
+/**
+ * 🆕 基于关键词的分类（原有逻辑，作为回退方案）
+ */
+function categorizeByKeywords(title) {
     const lower = title.toLowerCase();
 
     if (lower.match(/phone|laptop|tablet|computer|headphone|speaker|camera|tv|monitor|keyboard|mouse|smartwatch|earbuds|airpods|ipad|macbook|gaming|console|playstation|xbox|nintendo|electronics|cable|charger|adapter|router|printer/)) {
@@ -182,7 +693,7 @@ function categorizeProduct(title) {
         return 'Pets';
     }
 
-    return 'Electronics';
+    return 'Electronics'; // 默认分类
 }
 
 /**
@@ -227,7 +738,7 @@ const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || process.env.RAPIDAPI_KEY_AMAZON
 // 向后兼容：如果设置了单独的 Key，使用单独的；否则都用同一个
 const RAPIDAPI_KEYS = {
     amazon: process.env.RAPIDAPI_KEY_AMAZON || RAPIDAPI_KEY,
-    bestbuy: process.env.RAPIDAPI_KEY_BESTBUY || RAPIDAPI_KEY,
+    ebay: process.env.RAPIDAPI_KEY_EBAY || RAPIDAPI_KEY,
     walmart: process.env.RAPIDAPI_KEY_WALMART || RAPIDAPI_KEY
 };
 
@@ -266,38 +777,53 @@ async function fetchFromAmazon(query, page = 1) {
 }
 
 /**
- * 🆕 从 BestBuy RapidAPI 获取产品数据
- * API: bestbuy-usa by belchiorarkad
+ * 从 eBay RapidAPI 获取产品数据
+ *
+ * @param {string} query - 搜索关键词（使用 short_title）
+ * @param {number} page - 页码
+ * @returns {Array} - 产品列表
  */
-async function fetchFromBestBuy(query, page = 1) {
+async function fetchFromEbay(query, page = 1) {
     try {
-        console.log(`🔍 [BestBuy] Searching: "${query}"`);
+        console.log(`🔍 [eBay] Searching: "${query}" (page ${page})`);
 
-        if (!RAPIDAPI_KEYS.bestbuy) {
-            console.log('⚠️  BestBuy API key not configured, skipping...');
+        if (!RAPIDAPI_KEYS.ebay || RAPIDAPI_KEYS.ebay === 'YOUR_RAPIDAPI_KEY_HERE') {
+            console.log('⚠️  eBay API key not configured, skipping...');
             return [];
         }
 
-        // 使用 BestBuy USA API 的搜索端点
-        const response = await axios.get('https://bestbuy-usa.p.rapidapi.com/search', {
+        const response = await axios.get('https://ebay-data-api.p.rapidapi.com/search', {
             params: {
                 query: query,
-                page: page.toString()
+                page: page.toString(),
+                countryIso: 'us',
+                minPrice: 0,
+                location: 'us_only',
+                sort: 'price_asc',  // 按价格升序
+                shipping: 'free',   // 优先免费配送
+                seller: 'top_rated',
+                excludeKeywords: 'broken+damaged'
             },
             headers: {
-                'X-RapidAPI-Key': RAPIDAPI_KEYS.bestbuy,
-                'X-RapidAPI-Host': 'bestbuy-usa.p.rapidapi.com'
-            }
-            // 移除 timeout 限制
+                'X-RapidAPI-Key': RAPIDAPI_KEYS.ebay,
+                'X-RapidAPI-Host': 'ebay-data-api.p.rapidapi.com'
+            },
+            timeout: 15000
         });
 
-        // BestBuy USA API 返回的数据结构
-        const products = response.data?.products || response.data?.data?.products || [];
-        console.log(`✅ [BestBuy] Found ${products.length} products`);
+        const products = response.data?.items || [];
+        console.log(`✅ [eBay] Found ${products.length} products`);
         return products;
 
     } catch (error) {
-        console.error('❌ [BestBuy] API Error:', error.message);
+        if (error.response) {
+            console.error('❌ [eBay] API Error:', {
+                status: error.response.status,
+                message: error.response.data
+            });
+        } else {
+            console.error('❌ [eBay] Request Error:', error.message);
+        }
         return [];
     }
 }
@@ -402,6 +928,48 @@ function transformAmazonProduct(apiProduct) {
     const fullTitle = apiProduct.product_title || 'Unknown Product';
     const shortTitle = extractShortTitle(fullTitle);
 
+    // ⭐ 优化 1: Free Shipping 判断
+        let freeShipping = false;
+
+        // 方法 1: is_prime
+        if (apiProduct.is_prime === true) {
+            freeShipping = true;
+            console.log(`📦 [Free Shipping] Detected via is_prime`);
+        }
+
+        // 方法 2: delivery 字段包含 "free" (不区分大小写)
+        if (!freeShipping && apiProduct.delivery) {
+            const deliveryText = apiProduct.delivery.toLowerCase();
+            if (deliveryText.includes('free')) {
+                freeShipping = true;
+                console.log(`📦 [Free Shipping] Detected via delivery: "${apiProduct.delivery}"`);
+            }
+        }
+
+        // ⭐ 优化 2: In Stock 判断
+        let inStock = false;
+
+        // 方法 1: product_availability 包含 "in stock"
+        if (apiProduct.product_availability) {
+            const availability = apiProduct.product_availability.toLowerCase();
+            if (availability.includes('in stock') || availability.includes('available')) {
+                inStock = true;
+                console.log(`✅ [In Stock] Detected via product_availability: "${apiProduct.product_availability}"`);
+            }
+        }
+
+        // 方法 2: product_num_offers > 0
+        if (!inStock && apiProduct.product_num_offers) {
+            const numOffers = typeof apiProduct.product_num_offers === 'number'
+                ? apiProduct.product_num_offers
+                : parseInt(apiProduct.product_num_offers);
+
+            if (numOffers > 0) {
+                inStock = true;
+                console.log(`✅ [In Stock] Detected via product_num_offers: ${numOffers}`);
+            }
+        }
+
     return {
         shortTitle: shortTitle,
         fullTitle: fullTitle,
@@ -411,62 +979,75 @@ function transformAmazonProduct(apiProduct) {
         freeShipping: apiProduct.is_prime ? 1 : 0,
         inStock: apiProduct.product_availability?.toLowerCase().includes('in stock') ? 1 : 0,
         information: generateInformation(apiProduct),
-        category: categorizeProduct(fullTitle),
+        category: categorizeProduct(fullTitle, apiProduct),
         imageUrl: apiProduct.product_photo || '',
+        idInPlatform: apiProduct.asin || '',
         link: apiProduct.product_url || ''
     };
 }
 
 /**
- * 🆕 转换 BestBuy 产品数据
- * BestBuy USA API 字段映射：
- * - name/title -> title
- * - price/salePrice/regularPrice -> price
- * - url/productUrl -> link
- * - inStock/availability -> in_stock
- * - freeShipping/shipping -> free_shipping
+ * 转换 eBay 产品数据
+ *
+ * eBay API 返回示例：
+ * {
+ *   "itemId": "366033421295",
+ *   "title": "APPLE MACBOOK PRO MLL42LL/A | CORE I5-6360U 2.0GHZ | 256GB | 8GB",
+ *   "price": 64,
+ *   "currency": "USD",
+ *   "shipping": 0,
+ *   "total": 64,
+ *   "soldQuantity": 0,
+ *   "imageUrl": "https://i.ebayimg.com/...",
+ *   "time-left": "11 bids · Time left18h 29m left",
+ *   "bid-count": 11,
+ *   "condition": "Pre-Owned · 13 in",
+ *   "delivery-date": "Free delivery",
+ *   "url": "https://www.ebay.com/itm/..."
+ * }
  */
-function transformBestBuyProduct(apiProduct) {
-    // 处理价格（可能是 price, salePrice, regularPrice）
-    const price = parsePrice(
-        apiProduct.price ||
-        apiProduct.salePrice ||
-        apiProduct.regularPrice ||
-        apiProduct.current_price ||
-        0
-    );
+function transformEbayProduct(apiProduct) {
+    // 处理价格
+    const price = apiProduct.total || apiProduct.price || 0;
 
-    // 处理包邮（可能是 freeShipping, shipping, shippingCost）
-    let freeShipping = false;
-    if (apiProduct.freeShipping !== undefined) {
-        freeShipping = apiProduct.freeShipping === true;
-    } else if (apiProduct.shipping !== undefined) {
-        freeShipping = apiProduct.shipping === 'Free' || apiProduct.shipping === 0;
-    } else if (apiProduct.shippingCost !== undefined) {
-        freeShipping = apiProduct.shippingCost === 0 || apiProduct.shippingCost === '0' || apiProduct.shippingCost === 'Free';
+    // 处理包邮（shipping = 0 表示免费配送）
+    const freeShipping = apiProduct.shipping === 0 ||
+                        apiProduct['delivery-date']?.toLowerCase().includes('free');
+
+    // 处理库存（eBay 通常有货，除非已售罄）
+    const inStock = !apiProduct.condition?.toLowerCase().includes('sold out');
+
+    // 生成详情信息
+    const info = [];
+
+    if (apiProduct.itemId) {
+        info.push(`eBay ID: ${apiProduct.itemId}`);
     }
 
-    // 处理库存（可能是 inStock, availability, stock）
-    let inStock = true; // 默认有货
-    if (apiProduct.inStock !== undefined) {
-        inStock = apiProduct.inStock === true;
-    } else if (apiProduct.availability !== undefined) {
-        const avail = String(apiProduct.availability).toLowerCase();
-        inStock = avail.includes('in stock') || avail.includes('available');
-    } else if (apiProduct.stock !== undefined) {
-        inStock = apiProduct.stock > 0 || apiProduct.stock === 'In Stock';
+    if (apiProduct.condition) {
+        info.push(apiProduct.condition);
     }
 
-    // 处理链接
-    const link = apiProduct.url || apiProduct.productUrl || apiProduct.link || '';
+    if (apiProduct['bid-count'] && apiProduct['bid-count'] > 0) {
+        info.push(`${apiProduct['bid-count']} bids`);
+    }
+
+    if (apiProduct.soldQuantity && apiProduct.soldQuantity > 0) {
+        info.push(`${apiProduct.soldQuantity} sold`);
+    }
+
+    if (apiProduct['time-left']) {
+        info.push(apiProduct['time-left']);
+    }
 
     return {
         price: price,
-        platform: 'BestBuy',
+        platform: 'eBay',
         freeShipping: freeShipping ? 1 : 0,
         inStock: inStock ? 1 : 0,
-        link: link,
-        information: '' // BestBuy 不需要 information，用完整标题
+        link: apiProduct.url || '',
+        idInPlatform: apiProduct.itemId || '',  // ⭐ eBay 商品 ID
+        title: apiProduct.title || ''  // ⭐ 用于匹配
     };
 }
 
@@ -530,7 +1111,7 @@ function transformWalmartProduct(apiProduct) {
     }
 
     // 处理链接（canonicalUrl）
-    const link = apiProduct.canonicalUrl || apiProduct.url || apiProduct.productUrl || '';
+    const link = apiProduct.productLink || '';
 
     return {
         price: price,
@@ -543,16 +1124,55 @@ function transformWalmartProduct(apiProduct) {
 }
 
 /**
- * 🆕 计算两个标题的相似度（简单版本）
+ * 从 eBay 搜索结果中找到最佳匹配
+ *
+ * @param {Object} dbProduct - 数据库商品 {pid, title, short_title}
+ * @param {Array} ebayProducts - eBay 搜索结果
+ * @returns {Object|null} - 最佳匹配的 eBay 商品
  */
-function calculateSimilarity(title1, title2) {
-    const words1 = title1.toLowerCase().split(/\s+/);
-    const words2 = title2.toLowerCase().split(/\s+/);
+function findBestEbayMatch(dbProduct, ebayProducts) {
+    if (!ebayProducts || ebayProducts.length === 0) {
+        return null;
+    }
 
-    const commonWords = words1.filter(w => words2.includes(w));
-    const similarity = commonWords.length / Math.max(words1.length, words2.length);
+    // 转换所有 eBay 商品
+    const transformed = ebayProducts.map(p => transformEbayProduct(p));
 
-    return similarity;
+    // 计算每个商品的匹配度
+    const scored = transformed.map(ebayProduct => {
+        const similarity = calculateSimilarity(dbProduct.title, ebayProduct.title);
+        return {
+            product: ebayProduct,
+            similarity: similarity,
+            price: ebayProduct.price
+        };
+    });
+
+    // 按匹配度降序排序
+    scored.sort((a, b) => b.similarity - a.similarity);
+
+    // 如果没有匹配度 >= 0.6 的商品，返回 null
+    if (scored.length === 0 || scored[0].similarity < 0.6) {
+        console.log(`⚠️  [eBay] No good match found for "${dbProduct.title}" (best similarity: ${scored[0]?.similarity.toFixed(2) || 0})`);
+        return null;
+    }
+
+    // 找出最高匹配度
+    const topSimilarity = scored[0].similarity;
+
+    // 找出所有匹配度 >= topSimilarity - 0.05 的商品（相近匹配度）
+    const topMatches = scored.filter(s => s.similarity >= topSimilarity - 0.05);
+
+    // 如果有多个相近匹配度，选最便宜的
+    if (topMatches.length > 1) {
+        topMatches.sort((a, b) => a.price - b.price);
+        console.log(`✅ [eBay] Found ${topMatches.length} similar matches, choosing cheapest at $${topMatches[0].price}`);
+    }
+
+    const bestMatch = topMatches[0];
+    console.log(`✅ [eBay] Best match: "${bestMatch.product.title.substring(0, 50)}..." (similarity: ${bestMatch.similarity.toFixed(2)}, price: $${bestMatch.price})`);
+
+    return bestMatch.product;
 }
 
 // ===================================
@@ -982,28 +1602,29 @@ app.post('/api/admin/import-initial', async (req, res) => {
 
                 // Step 3: 插入 Amazon 价格到 price 表
                 await pool.query(`
-                    INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, link)
-                    VALUES (?, ?, ?, ?, ?, NOW(), ?)
-                `, [pid, 'Amazon', amazonProduct.price, amazonProduct.freeShipping, amazonProduct.inStock, amazonProduct.link]);
+                    INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, idInPlatform, link)
+                    VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)
+                `, [pid, 'Amazon', amazonProduct.price, amazonProduct.freeShipping, amazonProduct.inStock, amazonProduct.idInPlatform, amazonProduct.link]);
 
                 console.log(`   💰 Amazon: $${amazonProduct.price}`);
 
-                // Step 4: 用原始完整标题搜索 BestBuy
-                console.log(`   🔍 Searching BestBuy with: "${amazonProduct.fullTitle}"`);
+                // Step 4: 用原始完整标题搜索 ebay
+                console.log(`   🔍 Searching eBay with: "${amazonProduct.fullTitle}"`);
+                await new Promise(resolve => setTimeout(resolve, 2000));
 
-                await new Promise(resolve => setTimeout(resolve, 2000)); // 防止 API 限流
-                const bestbuyProducts = await fetchFromBestBuy(amazonProduct.fullTitle, 1);
+                const ebayProducts = await fetchFromEbay(amazonProduct.shortTitle, 1);
 
-                if (bestbuyProducts.length > 0) {
-                    const bestbuyProduct = transformBestBuyProduct(bestbuyProducts[0]);
+                if (ebayProducts.length > 0) {
+                    // ⭐ 使用智能匹配
+                    const ebayProduct = findBestEbayMatch({ title: amazonProduct.fullTitle }, ebayProducts);
 
-                    if (bestbuyProduct.price > 0) {
+                    if (ebayProduct && ebayProduct.price > 0) {
                         await pool.query(`
-                            INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, link)
-                            VALUES (?, ?, ?, ?, ?, NOW(), ?)
-                        `, [pid, 'BestBuy', bestbuyProduct.price, bestbuyProduct.freeShipping, bestbuyProduct.inStock, bestbuyProduct.link]);
+                            INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, idInPlatform, link)
+                            VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)
+                        `, [pid, 'eBay', ebayProduct.price, ebayProduct.freeShipping, ebayProduct.inStock, ebayProduct.idInPlatform, ebayProduct.link]);
 
-                        console.log(`   💰 BestBuy: $${bestbuyProduct.price}`);
+                        console.log(`   💰 eBay: $${ebayProduct.price}`);
                     }
                 }
 
@@ -1082,9 +1703,9 @@ app.post('/api/admin/update-all-prices', async (req, res) => {
                     const amazonProduct = transformAmazonProduct(amazonProducts[0]);
                     if (amazonProduct.price > 0) {
                         await pool.query(`
-                            INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, link)
-                            VALUES (?, ?, ?, ?, ?, NOW(), ?)
-                        `, [dbProduct.pid, 'Amazon', amazonProduct.price, amazonProduct.freeShipping, amazonProduct.inStock, amazonProduct.link]);
+                            INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, idInPlatform, link)
+                            VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)
+                        `, [dbProduct.pid, 'Amazon', amazonProduct.price, amazonProduct.freeShipping, amazonProduct.inStock, amazonProduct.idInPlatform, amazonProduct.link]);
 
                         console.log(`   💰 Amazon: $${amazonProduct.price}`);
                     }
@@ -1092,17 +1713,19 @@ app.post('/api/admin/update-all-prices', async (req, res) => {
 
                 await new Promise(resolve => setTimeout(resolve, 2000));
 
-                // 更新 BestBuy 价格
-                const bestbuyProducts = await fetchFromBestBuy(dbProduct.title, 1);
-                if (bestbuyProducts.length > 0) {
-                    const bestbuyProduct = transformBestBuyProduct(bestbuyProducts[0]);
-                    if (bestbuyProduct.price > 0) {
-                        await pool.query(`
-                            INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, link)
-                            VALUES (?, ?, ?, ?, ?, NOW(), ?)
-                        `, [dbProduct.pid, 'BestBuy', bestbuyProduct.price, bestbuyProduct.freeShipping, bestbuyProduct.inStock, bestbuyProduct.link]);
+                // 更新 ebay 价格
+                const ebayProducts = await fetchFromEbay(dbProduct.title, 1);
 
-                        console.log(`   💰 BestBuy: $${bestbuyProduct.price}`);
+                if (ebayProducts.length > 0) {
+                    const ebayProduct = findBestEbayMatch(dbProduct, ebayProducts);
+
+                    if (ebayProduct && ebayProduct.price > 0) {
+                        await pool.query(`
+                            INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, idInPlatform, link)
+                            VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)
+                        `, [dbProduct.pid, 'eBay', ebayProduct.price, ebayProduct.freeShipping, ebayProduct.inStock, ebayProduct.idInPlatform, ebayProduct.link]);
+
+                        console.log(`   💰 eBay: $${ebayProduct.price}`);
                     }
                 }
 
@@ -1244,6 +1867,122 @@ app.post('/api/admin/add-walmart-prices', async (req, res) => {
         console.error('Walmart supplement failed:', error);
         res.status(500).json({
             error: 'Walmart supplement failed',
+            details: error.message
+        });
+    }
+});
+
+/**
+ * 🆕 同步所有产品的 eBay 价格
+ * POST /api/admin/sync-ebay-prices
+ */
+app.post('/api/admin/sync-ebay-prices', async (req, res) => {
+    try {
+        console.log('\n🔄 Starting eBay price sync for all products...');
+        console.log('='.repeat(70));
+
+        const [dbProducts] = await pool.query('SELECT pid, title, short_title FROM products');
+        console.log(`📊 Found ${dbProducts.length} products to sync`);
+
+        let syncedCount = 0;
+        let failedCount = 0;
+        const syncLog = [];
+
+        for (const dbProduct of dbProducts) {
+            try {
+                // 使用 short_title 搜索（如果没有则使用 title）
+                const searchQuery = dbProduct.short_title || dbProduct.title;
+
+                console.log(`\n🔍 [${syncedCount + failedCount + 1}/${dbProducts.length}] Searching eBay for: "${searchQuery.substring(0, 50)}"`);
+
+                // 查询 eBay
+                const ebayProducts = await fetchFromEbay(searchQuery, 1);
+
+                if (ebayProducts.length > 0) {
+                    // 智能匹配
+                    const bestMatch = findBestEbayMatch(dbProduct, ebayProducts);
+
+                    if (bestMatch && bestMatch.price > 0) {
+                        // 检查是否已存在
+                        const [existing] = await pool.query(
+                            'SELECT id FROM price WHERE pid = ? AND platform = ? AND date >= DATE_SUB(NOW(), INTERVAL 1 DAY)',
+                            [dbProduct.pid, 'eBay']
+                        );
+
+                        if (existing.length > 0) {
+                            // 更新现有记录
+                            await pool.query(`
+                                UPDATE price
+                                SET price = ?, free_shipping = ?, in_stock = ?, link = ?, idInPlatform = ?, date = NOW()
+                                WHERE id = ?
+                            `, [
+                                bestMatch.price,
+                                bestMatch.freeShipping,
+                                bestMatch.inStock,
+                                bestMatch.link,
+                                bestMatch.idInPlatform,
+                                existing[0].id
+                            ]);
+                            console.log(`   ✅ Updated eBay price: $${bestMatch.price}`);
+                        } else {
+                            // 插入新记录
+                            await pool.query(`
+                                INSERT INTO price (pid, platform, price, free_shipping, in_stock, link, idInPlatform, date)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+                            `, [
+                                dbProduct.pid,
+                                'eBay',
+                                bestMatch.price,
+                                bestMatch.freeShipping,
+                                bestMatch.inStock,
+                                bestMatch.link,
+                                bestMatch.idInPlatform
+                            ]);
+                            console.log(`   ✅ Inserted eBay price: $${bestMatch.price}`);
+                        }
+
+                        syncedCount++;
+                        syncLog.push({
+                            pid: dbProduct.pid,
+                            title: dbProduct.title.substring(0, 40),
+                            ebayPrice: bestMatch.price,
+                            ebayId: bestMatch.idInPlatform
+                        });
+                    } else {
+                        console.log(`   ⚠️  No suitable match found`);
+                        failedCount++;
+                    }
+                } else {
+                    console.log(`   ⚠️  No results from eBay`);
+                    failedCount++;
+                }
+
+                // 延迟避免 API 限流
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+            } catch (error) {
+                failedCount++;
+                console.error(`   ❌ Error syncing ${dbProduct.title}:`, error.message);
+            }
+        }
+
+        console.log('\n' + '='.repeat(70));
+        console.log(`✅ eBay sync completed: ${syncedCount} synced, ${failedCount} failed`);
+        console.log('='.repeat(70) + '\n');
+
+        res.json({
+            success: true,
+            message: `Synced ${syncedCount}/${dbProducts.length} products`,
+            syncedCount,
+            failedCount,
+            totalProducts: dbProducts.length,
+            syncLog: syncLog.slice(0, 10)  // 返回前 10 条
+        });
+
+    } catch (error) {
+        console.error('eBay sync failed:', error);
+        res.status(500).json({
+            error: 'eBay sync failed',
             details: error.message
         });
     }
@@ -1509,23 +2248,25 @@ cron.schedule('0 3 * * *', async () => {
                     const amazonProduct = transformAmazonProduct(amazonProducts[0]);
                     if (amazonProduct.price > 0) {
                         await pool.query(`
-                            INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, link)
-                            VALUES (?, ?, ?, ?, ?, NOW(), ?)
-                        `, [dbProduct.pid, 'Amazon', amazonProduct.price, amazonProduct.freeShipping, amazonProduct.inStock, amazonProduct.link]);
+                            INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, idInPlatform, link)
+                            VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)
+                        `, [dbProduct.pid, 'Amazon', amazonProduct.price, amazonProduct.freeShipping, amazonProduct.inStock, amazonProduct.idInPlatform, amazonProduct.link]);
                     }
                 }
 
                 await new Promise(resolve => setTimeout(resolve, 2000));
 
-                // 2) 更新 BestBuy
-                const bestbuyProducts = await fetchFromBestBuy(dbProduct.title, 1);
-                if (bestbuyProducts.length > 0) {
-                    const bestbuyProduct = transformBestBuyProduct(bestbuyProducts[0]);
-                    if (bestbuyProduct.price > 0) {
+                // 2) 更新 ebay
+                const ebayProducts = await fetchFromEbay(dbProduct.title, 1);
+
+                if (ebayProducts.length > 0) {
+                    const ebayProduct = findBestEbayMatch(dbProduct, ebayProducts);
+
+                    if (ebayProduct && ebayProduct.price > 0) {
                         await pool.query(`
-                            INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, link)
-                            VALUES (?, ?, ?, ?, ?, NOW(), ?)
-                        `, [dbProduct.pid, 'BestBuy', bestbuyProduct.price, bestbuyProduct.freeShipping, bestbuyProduct.inStock, bestbuyProduct.link]);
+                            INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, idInPlatform, link)
+                            VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)
+                        `, [dbProduct.pid, 'eBay', ebayProduct.price, ebayProduct.freeShipping, ebayProduct.inStock, ebayProduct.idInPlatform, ebayProduct.link]);
                     }
                 }
 
@@ -1600,7 +2341,7 @@ app.get('/health', async (req, res) => {
         // 检查是否使用统一的 Key
         const usingUnifiedKey = RAPIDAPI_KEY &&
                                 RAPIDAPI_KEYS.amazon === RAPIDAPI_KEY &&
-                                RAPIDAPI_KEYS.bestbuy === RAPIDAPI_KEY &&
+                                RAPIDAPI_KEYS.ebay === RAPIDAPI_KEY &&
                                 RAPIDAPI_KEYS.walmart === RAPIDAPI_KEY;
 
         res.json({
@@ -1611,7 +2352,7 @@ app.get('/health', async (req, res) => {
             apiKeyMode: usingUnifiedKey ? 'Unified (Recommended)' : 'Separate Keys',
             platforms: {
                 amazon: RAPIDAPI_KEYS.amazon ? 'Configured' : 'Missing',
-                bestbuy: RAPIDAPI_KEYS.bestbuy ? 'Configured' : 'Missing',
+                ebay: RAPIDAPI_KEYS.ebay ? 'Configured' : 'Missing',
                 walmart: RAPIDAPI_KEYS.walmart ? 'Configured' : 'Missing'
             }
         });

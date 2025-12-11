@@ -181,7 +181,6 @@ Amazon's Choice 标识
 问题：
 5. 购买升级版api计划，获得更多查询次数与更好效果
 6. 我们在导入多平台数据时使用Amazon标题在其他平台进行搜索，由于api的search接口返回结果过多可能无法匹配到完全相同的产品，目前也只是匹配相似度最高的结果，这个问题在未来还需要解决
-7. Amazon bestbuy api还需要处理下
-8. wishlist中条目可以点开detail页面
+8. 定时任务和update-all-prices: amazon用asin号，ebay用itemid，walmart? 初次导入walmart选取最匹配
 
 
