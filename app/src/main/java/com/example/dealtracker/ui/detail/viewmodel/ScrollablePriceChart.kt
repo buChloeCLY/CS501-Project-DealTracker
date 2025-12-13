@@ -36,6 +36,11 @@ fun ScrollablePriceChart(
     val windowSize = 7
     val totalDataPoints = priceHistory.size
     val maxScroll = (totalDataPoints - windowSize).coerceAtLeast(0)
+
+    // 默认显示最新数据（最右边）
+    LaunchedEffect(totalDataPoints) {
+        scrollOffset = maxScroll.toFloat()
+    }
     val startIndex = scrollOffset.toInt().coerceIn(0, maxScroll)
     val endIndex = (startIndex + windowSize).coerceAtMost(totalDataPoints)
     val visibleData = if (priceHistory.isNotEmpty()) {
@@ -61,7 +66,7 @@ fun ScrollablePriceChart(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "Price History (30 Days)",
+                    "Price History (${totalDataPoints} Days)",
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp
                 )
@@ -78,7 +83,7 @@ fun ScrollablePriceChart(
             Spacer(modifier = Modifier.height(8.dp))
 
             if (visibleData.isNotEmpty()) {
-                Box(modifier = Modifier.height(220.dp)) {
+                Box(modifier = Modifier.height(200.dp)) {
                     Canvas(
                         modifier = Modifier
                             .fillMaxSize()
@@ -103,8 +108,9 @@ fun ScrollablePriceChart(
                         val width = size.width
                         val height = size.height
                         val padding = 40f
+                        val bottomPadding = 35f
                         val chartWidth = width - padding * 2
-                        val chartHeight = height - padding * 2
+                        val chartHeight = height - padding - bottomPadding
 
                         if (visibleData.isEmpty()) return@Canvas
 
@@ -170,7 +176,7 @@ fun ScrollablePriceChart(
                                     canvas.nativeCanvas.drawText(
                                         formatDate(point.date),
                                         x,
-                                        height - 10f,
+                                        height - 15f,
                                         paint
                                     )
                                 }
@@ -274,14 +280,14 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawVolatileMarker(
 
     val arrowPath = Path().apply {
         if (isIncrease) {
-            moveTo(point.x, point.y - 25f)
-            lineTo(point.x - 6f, point.y - 15f)
-            lineTo(point.x + 6f, point.y - 15f)
+            moveTo(point.x, point.y - 30f)
+            lineTo(point.x - 5f, point.y - 22f)
+            lineTo(point.x + 5f, point.y - 22f)
             close()
         } else {
-            moveTo(point.x, point.y + 25f)
-            lineTo(point.x - 6f, point.y + 15f)
-            lineTo(point.x + 6f, point.y + 15f)
+            moveTo(point.x, point.y + 30f)
+            lineTo(point.x - 5f, point.y + 22f)
+            lineTo(point.x + 5f, point.y + 22f)
             close()
         }
     }
@@ -295,14 +301,14 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawVolatileMarker(
     drawIntoCanvas { canvas ->
         val paint = android.graphics.Paint().apply {
             color = android.graphics.Color.RED
-            textSize = 22f
+            textSize = 20f
             textAlign = android.graphics.Paint.Align.CENTER
             isFakeBoldText = true
         }
         canvas.nativeCanvas.drawText(
             "${if (isIncrease) "+" else "-"}${"%.1f".format(changePercent)}%",
             point.x,
-            if (isIncrease) point.y - 30f else point.y + 40f,
+            if (isIncrease) point.y - 35f else point.y - 15f,
             paint
         )
     }

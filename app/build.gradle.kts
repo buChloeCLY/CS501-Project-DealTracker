@@ -88,4 +88,7 @@ dependencies {
 
     // 图片加载库
     implementation("io.coil-kt:coil-compose:2.6.0")
+
+    // link
+    implementation("androidx.browser:browser:1.8.0")
 }

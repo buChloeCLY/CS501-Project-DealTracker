@@ -9,8 +9,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
@@ -38,6 +40,7 @@ import com.example.dealtracker.domain.model.PlatformPrice
 import com.example.dealtracker.ui.detail.viewmodel.ProductViewModel
 import com.example.dealtracker.ui.theme.AppColors
 import com.example.dealtracker.ui.theme.AppDimens
+import com.example.dealtracker.ui.theme.AppTheme
 import com.example.dealtracker.domain.model.Platform
 import com.example.dealtracker.domain.model.Product
 import com.example.dealtracker.ui.wishlist.WishListHolder
@@ -61,6 +64,8 @@ fun ProductDetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+
+    val colors = AppTheme.colors
 
     val platformPricesState = viewModel.platformPrices.collectAsState()
     val priceHistoryState = viewModel.priceHistory.collectAsState()
@@ -120,8 +125,7 @@ fun ProductDetailScreen(
                     }) {
                         Icon(
                             Icons.Filled.Share,
-                            contentDescription = "Share",
-                            tint = AppColors.PrimaryText
+                            contentDescription = "Share"
                         )
                     }
 
@@ -165,18 +169,26 @@ fun ProductDetailScreen(
                         Icon(
                             if (isInWishlist) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                             contentDescription = "Add to WishList",
-                            tint = if (isInWishlist) Color.Red else AppColors.PrimaryText
+                            tint = if (isInWishlist) colors.error else colors.primaryText
                         )
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = colors.topBarBackground,
+                    titleContentColor = colors.topBarContent,
+                    navigationIconContentColor = colors.topBarContent,
+                    actionIconContentColor = colors.topBarContent
+                )
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = colors.background
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -195,14 +207,16 @@ fun ProductDetailScreen(
                             .height(200.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator()
+                        CircularProgressIndicator(color = colors.accent)
                     }
                 }
 
                 priceHistory.error -> {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0))
+                        colors = CardDefaults.cardColors(
+                            containerColor = colors.card
+                        )
                     ) {
                         Box(
                             modifier = Modifier
@@ -210,7 +224,10 @@ fun ProductDetailScreen(
                                 .padding(16.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("No price history available", color = Color.Gray)
+                            Text(
+                                "No price history available",
+                                color = colors.secondaryText
+                            )
                         }
                     }
                 }
@@ -221,28 +238,90 @@ fun ProductDetailScreen(
             }
 
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight(),
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
                     Text(
                         "Available on",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
+                        fontSize = 16.sp,
+                        modifier = Modifier.padding(bottom = 12.dp)
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // 调试日志
+                    LaunchedEffect(platformPrices) {
+                        android.util.Log.d("ProductDetail", "Total platforms: ${platformPrices.size}")
+                        platformPrices.forEachIndexed { index, platform ->
+                            android.util.Log.d("ProductDetail", "[$index] ${platform.platformName}: $${platform.price}, link=${platform.link}")
+                        }
+                    }
+
                     if (platformPrices.isNotEmpty()) {
-                        PlatformPriceCardList(
-                            items = platformPrices,
-                            context = context,
-                            onItemClick = { link ->
-                                if (link.isNotEmpty()) {
-                                    openUrl(context, link)
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            platformPrices.forEach { platform ->
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(72.dp)
+                                        .clickable {
+                                            android.util.Log.d(
+                                                "ProductDetail",
+                                                "Clicked: ${platform.platformName} - ${platform.link}"
+                                            )
+                                            if (!platform.link.isNullOrEmpty()) {
+                                                openUrl(context, platform.link)
+                                            } else {
+                                                android.util.Log.d(
+                                                    "ProductDetail",
+                                                    "No link available for ${platform.platformName}"
+                                                )
+                                            }
+                                        },
+                                    shape = RoundedCornerShape(AppDimens.CornerRadius),
+                                    colors = CardDefaults.cardColors(containerColor = AppColors.Card)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            PlatformIcon(platformIcon = platform.platformIcon)
+                                            Text(
+                                                text = platform.platformName,
+                                                fontWeight = FontWeight.Medium,
+                                                fontSize = 16.sp,
+                                                color = AppColors.PrimaryText
+                                            )
+                                        }
+                                        Text(
+                                            text = "$${"%.2f".format(platform.price)}",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 16.sp,
+                                            color = AppColors.Accent
+                                        )
+                                    }
                                 }
                             }
-                        )
+                        }
                     } else {
                         Text(
                             "No platform data available",
@@ -331,13 +410,6 @@ private fun PlatformPriceCardList(
                                 fontWeight = FontWeight.Medium,
                                 color = AppColors.PrimaryText
                             )
-                            if (!row.link.isNullOrEmpty()) {
-                                Text(
-                                    "Tap to open",
-                                    fontSize = 12.sp,
-                                    color = AppColors.SecondaryText
-                                )
-                            }
                         }
                     }
 
@@ -388,11 +460,24 @@ private fun shareProduct(
 
 private fun openUrl(context: Context, url: String) {
     try {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-        context.startActivity(intent)
-        android.util.Log.e("ProductDetail", "Succeeded to open URL: $url")
+        // 使用Chrome Custom Tabs在App内打开
+        val builder = androidx.browser.customtabs.CustomTabsIntent.Builder()
+        builder.setShowTitle(true)
+        builder.setUrlBarHidingEnabled(false)
+
+        val customTabsIntent = builder.build()
+        customTabsIntent.launchUrl(context, Uri.parse(url))
+
+        android.util.Log.d("ProductDetail", "Opened URL in Custom Tab: $url")
     } catch (e: Exception) {
-        android.util.Log.e("ProductDetail", "Failed to open URL: $url", e)
+        // 如果Custom Tabs失败，使用普通浏览器
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            context.startActivity(intent)
+            android.util.Log.d("ProductDetail", "Opened URL in browser: $url")
+        } catch (ex: Exception) {
+            android.util.Log.e("ProductDetail", "Failed to open URL: $url", ex)
+        }
     }
 }
 
