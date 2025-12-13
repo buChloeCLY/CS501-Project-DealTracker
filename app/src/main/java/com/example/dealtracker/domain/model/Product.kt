@@ -28,7 +28,7 @@ data class Product(
             platformList.size > 1 -> "Best Price from ${platformList.joinToString(" & ")}"
             else -> when (platform) {
                 Platform.Amazon -> "Best Price from Amazon"
-                Platform.BestBuy -> "Best Price from BestBuy"
+                Platform.eBay-> "Best Price from Ebay"
                 Platform.Walmart -> "Best Price from Walmart"
             }
         }

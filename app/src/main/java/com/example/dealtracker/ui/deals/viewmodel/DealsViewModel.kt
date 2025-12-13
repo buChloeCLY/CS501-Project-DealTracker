@@ -69,7 +69,7 @@ class DealsViewModel : ViewModel() {
             .filter { it.price in f.priceMin.toDouble()..f.priceMax.toDouble() }
             .filter {
                 (f.chooseAmazon && it.platform == Platform.Amazon) ||
-                        (f.chooseBestBuy && it.platform == Platform.BestBuy) ||
+                        (f.chooseBestBuy && it.platform == Platform.eBay) ||
                         (f.chooseWalmart && it.platform == Platform.Walmart)
             }
             .filter { if (f.onlyFreeShipping) it.freeShipping else true }

@@ -266,7 +266,7 @@ fun DealsScreen(
             onPlatformToggle = { p, checked ->
                 when (p) {
                     Platform.Amazon -> viewModel.toggleAmazon(checked)
-                    Platform.BestBuy -> viewModel.toggleBestBuy(checked)
+                    Platform.eBay -> viewModel.toggleBestBuy(checked)
                     Platform.Walmart -> viewModel.toggleWalmart(checked)
                 }
             },
@@ -546,7 +546,7 @@ private fun FilterSheet(
                 )
                 FilterChip(
                     selected = chooseBestBuy,
-                    onClick = { onPlatformToggle(Platform.BestBuy, !chooseBestBuy) },
+                    onClick = { onPlatformToggle(Platform.eBay, !chooseBestBuy) },
                     label = { Text("BestBuy") }
                 )
                 FilterChip(

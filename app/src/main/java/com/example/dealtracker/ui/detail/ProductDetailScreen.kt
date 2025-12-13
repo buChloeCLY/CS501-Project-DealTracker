@@ -242,7 +242,7 @@ fun ProductDetailScreen(
                     .fillMaxWidth()
                     .wrapContentHeight(),
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = colors.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Column(
@@ -250,10 +250,13 @@ fun ProductDetailScreen(
                         .fillMaxWidth()
                         .padding(16.dp)
                 ) {
+                    val fontScale = AppTheme.fontScale
+
                     Text(
                         "Available on",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
+                        fontSize = (16 * fontScale).sp,
+                        color = colors.primaryText,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
 
@@ -290,7 +293,7 @@ fun ProductDetailScreen(
                                             }
                                         },
                                     shape = RoundedCornerShape(AppDimens.CornerRadius),
-                                    colors = CardDefaults.cardColors(containerColor = AppColors.Card)
+                                    colors = CardDefaults.cardColors(containerColor = colors.card)
                                 ) {
                                     Row(
                                         modifier = Modifier
@@ -304,19 +307,20 @@ fun ProductDetailScreen(
                                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                                             modifier = Modifier.weight(1f)
                                         ) {
+                                            val fontScale = AppTheme.fontScale
                                             PlatformIcon(platformIcon = platform.platformIcon)
                                             Text(
                                                 text = platform.platformName,
                                                 fontWeight = FontWeight.Medium,
-                                                fontSize = 16.sp,
-                                                color = AppColors.PrimaryText
+                                                fontSize = (16 * fontScale).sp,
+                                                color = colors.primaryText
                                             )
                                         }
                                         Text(
                                             text = "$${"%.2f".format(platform.price)}",
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 16.sp,
-                                            color = AppColors.Accent
+                                            fontSize = (16 * fontScale).sp,
+                                            color = colors.accent
                                         )
                                     }
                                 }
@@ -325,7 +329,7 @@ fun ProductDetailScreen(
                     } else {
                         Text(
                             "No platform data available",
-                            color = Color.Gray,
+                            color = colors.secondaryText,
                             modifier = Modifier.padding(vertical = 8.dp)
                         )
                     }
@@ -342,31 +346,34 @@ private fun ProductHeader(
     lowestPlatform: String?,
     hasData: Boolean
 ) {
+    val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = colors.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 name,
                 fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
-                color = AppColors.PrimaryText
+                fontSize = (20 * fontScale).sp,
+                color = colors.primaryText
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 "$${"%.2f".format(currentPrice)}",
-                fontSize = 28.sp,
+                fontSize = (28 * fontScale).sp,
                 fontWeight = FontWeight.Bold,
-                color = AppColors.Accent
+                color = colors.accent
             )
             if (hasData && lowestPlatform != null) {
                 Text(
                     "Lowest price on $lowestPlatform",
-                    fontSize = 12.sp,
-                    color = AppColors.SecondaryText
+                    fontSize = (12 * fontScale).sp,
+                    color = colors.secondaryText
                 )
             }
         }
@@ -483,11 +490,13 @@ private fun openUrl(context: Context, url: String) {
 
 @Composable
 private fun PlatformIcon(platformIcon: String) {
+    val colors = AppTheme.colors
+
     Box(
         modifier = Modifier
             .size(40.dp)
             .clip(CircleShape)
-            .background(AppColors.Card),
+            .background(colors.card),
         contentAlignment = Alignment.Center
     ) {
         when {
@@ -528,7 +537,7 @@ private fun PlatformIcon(platformIcon: String) {
                         imageVector = Icons.Filled.ShoppingCart,
                         contentDescription = "Platform Icon",
                         modifier = Modifier.size(24.dp),
-                        tint = AppColors.SecondaryText
+                        tint = colors.secondaryText
                     )
                 }
             }
@@ -537,7 +546,7 @@ private fun PlatformIcon(platformIcon: String) {
                     imageVector = Icons.Filled.ShoppingCart,
                     contentDescription = "Platform Icon",
                     modifier = Modifier.size(24.dp),
-                    tint = AppColors.SecondaryText
+                    tint = colors.secondaryText
                 )
             }
         }

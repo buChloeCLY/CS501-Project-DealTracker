@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.example.dealtracker.data.local.UserPreferences
 import com.example.dealtracker.domain.UserManager
+import com.example.dealtracker.ui.theme.AppTheme
 import com.example.dealtracker.ui.wishlist.WishListHolder
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -28,8 +29,9 @@ import com.example.dealtracker.ui.wishlist.WishListHolder
 fun ProfileScreen(navController: NavHostController) {
     val currentUser by UserManager.currentUser.collectAsState()
     var showLogoutDialog by remember { mutableStateOf(false) }
+    val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
 
-    // 初始化时从持久化存储加载用户
     LaunchedEffect(Unit) {
         if (UserManager.getUser() == null) {
             val savedUser = UserPreferences.getUser()
@@ -46,29 +48,30 @@ fun ProfileScreen(navController: NavHostController) {
                     Text(
                         "Profile",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp
+                        fontSize = (20 * fontScale).sp
                     )
                 },
                 actions = {
                     IconButton(onClick = { navController.navigate("settings") }) {
                         Icon(
                             Icons.Default.Settings,
-                            contentDescription = "Settings",
-                            tint = Color(0xFF6B6B6B)
+                            contentDescription = "Settings"
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFFFCE4D6)
+                    containerColor = colors.topBarBackground,
+                    titleContentColor = colors.topBarContent,
+                    actionIconContentColor = colors.topBarContent
                 )
             )
-        }
+        },
+        containerColor = colors.background
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(Color.White)
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -79,15 +82,15 @@ fun ProfileScreen(navController: NavHostController) {
                 modifier = Modifier
                     .size(120.dp)
                     .clip(CircleShape)
-                    .border(3.dp, Color(0xFFE0E0E0), CircleShape)
-                    .background(Color(0xFFF5F5F5)),
+                    .border(3.dp, colors.border, CircleShape)
+                    .background(colors.card),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Default.Person,
                     contentDescription = "Profile Picture",
                     modifier = Modifier.size(60.dp),
-                    tint = Color(0xFF9E9E9E)
+                    tint = colors.secondaryText
                 )
             }
 
@@ -96,15 +99,15 @@ fun ProfileScreen(navController: NavHostController) {
             // User Info
             Text(
                 text = currentUser?.name ?: "Guest",
-                fontSize = 24.sp,
+                fontSize = (24 * fontScale).sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF212121)
+                color = colors.primaryText
             )
 
             Text(
                 text = currentUser?.email ?: "Not logged in",
-                fontSize = 14.sp,
-                color = Color(0xFF757575)
+                fontSize = (14 * fontScale).sp,
+                color = colors.secondaryText
             )
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -139,7 +142,7 @@ fun ProfileScreen(navController: NavHostController) {
                 ProfileMenuItem(
                     icon = Icons.Default.ExitToApp,
                     title = "Logout",
-                    textColor = Color(0xFFE53935),
+                    isError = true,
                     onClick = { showLogoutDialog = true }
                 )
             } else {
@@ -170,22 +173,16 @@ fun ProfileScreen(navController: NavHostController) {
             confirmButton = {
                 TextButton(
                     onClick = {
-                        // 清除用户信息
                         UserManager.logout()
                         UserPreferences.clearUser()
-
-                        // 清空心愿单数据
                         WishListHolder.clear()
-
                         showLogoutDialog = false
-
-                        // 跳转到登录页
                         navController.navigate("login") {
                             popUpTo("profile") { inclusive = true }
                         }
                     }
                 ) {
-                    Text("Logout", color = Color(0xFFE53935))
+                    Text("Logout", color = colors.error)
                 }
             },
             dismissButton = {
@@ -201,9 +198,14 @@ fun ProfileScreen(navController: NavHostController) {
 fun ProfileMenuItem(
     icon: ImageVector,
     title: String,
-    textColor: Color = Color(0xFF212121),
+    isError: Boolean = false,
     onClick: () -> Unit
 ) {
+    val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
+    val textColor = if (isError) colors.error else colors.primaryText
+    val iconColor = if (isError) colors.error else colors.secondaryText
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -211,21 +213,21 @@ fun ProfileMenuItem(
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color.White
+            containerColor = colors.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(12.dp))
+                .border(1.dp, colors.border, RoundedCornerShape(12.dp))
                 .padding(horizontal = 20.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = title,
-                tint = if (textColor == Color(0xFF212121)) Color(0xFF616161) else textColor,
+                tint = iconColor,
                 modifier = Modifier.size(24.dp)
             )
 
@@ -233,7 +235,7 @@ fun ProfileMenuItem(
 
             Text(
                 text = title,
-                fontSize = 18.sp,
+                fontSize = (18 * fontScale).sp,
                 fontWeight = FontWeight.Medium,
                 color = textColor,
                 modifier = Modifier.weight(1f)
@@ -242,7 +244,7 @@ fun ProfileMenuItem(
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = "Navigate",
-                tint = Color(0xFFBDBDBD),
+                tint = colors.tertiaryText,
                 modifier = Modifier.size(24.dp)
             )
         }

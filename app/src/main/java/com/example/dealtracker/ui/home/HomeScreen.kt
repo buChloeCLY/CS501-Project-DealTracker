@@ -39,6 +39,7 @@ import com.example.dealtracker.ui.home.viewmodel.HomeViewModel
 import com.example.dealtracker.ui.home.viewmodel.HomeViewModelFactory
 import com.example.dealtracker.ui.navigation.Routes
 import com.example.dealtracker.ui.navigation.navigateToRoot
+import com.example.dealtracker.ui.theme.AppTheme
 import kotlinx.coroutines.launch
 import androidx.lifecycle.viewmodel.compose.viewModel
 
@@ -46,20 +47,17 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(navController: NavHostController) {
-
     val context = LocalContext.current
+    val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
 
-    // 自动初始化 SharedPreferences
     UserPreferences.init(context)
 
     val user = UserPreferences.getUser()
-    val userId = user?.uid ?: -1     // ← 自动读取登录用户ID（未登录 = -1）
-    // 浏览历史仓库
+    val userId = user?.uid ?: -1
     val historyRepository = remember { HistoryRepository() }
-    // ProductRepository 实现
     val productRepository = remember { ProductRepositoryImpl() }
 
-    // 推荐仓库
     val recommendationRepository = remember {
         RecommendationRepository(
             historyRepository = historyRepository,
@@ -67,7 +65,6 @@ fun HomeScreen(navController: NavHostController) {
         )
     }
 
-    // ViewModel（用 Factory 注入 userId）
     val homeViewModel: HomeViewModel = viewModel(
         factory = HomeViewModelFactory(
             recommendationRepository = recommendationRepository,
@@ -75,16 +72,12 @@ fun HomeScreen(navController: NavHostController) {
         )
     )
 
-    // ------------------ UI 状态监听 ------------------
     val searchQuery by homeViewModel.searchQuery.collectAsState()
-    // 推荐产品
     val recommended by homeViewModel.recommendedProducts.collectAsState()
     var isSearchMode by remember { mutableStateOf(false) }
-    /** ---------- 回到顶部按钮滚动控制 ---------- */
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
-    /** ---------- 语音识别 Launcher ---------- */
     val voiceLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             try {
@@ -106,8 +99,8 @@ fun HomeScreen(navController: NavHostController) {
         }
 
     Scaffold(
+        containerColor = colors.background,
         floatingActionButton = {
-            // 超过 5 个 item 显示按钮
             val showScrollTop by remember {
                 derivedStateOf { listState.firstVisibleItemIndex > 4 }
             }
@@ -117,9 +110,14 @@ fun HomeScreen(navController: NavHostController) {
                 exit = fadeOut()
             ) {
                 SmallFloatingActionButton(
-                    onClick = { scope.launch { listState.animateScrollToItem(0) } }
+                    onClick = { scope.launch { listState.animateScrollToItem(0) } },
+                    containerColor = colors.accent
                 ) {
-                    Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Top")
+                    Icon(
+                        Icons.Filled.KeyboardArrowUp,
+                        contentDescription = "Top",
+                        tint = colors.onPrimary
+                    )
                 }
             }
         },
@@ -138,17 +136,18 @@ fun HomeScreen(navController: NavHostController) {
                         }
                     }
                 },
-
                 title = {
                     if (!isSearchMode) {
-                        Text("Home", fontWeight = FontWeight.Bold)
+                        Text(
+                            "Home",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = (20 * fontScale).sp
+                        )
                     } else {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-
-                            /** Voice input */
                             IconButton(onClick = {
                                 val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                                     putExtra(
@@ -169,22 +168,28 @@ fun HomeScreen(navController: NavHostController) {
                                 Icon(
                                     imageVector = Icons.Default.KeyboardVoice,
                                     contentDescription = "Voice Search",
-                                    tint = MaterialTheme.colorScheme.primary
+                                    tint = colors.accent
                                 )
                             }
-                            /** 输入框 */
                             TextField(
                                 value = searchQuery,
                                 onValueChange = { homeViewModel.updateQuery(it) },
                                 modifier = Modifier.weight(1f),
-                                placeholder = { Text("Search products...") },
+                                placeholder = {
+                                    Text(
+                                        "Search products...",
+                                        fontSize = (14 * fontScale).sp
+                                    )
+                                },
                                 singleLine = true,
                                 colors = TextFieldDefaults.colors(
                                     focusedContainerColor = Color.Transparent,
                                     unfocusedContainerColor = Color.Transparent,
                                     disabledContainerColor = Color.Transparent,
                                     focusedIndicatorColor = Color.Transparent,
-                                    unfocusedIndicatorColor = Color.Transparent
+                                    unfocusedIndicatorColor = Color.Transparent,
+                                    focusedTextColor = colors.primaryText,
+                                    unfocusedTextColor = colors.primaryText
                                 ),
                                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                                     imeAction = ImeAction.Search
@@ -200,7 +205,6 @@ fun HomeScreen(navController: NavHostController) {
                                 )
                             )
 
-                            /** ✕ 清除按钮（有字时才显示） */
                             if (searchQuery.isNotEmpty()) {
                                 IconButton(onClick = { homeViewModel.updateQuery("") }) {
                                     Icon(
@@ -212,7 +216,6 @@ fun HomeScreen(navController: NavHostController) {
                         }
                     }
                 },
-
                 actions = {
                     if (!isSearchMode) {
                         IconButton(onClick = { isSearchMode = true }) {
@@ -233,11 +236,16 @@ fun HomeScreen(navController: NavHostController) {
                             )
                         }
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = colors.topBarBackground,
+                    titleContentColor = colors.topBarContent,
+                    navigationIconContentColor = colors.topBarContent,
+                    actionIconContentColor = colors.topBarContent
+                )
             )
         }
     ) { innerPadding ->
-        /** ---------- 列表内容 ---------- */
         LazyColumn(
             state = listState,
             modifier = Modifier
@@ -254,10 +262,11 @@ fun HomeScreen(navController: NavHostController) {
             item {
                 Text(
                     text = "Deals of the Day",
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                    fontSize = (22 * fontScale).sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.primaryText
                 )
             }
-            /** ---------- 推荐商品列表 ---------- */
             items(recommended) { product ->
                 DealItem(
                     product = product,
@@ -277,9 +286,10 @@ fun HomeScreen(navController: NavHostController) {
     }
 }
 
-/* ----------------------------- 分类部分 ----------------------------- */
 @Composable
 fun CategorySection(onCategoryClick: (String) -> Unit) {
+    val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
     var expanded by remember { mutableStateOf(false) }
 
     val allCategories = listOf(
@@ -291,7 +301,9 @@ fun CategorySection(onCategoryClick: (String) -> Unit) {
     Column {
         Text(
             text = "Categories",
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+            fontSize = (22 * fontScale).sp,
+            fontWeight = FontWeight.Bold,
+            color = colors.primaryText,
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(Modifier.height(8.dp))
@@ -321,42 +333,51 @@ fun CategorySection(onCategoryClick: (String) -> Unit) {
                 modifier = Modifier
                     .width(150.dp)
                     .height(50.dp)
-                    .background(Color(0xFFE0E0E0), shape = RoundedCornerShape(12.dp))
+                    .background(colors.card, shape = RoundedCornerShape(12.dp))
                     .clickable { expanded = !expanded },
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     if (expanded) "Less ▲" else "More ▼",
                     fontWeight = FontWeight.Medium,
-                    fontSize = 16.sp
+                    fontSize = (16 * fontScale).sp,
+                    color = colors.primaryText
                 )
             }
         }
     }
 }
 
-/* ----------------------------- 单个分类卡片 ----------------------------- */
 @Composable
 fun CategoryCard(category: String, modifier: Modifier = Modifier) {
+    val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
+
     Box(
         modifier = modifier
             .height(80.dp)
-            .background(Color(0xFFF2F2F2), shape = RoundedCornerShape(12.dp)),
+            .background(colors.card, shape = RoundedCornerShape(12.dp)),
         contentAlignment = Alignment.Center
     ) {
-        Text(text = category, fontWeight = FontWeight.Medium, fontSize = 16.sp)
+        Text(
+            text = category,
+            fontWeight = FontWeight.Medium,
+            fontSize = (16 * fontScale).sp,
+            color = colors.primaryText
+        )
     }
 }
 
-/* ======================== 单个商品 Item ======================== */
-
 @Composable
 fun DealItem(product: Product, onClick: () -> Unit) {
+    val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(90.dp)
-            .background(Color(0xFFF7F7F7), shape = RoundedCornerShape(12.dp))
+            .background(colors.card, shape = RoundedCornerShape(12.dp))
             .padding(12.dp)
             .clickable { onClick() },
         verticalAlignment = Alignment.CenterVertically
@@ -372,9 +393,23 @@ fun DealItem(product: Product, onClick: () -> Unit) {
         Spacer(Modifier.width(12.dp))
 
         Column {
-            Text(product.title, fontWeight = FontWeight.SemiBold)
-            Text(product.priceText, color = Color(0xFF388E3C))
-            Text("Best from ${product.platform}", color = Color.Gray, fontSize = 12.sp)
+            Text(
+                product.title,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = (14 * fontScale).sp,
+                color = colors.primaryText
+            )
+            Text(
+                product.priceText,
+                color = colors.success,
+                fontSize = (16 * fontScale).sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                "Best from ${product.platform}",
+                color = colors.secondaryText,
+                fontSize = (12 * fontScale).sp
+            )
         }
     }
 }

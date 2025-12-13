@@ -56,7 +56,6 @@ object DarkColorScheme {
     val outlineVariant = Color(0xFF2B2B2B)
 }
 
-// 业务语义化颜色
 class AppColorScheme(
     val isDark: Boolean
 ) {
@@ -73,6 +72,7 @@ class AppColorScheme(
 
     val accent = if (isDark) dark.primary else light.primary
     val accentSecondary = if (isDark) dark.secondary else light.secondary
+    val onPrimary = if (isDark) dark.onPrimary else light.onPrimary
 
     val success = if (isDark) dark.secondary else light.secondary
     val warning = Color(0xFFFFA726)
