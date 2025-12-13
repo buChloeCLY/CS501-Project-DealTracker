@@ -263,12 +263,12 @@ fun DealsScreen(
             priceMax = ui.filters.priceMax,
             onPriceChange = { min, max -> viewModel.setPrice(min, max) },
             chooseAmazon = ui.filters.chooseAmazon,
-            chooseBestBuy = ui.filters.chooseBestBuy,
+            chooseEBay = ui.filters.chooseEBay,
             chooseWalmart = ui.filters.chooseWalmart,
             onPlatformToggle = { p, checked ->
                 when (p) {
                     Platform.Amazon -> viewModel.toggleAmazon(checked)
-                    Platform.eBay -> viewModel.toggleBestBuy(checked)
+                    Platform.eBay -> viewModel.toggleEBay(checked)
                     Platform.Walmart -> viewModel.toggleWalmart(checked)
                 }
             },
@@ -483,7 +483,7 @@ private fun FilterSheet(
     priceMax: Float,
     onPriceChange: (Float, Float) -> Unit,
     chooseAmazon: Boolean,
-    chooseBestBuy: Boolean,
+    chooseEBay: Boolean,
     chooseWalmart: Boolean,
     onPlatformToggle: (Platform, Boolean) -> Unit,
     onlyFreeShipping: Boolean,
@@ -542,9 +542,9 @@ private fun FilterSheet(
                     label = { Text("Amazon") }
                 )
                 FilterChip(
-                    selected = chooseBestBuy,
-                    onClick = { onPlatformToggle(Platform.eBay, !chooseBestBuy) },
-                    label = { Text("BestBuy") }
+                    selected = chooseEBay,
+                    onClick = { onPlatformToggle(Platform.eBay, !chooseEBay) },
+                    label = { Text("eBay") }
                 )
                 FilterChip(
                     selected = chooseWalmart,

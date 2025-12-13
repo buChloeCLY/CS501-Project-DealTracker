@@ -18,7 +18,7 @@ data class DealsFilterState(
     val priceMin: Float = 0f,
     val priceMax: Float = 2000f,
     val chooseAmazon: Boolean = true,
-    val chooseBestBuy: Boolean = true,
+    val chooseEBay: Boolean = true,
     val chooseWalmart: Boolean = true,
     val onlyFreeShipping: Boolean = false,
     val onlyInStock: Boolean = false
@@ -69,7 +69,7 @@ class DealsViewModel : ViewModel() {
             .filter { it.price in f.priceMin.toDouble()..f.priceMax.toDouble() }
             .filter {
                 (f.chooseAmazon && it.platform == Platform.Amazon) ||
-                        (f.chooseBestBuy && it.platform == Platform.eBay) ||
+                        (f.chooseEBay && it.platform == Platform.eBay) ||
                         (f.chooseWalmart && it.platform == Platform.Walmart)
             }
             .filter { if (f.onlyFreeShipping) it.freeShipping else true }
@@ -289,9 +289,9 @@ class DealsViewModel : ViewModel() {
         }
     }
 
-    fun toggleBestBuy(checked: Boolean) {
+    fun toggleEBay(checked: Boolean) {
         _uiState.update { old ->
-            recompute(old.copy(filters = old.filters.copy(chooseBestBuy = checked)))
+            recompute(old.copy(filters = old.filters.copy(chooseEBay = checked)))
         }
     }
 
