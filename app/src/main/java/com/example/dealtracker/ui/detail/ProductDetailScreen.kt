@@ -66,6 +66,7 @@ fun ProductDetailScreen(
     val context = LocalContext.current
 
     val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
 
     val platformPricesState = viewModel.platformPrices.collectAsState()
     val priceHistoryState = viewModel.priceHistory.collectAsState()
@@ -225,8 +226,9 @@ fun ProductDetailScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                "No price history available",
-                                color = colors.secondaryText
+                                "No platform data available",
+                                color = colors.secondaryText,
+                                modifier = Modifier.padding(vertical = 8.dp)
                             )
                         }
                     }
@@ -260,7 +262,7 @@ fun ProductDetailScreen(
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
 
-                    // 调试日志
+                    // debug log
                     LaunchedEffect(platformPrices) {
                         android.util.Log.d("ProductDetail", "Total platforms: ${platformPrices.size}")
                         platformPrices.forEachIndexed { index, platform ->
@@ -293,7 +295,7 @@ fun ProductDetailScreen(
                                             }
                                         },
                                     shape = RoundedCornerShape(AppDimens.CornerRadius),
-                                    colors = CardDefaults.cardColors(containerColor = colors.card)
+                                    colors = CardDefaults.cardColors(containerColor = colors.surface),
                                 ) {
                                     Row(
                                         modifier = Modifier
@@ -396,7 +398,7 @@ private fun PlatformPriceCardList(
                         onItemClick(row.link ?: "")
                     },
                 shape = RoundedCornerShape(AppDimens.CornerRadius),
-                colors = CardDefaults.cardColors(containerColor = AppColors.Card)
+                colors = CardDefaults.cardColors(containerColor = AppTheme.colors.card)
             ) {
                 Row(
                     modifier = Modifier

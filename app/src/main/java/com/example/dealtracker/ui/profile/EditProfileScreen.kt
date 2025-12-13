@@ -12,7 +12,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -21,15 +20,19 @@ import androidx.navigation.NavHostController
 import com.example.dealtracker.data.remote.api.UserUpdateRequest
 import com.example.dealtracker.domain.UserManager
 import com.example.dealtracker.domain.model.User
+import com.example.dealtracker.ui.theme.AppTheme
 import kotlinx.coroutines.launch
 import com.example.dealtracker.data.remote.repository.RetrofitClient
+
+// Edit user profile screen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditProfileScreen(navController: NavHostController) {
+    val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
     val currentUser by UserManager.currentUser.collectAsState()
     val scope = rememberCoroutineScope()
 
-    // 使用真实用户数据初始化
     var name by remember { mutableStateOf(currentUser?.name ?: "") }
     var gender by remember { mutableStateOf(currentUser?.gender ?: "Male") }
     var email by remember { mutableStateOf(currentUser?.email ?: "") }
@@ -49,7 +52,8 @@ fun EditProfileScreen(navController: NavHostController) {
                 title = {
                     Text(
                         "Edit Profile",
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        fontSize = (20 * fontScale).sp
                     )
                 },
                 navigationIcon = {
@@ -61,10 +65,13 @@ fun EditProfileScreen(navController: NavHostController) {
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
+                    containerColor = colors.topBarBackground,
+                    titleContentColor = colors.topBarContent,
+                    navigationIconContentColor = colors.topBarContent
                 )
             )
-        }
+        },
+        containerColor = colors.background
     ) { innerPadding ->
         Box(
             modifier = Modifier
@@ -74,14 +81,12 @@ fun EditProfileScreen(navController: NavHostController) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xFFF8F9FA))
                     .verticalScroll(rememberScrollState())
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Name Field
                 ProfileTextField(
                     label = "Name",
                     value = name,
@@ -90,13 +95,12 @@ fun EditProfileScreen(navController: NavHostController) {
                     enabled = !isLoading
                 )
 
-                // Gender Dropdown
                 Column {
                     Text(
                         text = "Gender",
-                        fontSize = 14.sp,
+                        fontSize = (14 * fontScale).sp,
                         fontWeight = FontWeight.Medium,
-                        color = Color(0xFF424242),
+                        color = colors.primaryText,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
 
@@ -111,17 +115,17 @@ fun EditProfileScreen(navController: NavHostController) {
                             enabled = !isLoading,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .menuAnchor(),
+                                .menuAnchor(MenuAnchorType.PrimaryNotEditable),
                             trailingIcon = {
                                 ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
                             },
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Color(0xFF6200EA),
-                                unfocusedBorderColor = Color(0xFFE0E0E0),
-                                disabledBorderColor = Color(0xFFE0E0E0),
-                                focusedContainerColor = Color.White,
-                                unfocusedContainerColor = Color.White,
-                                disabledContainerColor = Color(0xFFF5F5F5)
+                                focusedBorderColor = colors.accent,
+                                unfocusedBorderColor = colors.border,
+                                disabledBorderColor = colors.border,
+                                focusedContainerColor = colors.surface,
+                                unfocusedContainerColor = colors.surface,
+                                disabledContainerColor = colors.card
                             ),
                             shape = RoundedCornerShape(12.dp)
                         )
@@ -143,7 +147,6 @@ fun EditProfileScreen(navController: NavHostController) {
                     }
                 }
 
-                // Email Field
                 ProfileTextField(
                     label = "Email",
                     value = email,
@@ -152,7 +155,6 @@ fun EditProfileScreen(navController: NavHostController) {
                     enabled = !isLoading
                 )
 
-                // Password Field
                 ProfilePasswordField(
                     label = "New Password",
                     value = password,
@@ -161,7 +163,6 @@ fun EditProfileScreen(navController: NavHostController) {
                     enabled = !isLoading
                 )
 
-                // Confirm Password Field
                 if (password.isNotEmpty()) {
                     ProfilePasswordField(
                         label = "Confirm Password",
@@ -174,24 +175,18 @@ fun EditProfileScreen(navController: NavHostController) {
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Save Button
                 Button(
                     onClick = {
-                        // Validate passwords match if password is being changed
                         if (password.isNotEmpty() && password != confirmPassword) {
                             errorMessage = "Passwords do not match"
                             showErrorDialog = true
                             return@Button
                         }
 
-                        // Call API to update user
                         isLoading = true
                         scope.launch {
                             try {
                                 val uid = currentUser?.uid ?: 1
-
-                                println("Updating user $uid")
-                                println("Name: $name, Email: $email, Gender: $gender")
 
                                 val request = UserUpdateRequest(
                                     name = name,
@@ -202,14 +197,9 @@ fun EditProfileScreen(navController: NavHostController) {
 
                                 val response = RetrofitClient.userApi.updateUser(uid, request)
 
-                                println("Response code: ${response.code()}")
-                                println("Response body: ${response.body()}")
-                                println("Response error: ${response.errorBody()?.string()}")
-
                                 isLoading = false
 
                                 if (response.isSuccessful && response.body()?.success == true) {
-                                    // 更新本地 UserManager
                                     val updatedUser = response.body()?.user
                                     if (updatedUser != null) {
                                         UserManager.setUser(
@@ -221,21 +211,17 @@ fun EditProfileScreen(navController: NavHostController) {
                                             )
                                         )
                                     }
-                                    println("Update successful!")
                                     showSuccessDialog = true
                                 } else {
                                     val errorBody = response.errorBody()?.string()
                                     errorMessage = response.body()?.error
                                         ?: errorBody
                                                 ?: "Failed to update profile. Please try again."
-                                    println("Update failed: $errorMessage")
                                     showErrorDialog = true
                                 }
                             } catch (e: Exception) {
                                 isLoading = false
                                 errorMessage = "Network error: ${e.message}"
-                                println("Exception: ${e.message}")
-                                e.printStackTrace()
                                 showErrorDialog = true
                             }
                         }
@@ -245,21 +231,21 @@ fun EditProfileScreen(navController: NavHostController) {
                         .height(56.dp),
                     enabled = !isLoading,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF6200EA),
-                        disabledContainerColor = Color(0xFFBDBDBD)
+                        containerColor = colors.accent,
+                        disabledContainerColor = colors.border
                     ),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     if (isLoading) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(24.dp),
-                            color = Color.White,
+                            color = colors.onPrimary,
                             strokeWidth = 2.dp
                         )
                     } else {
                         Text(
                             "Save Changes",
-                            fontSize = 16.sp,
+                            fontSize = (16 * fontScale).sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -268,21 +254,19 @@ fun EditProfileScreen(navController: NavHostController) {
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
-            // Loading overlay
             if (isLoading) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.3f)),
+                        .background(colors.primaryText.copy(alpha = 0.3f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = Color.White)
+                    CircularProgressIndicator(color = colors.accent)
                 }
             }
         }
     }
 
-    // Success Dialog
     if (showSuccessDialog) {
         AlertDialog(
             onDismissRequest = {
@@ -293,7 +277,7 @@ fun EditProfileScreen(navController: NavHostController) {
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = "Success",
-                    tint = Color(0xFF4CAF50),
+                    tint = colors.success,
                     modifier = Modifier.size(48.dp)
                 )
             },
@@ -315,16 +299,14 @@ fun EditProfileScreen(navController: NavHostController) {
                 ) {
                     Text(
                         "OK",
-                        color = Color(0xFF6200EA),
+                        color = colors.accent,
                         fontWeight = FontWeight.Bold
                     )
                 }
-            },
-            containerColor = Color.White
+            }
         )
     }
 
-    // Error Dialog
     if (showErrorDialog) {
         AlertDialog(
             onDismissRequest = { showErrorDialog = false },
@@ -332,7 +314,7 @@ fun EditProfileScreen(navController: NavHostController) {
                 Text(
                     text = "Error",
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFFD32F2F)
+                    color = colors.error
                 )
             },
             text = {
@@ -344,16 +326,16 @@ fun EditProfileScreen(navController: NavHostController) {
                 ) {
                     Text(
                         "OK",
-                        color = Color(0xFF6200EA),
+                        color = colors.accent,
                         fontWeight = FontWeight.Bold
                     )
                 }
-            },
-            containerColor = Color.White
+            }
         )
     }
 }
 
+// Text field component
 @Composable
 fun ProfileTextField(
     label: String,
@@ -362,12 +344,15 @@ fun ProfileTextField(
     placeholder: String,
     enabled: Boolean = true
 ) {
+    val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
+
     Column {
         Text(
             text = label,
-            fontSize = 14.sp,
+            fontSize = (14 * fontScale).sp,
             fontWeight = FontWeight.Medium,
-            color = Color(0xFF424242),
+            color = colors.primaryText,
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
@@ -379,24 +364,25 @@ fun ProfileTextField(
             placeholder = {
                 Text(
                     placeholder,
-                    color = Color(0xFFBDBDBD)
+                    color = colors.tertiaryText
                 )
             },
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color(0xFF6200EA),
-                unfocusedBorderColor = Color(0xFFE0E0E0),
-                disabledBorderColor = Color(0xFFE0E0E0),
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
-                disabledContainerColor = Color(0xFFF5F5F5),
-                cursorColor = Color(0xFF6200EA)
+                focusedBorderColor = colors.accent,
+                unfocusedBorderColor = colors.border,
+                disabledBorderColor = colors.border,
+                focusedContainerColor = colors.surface,
+                unfocusedContainerColor = colors.surface,
+                disabledContainerColor = colors.card,
+                cursorColor = colors.accent
             ),
             shape = RoundedCornerShape(12.dp)
         )
     }
 }
 
+// Password field component
 @Composable
 fun ProfilePasswordField(
     label: String,
@@ -405,12 +391,15 @@ fun ProfilePasswordField(
     placeholder: String,
     enabled: Boolean = true
 ) {
+    val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
+
     Column {
         Text(
             text = label,
-            fontSize = 14.sp,
+            fontSize = (14 * fontScale).sp,
             fontWeight = FontWeight.Medium,
-            color = Color(0xFF424242),
+            color = colors.primaryText,
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
@@ -422,19 +411,19 @@ fun ProfilePasswordField(
             placeholder = {
                 Text(
                     placeholder,
-                    color = Color(0xFFBDBDBD)
+                    color = colors.tertiaryText
                 )
             },
             visualTransformation = PasswordVisualTransformation(),
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color(0xFF6200EA),
-                unfocusedBorderColor = Color(0xFFE0E0E0),
-                disabledBorderColor = Color(0xFFE0E0E0),
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
-                disabledContainerColor = Color(0xFFF5F5F5),
-                cursorColor = Color(0xFF6200EA)
+                focusedBorderColor = colors.accent,
+                unfocusedBorderColor = colors.border,
+                disabledBorderColor = colors.border,
+                focusedContainerColor = colors.surface,
+                unfocusedContainerColor = colors.surface,
+                disabledContainerColor = colors.card,
+                cursorColor = colors.accent
             ),
             shape = RoundedCornerShape(12.dp)
         )

@@ -14,7 +14,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -25,21 +24,23 @@ import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import com.example.dealtracker.domain.UserManager
 import com.example.dealtracker.domain.model.History
+import com.example.dealtracker.ui.theme.AppTheme
 import java.text.SimpleDateFormat
 import java.util.*
 
-
+// User browsing history screen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(
     navController: NavHostController,
     viewModel: HistoryViewModel = viewModel()
 ) {
+    val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
     val currentUser by UserManager.currentUser.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
     var showClearDialog by remember { mutableStateOf(false) }
 
-    // 加载历史记录
     LaunchedEffect(currentUser) {
         currentUser?.let { user ->
             viewModel.loadHistory(user.uid)
@@ -53,7 +54,7 @@ fun HistoryScreen(
                     Text(
                         "Browsing History",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp
+                        fontSize = (20 * fontScale).sp
                     )
                 },
                 navigationIcon = {
@@ -68,29 +69,32 @@ fun HistoryScreen(
                         ) {
                             Text(
                                 "Clear All",
-                                color = Color(0xFFE53935),
+                                color = colors.error,
                                 fontWeight = FontWeight.Medium
                             )
                         }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFFFCE4D6)
+                    containerColor = colors.topBarBackground,
+                    titleContentColor = colors.topBarContent,
+                    navigationIconContentColor = colors.topBarContent,
+                    actionIconContentColor = colors.topBarContent
                 )
             )
-        }
+        },
+        containerColor = colors.background
     ) { padding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(Color(0xFFF5F5F5))
         ) {
             when {
                 uiState.isLoading -> {
                     CircularProgressIndicator(
                         modifier = Modifier.align(Alignment.Center),
-                        color = Color(0xFFFF6B6B)
+                        color = colors.accent
                     )
                 }
 
@@ -101,14 +105,14 @@ fun HistoryScreen(
                     ) {
                         Text(
                             text = "Error loading history",
-                            color = Color(0xFFE53935),
-                            fontSize = 16.sp
+                            color = colors.error,
+                            fontSize = (16 * fontScale).sp
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = uiState.error ?: "",
-                            color = Color.Gray,
-                            fontSize = 14.sp
+                            color = colors.secondaryText,
+                            fontSize = (14 * fontScale).sp
                         )
                     }
                 }
@@ -145,7 +149,6 @@ fun HistoryScreen(
         }
     }
 
-    // Clear All Dialog
     if (showClearDialog) {
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
@@ -160,7 +163,7 @@ fun HistoryScreen(
                         showClearDialog = false
                     }
                 ) {
-                    Text("Clear", color = Color(0xFFE53935))
+                    Text("Clear", color = colors.error)
                 }
             },
             dismissButton = {
@@ -171,7 +174,6 @@ fun HistoryScreen(
         )
     }
 
-    // Error Snackbar
     uiState.error?.let { error ->
         LaunchedEffect(error) {
             kotlinx.coroutines.delay(3000)
@@ -180,19 +182,23 @@ fun HistoryScreen(
     }
 }
 
+// Individual history item card
 @Composable
 fun HistoryItem(
     history: History,
     onItemClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
+    val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onItemClick),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color.White
+            containerColor = colors.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -202,39 +208,37 @@ fun HistoryItem(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Product Image
             AsyncImage(
                 model = history.productImage,
                 contentDescription = history.productTitle,
                 modifier = Modifier
                     .size(80.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFFF5F5F5)),
+                    .background(colors.card),
                 contentScale = ContentScale.Crop
             )
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Product Info
             Column(
                 modifier = Modifier.weight(1f)
             ) {
                 Text(
                     text = history.productTitle,
-                    fontSize = 16.sp,
+                    fontSize = (16 * fontScale).sp,
                     fontWeight = FontWeight.Medium,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    color = Color(0xFF212121)
+                    color = colors.primaryText
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
                     text = "$${String.format("%.2f", history.productPrice)}",
-                    fontSize = 18.sp,
+                    fontSize = (18 * fontScale).sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFFFF6B6B)
+                    color = colors.accent
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
@@ -244,65 +248,64 @@ fun HistoryItem(
                 ) {
                     Text(
                         text = history.productPlatform,
-                        fontSize = 12.sp,
-                        color = Color(0xFF757575)
+                        fontSize = (12 * fontScale).sp,
+                        color = colors.secondaryText
                     )
 
                     Text(
                         text = " • ",
-                        fontSize = 12.sp,
-                        color = Color(0xFF757575)
+                        fontSize = (12 * fontScale).sp,
+                        color = colors.secondaryText
                     )
 
                     Text(
                         text = formatTimestamp(history.viewedAt),
-                        fontSize = 12.sp,
-                        color = Color(0xFF757575)
+                        fontSize = (12 * fontScale).sp,
+                        color = colors.secondaryText
                     )
                 }
             }
 
-            // Delete Button
             IconButton(
                 onClick = onDeleteClick
             ) {
                 Icon(
                     imageVector = Icons.Default.Delete,
                     contentDescription = "Delete",
-                    tint = Color(0xFF9E9E9E)
+                    tint = colors.tertiaryText
                 )
             }
         }
     }
 }
 
+// Empty state view
 @Composable
 fun EmptyHistoryView() {
+    val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
+
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "📖",
-            fontSize = 64.sp
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
             text = "No browsing history",
-            fontSize = 18.sp,
+            fontSize = (18 * fontScale).sp,
             fontWeight = FontWeight.Medium,
-            color = Color(0xFF757575)
+            color = colors.secondaryText
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = "Products you view will appear here",
-            fontSize = 14.sp,
-            color = Color(0xFF9E9E9E)
+            fontSize = (14 * fontScale).sp,
+            color = colors.tertiaryText
         )
     }
 }
 
+// Format timestamp to relative time
 private fun formatTimestamp(timestamp: String): String {
     return try {
         val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)

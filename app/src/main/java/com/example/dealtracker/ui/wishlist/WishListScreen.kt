@@ -19,17 +19,19 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import com.example.dealtracker.domain.model.Product
 import com.example.dealtracker.ui.navigation.Routes
 import com.example.dealtracker.ui.notifications.NotificationHelper
+import com.example.dealtracker.ui.theme.AppTheme
 import com.example.dealtracker.ui.wishlist.viewmodel.WishListViewModel
 
+// User wishlist screen with price alerts
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WishListScreen(
@@ -37,40 +39,39 @@ fun WishListScreen(
     currentUserId: Int,
     viewModel: WishListViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
+    val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
     val wishList by viewModel.wishList.collectAsState()
-    val targetPrices by viewModel.targetPrices.collectAsState()  // ⭐ 添加
+    val targetPrices by viewModel.targetPrices.collectAsState()
     val context = LocalContext.current
 
-    // ⭐ 加载 Wishlist
     LaunchedEffect(currentUserId) {
         if (currentUserId > 0) {
-            Log.d("WishListScreen", "🔄 Loading wishlist for uid=$currentUserId")
+            Log.d("WishListScreen", "Loading wishlist for uid=$currentUserId")
             viewModel.loadWishlist(currentUserId)
         }
     }
 
-    // ⭐ 添加权限请求 Launcher
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        Log.d("WishListScreen", "📱 Notification permission result: $isGranted")
+        Log.d("WishListScreen", "Notification permission result: $isGranted")
 
         if (isGranted) {
             Toast.makeText(
                 context,
-                "✅ Notification enabled! You'll receive price alerts.",
+                "Notification enabled! You'll receive price alerts.",
                 Toast.LENGTH_LONG
             ).show()
         } else {
             Toast.makeText(
                 context,
-                "⚠️ Notification disabled. Enable in Settings for price alerts.",
+                "Notification disabled. Enable in Settings for price alerts.",
                 Toast.LENGTH_LONG
             ).show()
         }
     }
 
-    // ⭐ 检查通知权限
     fun checkNotificationPermission(): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val hasPermission = ContextCompat.checkSelfPermission(
@@ -78,21 +79,19 @@ fun WishListScreen(
                 Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
 
-            Log.d("WishListScreen", "📱 Notification permission status: $hasPermission")
+            Log.d("WishListScreen", "Notification permission status: $hasPermission")
             return hasPermission
         }
-        return true // Android 12 及以下不需要运行时权限
+        return true
     }
 
-    // ⭐ 请求通知权限
     fun requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Log.d("WishListScreen", "⚠️ Requesting notification permission...")
+            Log.d("WishListScreen", "Requesting notification permission...")
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 
-    // 打开页面时检查是否有降价提醒
     LaunchedEffect(currentUserId) {
         if (currentUserId > 0) {
             viewModel.checkAlerts(currentUserId) { alerts ->
@@ -117,19 +116,30 @@ fun WishListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Wishlist") },
+                title = {
+                    Text(
+                        "Wishlist",
+                        fontSize = (20 * fontScale).sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = colors.topBarBackground,
+                    titleContentColor = colors.topBarContent,
+                    navigationIconContentColor = colors.topBarContent
+                )
             )
-        }
+        },
+        containerColor = colors.background
     ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF5F5F5))
                 .padding(innerPadding)
         ) {
             if (wishList.isEmpty()) {
@@ -137,7 +147,11 @@ fun WishListScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Your wishlist is empty")
+                    Text(
+                        "Your wishlist is empty",
+                        color = colors.secondaryText,
+                        fontSize = (16 * fontScale).sp
+                    )
                 }
             } else {
                 LazyColumn(
@@ -147,32 +161,28 @@ fun WishListScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(wishList, key = { it.pid }) { product ->
-                        // ⭐ 获取当前商品的 target price
                         val currentTargetPrice = targetPrices[product.pid]
 
                         WishListItem(
                             product = product,
-                            targetPrice = currentTargetPrice,  // ⭐ 传递 target price
+                            targetPrice = currentTargetPrice,
                             onRemove = {
                                 viewModel.removeProduct(currentUserId, product.pid)
                             },
                             onTargetPriceConfirm = { targetPrice ->
-                                Log.d("WishListScreen", "💾 Save button clicked: targetPrice=$targetPrice")
+                                Log.d("WishListScreen", "Save button clicked: targetPrice=$targetPrice")
 
-                                // ⭐ 第一步：检查权限
                                 val hasPermission = checkNotificationPermission()
 
                                 if (!hasPermission) {
-                                    // ⭐ 没有权限，显示提示并请求
                                     Toast.makeText(
                                         context,
-                                        "⚠️ Notification permission needed for price alerts!",
+                                        "Notification permission needed for price alerts!",
                                         Toast.LENGTH_SHORT
                                     ).show()
                                     requestNotificationPermission()
                                 }
 
-                                // ⭐ 第二步：保存 target_price（无论权限状态）
                                 viewModel.updateTargetPrice(
                                     uid = currentUserId,
                                     pid = product.pid,
@@ -181,11 +191,10 @@ fun WishListScreen(
                                     onSuccess = { priceReached ->
                                         Toast.makeText(
                                             context,
-                                            "✅ Target price saved: $$targetPrice",
+                                            "Target price saved: $$targetPrice",
                                             Toast.LENGTH_SHORT
                                         ).show()
 
-                                        // ⭐ 第三步：如果价格已达标且有权限，显示通知
                                         if (priceReached) {
                                             if (hasPermission) {
                                                 NotificationHelper.showPriceDropNotification(
@@ -198,14 +207,14 @@ fun WishListScreen(
                                                 )
                                                 Toast.makeText(
                                                     context,
-                                                    "🎉 Price already reached! Check your notifications.",
+                                                    "Price already reached! Check your notifications.",
                                                     Toast.LENGTH_LONG
                                                 ).show()
                                             } else {
-                                                Log.d("WishListScreen", "⚠️ Price reached but no permission, notification skipped")
+                                                Log.d("WishListScreen", "Price reached but no permission, notification skipped")
                                                 Toast.makeText(
                                                     context,
-                                                    "💡 Enable notifications to receive price alerts!",
+                                                    "Enable notifications to receive price alerts!",
                                                     Toast.LENGTH_LONG
                                                 ).show()
                                             }
@@ -214,7 +223,6 @@ fun WishListScreen(
                                 )
                             },
                             onClick = {
-                                // ⭐ 点击商品跳转到详情页
                                 navController.navigate(
                                     Routes.detailRoute(
                                         pid = product.pid,
@@ -232,23 +240,26 @@ fun WishListScreen(
     }
 }
 
+// Individual wishlist item with target price
 @Composable
 private fun WishListItem(
     product: Product,
-    targetPrice: Double?,  // ⭐ 添加参数
+    targetPrice: Double?,
     onRemove: () -> Unit,
     onTargetPriceConfirm: (Double) -> Unit,
-    onClick: () -> Unit  // ⭐ 添加点击回调
+    onClick: () -> Unit
 ) {
+    val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
     var targetPriceInput by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() },  // ⭐ 添加点击事件
+            .clickable { onClick() },
         colors = CardDefaults.cardColors(
-            containerColor = Color.White
+            containerColor = colors.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -263,23 +274,26 @@ private fun WishListItem(
                     Text(
                         text = product.title,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                        fontSize = (16 * fontScale).sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.primaryText
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "Current price: $${String.format("%.2f", product.price)}",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF555555)
+                        fontSize = (14 * fontScale).sp,
+                        color = colors.secondaryText
                     )
 
-                    // ⭐ 显示 Target Price
                     if (targetPrice != null) {
                         Spacer(modifier = Modifier.height(4.dp))
                         val priceReached = product.price <= targetPrice
                         Text(
                             text = "Target price: $${"%.2f".format(targetPrice)}",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = if (priceReached) Color(0xFF2E7D32) else Color(0xFFF57C00),
+                            fontSize = (14 * fontScale).sp,
+                            color = if (priceReached) colors.success else colors.warning,
                             fontWeight = if (priceReached) FontWeight.Bold else FontWeight.Normal
                         )
                     }
@@ -289,7 +303,7 @@ private fun WishListItem(
                     Icon(
                         imageVector = Icons.Default.Delete,
                         contentDescription = "Remove",
-                        tint = Color(0xFFD32F2F)
+                        tint = colors.error
                     )
                 }
             }
@@ -331,10 +345,13 @@ private fun WishListItem(
                             error = "Invalid price"
                         } else {
                             onTargetPriceConfirm(v)
-                            targetPriceInput = ""  // 清空输入框
+                            targetPriceInput = ""
                             error = null
                         }
-                    }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colors.accent
+                    )
                 ) {
                     Text(if (targetPrice != null) "Update" else "Save")
                 }
@@ -344,8 +361,9 @@ private fun WishListItem(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = error ?: "",
-                    color = Color.Red,
-                    style = MaterialTheme.typography.bodySmall
+                    color = colors.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = (12 * fontScale).sp
                 )
             }
         }

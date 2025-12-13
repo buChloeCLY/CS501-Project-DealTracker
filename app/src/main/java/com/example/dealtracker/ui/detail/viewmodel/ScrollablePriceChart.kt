@@ -19,28 +19,25 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.dealtracker.domain.model.PricePoint
+import com.example.dealtracker.ui.theme.AppTheme
 import kotlin.math.*
 
-/**
- * 可滚动的价格历史图表
- * 支持30天数据，7天窗口，左右拖动查看，15%波动标注
- */
+// Scrollable price history chart with 30-day data, drag gestures, and volatility markers
 @Composable
 fun ScrollablePriceChart(
     priceHistory: List<PricePoint>,
     modifier: Modifier = Modifier
 ) {
-    // 滑动窗口：7天
+    val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
+
     var scrollOffset by remember { mutableStateOf(0f) }
     var selectedPoint by remember { mutableStateOf<PricePoint?>(null) }
+
     val windowSize = 7
     val totalDataPoints = priceHistory.size
-    val maxScroll = (totalDataPoints - windowSize).coerceAtLeast(0)
 
-    // 默认显示最新数据（最右边）
-    LaunchedEffect(totalDataPoints) {
-        scrollOffset = maxScroll.toFloat()
-    }
+    val maxScroll = (totalDataPoints - windowSize).coerceAtLeast(0)
     val startIndex = scrollOffset.toInt().coerceIn(0, maxScroll)
     val endIndex = (startIndex + windowSize).coerceAtMost(totalDataPoints)
     val visibleData = if (priceHistory.isNotEmpty()) {
@@ -56,7 +53,7 @@ fun ScrollablePriceChart(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = colors.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -66,16 +63,17 @@ fun ScrollablePriceChart(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "Price History (${totalDataPoints} Days)",
+                    "Price History (30 Days)",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
+                    fontSize = (16 * fontScale).sp,
+                    color = colors.primaryText
                 )
 
                 if (totalDataPoints > windowSize) {
                     Text(
-                        "Showing ${startIndex + 1}-${endIndex} of $totalDataPoints days",
-                        fontSize = 12.sp,
-                        color = Color.Gray
+                        "Showing ${startIndex + 1}-${endIndex} of $totalDataPoints",
+                        fontSize = (12 * fontScale).sp,
+                        color = colors.secondaryText
                     )
                 }
             }
@@ -101,6 +99,7 @@ fun ScrollablePriceChart(
                                         visibleData,
                                         size.width.toFloat(),
                                         size.height.toFloat()
+
                                     )
                                 }
                             }
@@ -110,24 +109,23 @@ fun ScrollablePriceChart(
                         val padding = 40f
                         val bottomPadding = 35f
                         val chartWidth = width - padding * 2
-                        val chartHeight = height - padding - bottomPadding
+                        val chartHeight = height - bottomPadding - padding
 
                         if (visibleData.isEmpty()) return@Canvas
 
                         val minPrice = visibleData.minOf { it.price }
                         val maxPrice = visibleData.maxOf { it.price }
-                        val priceRange = maxPrice - minPrice
                         val axis = niceAxis(minPrice, maxPrice, 5)
 
-                        drawGridLines(axis, padding, chartWidth, chartHeight)
-                        drawYAxisLabels(axis, padding, chartHeight)
+                        drawGridLines(axis, padding, chartWidth, chartHeight, colors.isDark)
+                        drawYAxisLabels(axis, padding, chartHeight, colors.isDark)
 
                         val path = Path()
                         val points = mutableListOf<Offset>()
 
                         visibleData.forEachIndexed { index, point ->
                             val x = padding + (index.toFloat() / (visibleData.size - 1).coerceAtLeast(1)) * chartWidth
-                            val normalizedPrice = if (priceRange > 0) {
+                            val normalizedPrice = if (axis.max > axis.min) {
                                 (point.price - axis.min) / (axis.max - axis.min)
                             } else 0.5
                             val y = padding + chartHeight - (normalizedPrice * chartHeight).toFloat()
@@ -143,7 +141,7 @@ fun ScrollablePriceChart(
 
                         drawPath(
                             path = path,
-                            color = Color(0xFF4CAF50),
+                            color = if (colors.isDark) Color(0xFF81C784) else Color(0xFF4CAF50),
                             style = Stroke(width = 3f, cap = StrokeCap.Round)
                         )
 
@@ -153,13 +151,17 @@ fun ScrollablePriceChart(
                             val isSelected = selectedPoint == actualPoint
 
                             drawCircle(
-                                color = if (isSelected) Color(0xFF2196F3) else Color(0xFF4CAF50),
+                                color = if (isSelected) {
+                                    if (colors.isDark) Color(0xFF64B5F6) else Color(0xFF2196F3)
+                                } else {
+                                    if (colors.isDark) Color(0xFF81C784) else Color(0xFF4CAF50)
+                                },
                                 radius = if (isSelected) 8f else 6f,
                                 center = point
                             )
 
                             if (isVolatile) {
-                                drawVolatileMarker(point, visibleData, index)
+                                drawVolatileMarker(point, visibleData, index, colors.isDark)
                             }
                         }
 
@@ -169,7 +171,11 @@ fun ScrollablePriceChart(
                                 val x = padding + (index.toFloat() / (visibleData.size - 1).coerceAtLeast(1)) * chartWidth
                                 drawIntoCanvas { canvas ->
                                     val paint = android.graphics.Paint().apply {
-                                        color = android.graphics.Color.GRAY
+                                        color = if (colors.isDark) {
+                                            android.graphics.Color.rgb(158, 158, 158)
+                                        } else {
+                                            android.graphics.Color.GRAY
+                                        }
                                         textSize = 24f
                                         textAlign = android.graphics.Paint.Align.CENTER
                                     }
@@ -192,7 +198,7 @@ fun ScrollablePriceChart(
                         ) {
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
-                                color = Color(0xFF2196F3),
+                                color = if (colors.isDark) Color(0xFF64B5F6) else Color(0xFF2196F3),
                                 shadowElevation = 4.dp
                             ) {
                                 Column(
@@ -234,17 +240,14 @@ fun ScrollablePriceChart(
                         .height(200.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("No price history available", color = Color.Gray)
+                    Text("No price history available", color = colors.secondaryText)
                 }
             }
         }
     }
 }
 
-/**
- * 检测价格波动剧烈的点
- * threshold: 波动阈值，0.15表示15%
- */
+// Detect points with significant price volatility
 private fun detectVolatilePoints(
     data: List<PricePoint>,
     threshold: Double
@@ -264,13 +267,12 @@ private fun detectVolatilePoints(
     return volatileIndices
 }
 
-/**
- * 绘制波动标记
- */
+// Draw volatility marker with arrow and percentage
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawVolatileMarker(
     point: Offset,
     data: List<PricePoint>,
-    index: Int
+    index: Int,
+    isDark: Boolean
 ) {
     if (index == 0) return
 
@@ -280,27 +282,31 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawVolatileMarker(
 
     val arrowPath = Path().apply {
         if (isIncrease) {
-            moveTo(point.x, point.y - 30f)
-            lineTo(point.x - 5f, point.y - 22f)
-            lineTo(point.x + 5f, point.y - 22f)
+            moveTo(point.x, point.y - 25f)
+            lineTo(point.x - 5f, point.y - 15f)
+            lineTo(point.x + 5f, point.y - 15f)
             close()
         } else {
-            moveTo(point.x, point.y + 30f)
-            lineTo(point.x - 5f, point.y + 22f)
-            lineTo(point.x + 5f, point.y + 22f)
+            moveTo(point.x, point.y + 25f)
+            lineTo(point.x - 5f, point.y + 15f)
+            lineTo(point.x + 5f, point.y + 15f)
             close()
         }
     }
 
     drawPath(
         path = arrowPath,
-        color = Color(0xFFE53935)
+        color = if (isDark) Color(0xFFEF5350) else Color(0xFFE53935)
     )
 
     val changePercent = abs((currPrice - prevPrice) / prevPrice * 100)
     drawIntoCanvas { canvas ->
         val paint = android.graphics.Paint().apply {
-            color = android.graphics.Color.RED
+            color = if (isDark) {
+                android.graphics.Color.rgb(239, 83, 80)
+            } else {
+                android.graphics.Color.RED
+            }
             textSize = 20f
             textAlign = android.graphics.Paint.Align.CENTER
             isFakeBoldText = true
@@ -308,20 +314,19 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawVolatileMarker(
         canvas.nativeCanvas.drawText(
             "${if (isIncrease) "+" else "-"}${"%.1f".format(changePercent)}%",
             point.x,
-            if (isIncrease) point.y - 35f else point.y - 15f,
+            if (isIncrease) point.y - 35f else point.y + 40f,
             paint
         )
     }
 }
 
-/**
- * 绘制网格线
- */
+// Draw grid lines
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGridLines(
     axis: AxisInfo,
     padding: Float,
     chartWidth: Float,
-    chartHeight: Float
+    chartHeight: Float,
+    isDark: Boolean
 ) {
     var value = axis.min
     while (value <= axis.max + 0.001) {
@@ -329,7 +334,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGridLines(
         val y = padding + chartHeight - (normalizedY * chartHeight).toFloat()
 
         drawLine(
-            color = Color(0xFFE0E0E0),
+            color = if (isDark) Color(0xFF3E3E3E) else Color(0xFFE0E0E0),
             start = Offset(padding, y),
             end = Offset(padding + chartWidth, y),
             strokeWidth = 1f
@@ -339,17 +344,20 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGridLines(
     }
 }
 
-/**
- * 绘制Y轴标签
- */
+// Draw Y-axis labels
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawYAxisLabels(
     axis: AxisInfo,
     padding: Float,
-    chartHeight: Float
+    chartHeight: Float,
+    isDark: Boolean
 ) {
     drawIntoCanvas { canvas ->
         val paint = android.graphics.Paint().apply {
-            color = android.graphics.Color.GRAY
+            color = if (isDark) {
+                android.graphics.Color.rgb(158, 158, 158)
+            } else {
+                android.graphics.Color.GRAY
+            }
             textSize = 24f
             textAlign = android.graphics.Paint.Align.RIGHT
         }
@@ -371,9 +379,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawYAxisLabels(
     }
 }
 
-/**
- * 找到最近的数据点
- */
+// Find nearest data point to tap location
 private fun findNearestPoint(
     tapOffset: Offset,
     data: List<PricePoint>,
@@ -381,8 +387,9 @@ private fun findNearestPoint(
     height: Float
 ): PricePoint? {
     val padding = 40f
+    val bottomPadding = 35f
     val chartWidth = width - padding * 2
-    val chartHeight = height - padding * 2
+    val chartHeight = height - bottomPadding - padding
 
     if (data.isEmpty()) return null
 
@@ -405,7 +412,7 @@ private fun findNearestPoint(
             (tapOffset.x - x).pow(2) + (tapOffset.y - y).pow(2)
         )
 
-        if (distance < minDistance && distance < 50f) { // 50px触摸半径
+        if (distance < minDistance && distance < 50f) {
             minDistance = distance
             closestPoint = point
         }
@@ -414,33 +421,31 @@ private fun findNearestPoint(
     return closestPoint
 }
 
-/**
- * 滚动指示器
- */
+// Scroll position indicator
 @Composable
 private fun ScrollIndicator(
     currentPosition: Float,
     maxPosition: Float,
     modifier: Modifier = Modifier
 ) {
+    val colors = AppTheme.colors
+
     Box(
         modifier = modifier
             .height(4.dp)
-            .background(Color(0xFFE0E0E0), RoundedCornerShape(2.dp))
+            .background(colors.border, RoundedCornerShape(2.dp))
     ) {
         val progress = if (maxPosition > 0) currentPosition / maxPosition else 0f
         Box(
             modifier = Modifier
                 .fillMaxHeight()
                 .fillMaxWidth(progress.coerceIn(0f, 1f))
-                .background(Color(0xFF4CAF50), RoundedCornerShape(2.dp))
+                .background(colors.success, RoundedCornerShape(2.dp))
         )
     }
 }
 
-/**
- * 格式化日期显示
- */
+// Format date for display
 private fun formatDate(date: String): String {
     return try {
         val parts = date.split("-")
@@ -454,11 +459,10 @@ private fun formatDate(date: String): String {
     }
 }
 
+// Axis information for chart scaling
 private data class AxisInfo(val min: Double, val max: Double, val step: Double)
 
-/**
- * 计算漂亮的坐标轴
- */
+// Calculate nice axis values
 private fun niceAxis(minVal: Double, maxVal: Double, tickCount: Int): AxisInfo {
     val d = (maxVal - minVal)
     val rawStep = d / (tickCount - 1).coerceAtLeast(1)

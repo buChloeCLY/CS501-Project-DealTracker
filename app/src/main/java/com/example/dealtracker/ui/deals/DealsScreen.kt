@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -36,17 +37,20 @@ import com.example.dealtracker.domain.model.Product
 import com.example.dealtracker.ui.deals.viewmodel.DealsViewModel
 import com.example.dealtracker.ui.deals.viewmodel.SortField
 import com.example.dealtracker.ui.deals.viewmodel.SortOrder
+import com.example.dealtracker.ui.theme.AppTheme
 import kotlin.math.roundToInt
 
 @Composable
 fun DealsScreen(
     showBack: Boolean,
     onBack: () -> Unit,
-    category: String? = null,      // 分类点击过来的
-    searchQuery: String? = null,   // 搜索框过来的
+    category: String? = null,
+    searchQuery: String? = null,
     onCompareClick: (Product) -> Unit,
     viewModel: DealsViewModel = viewModel()
 ) {
+    val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
     val ui by viewModel.uiState.collectAsState()
 
     var filterSheetOpen by remember { mutableStateOf(false) }
@@ -55,9 +59,6 @@ fun DealsScreen(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
-    // 有 category → 按分类过滤
-    // 没 category 有 searchQuery → 走搜索 API
-    // 都没有 → 加载全部
     LaunchedEffect(searchQuery, category) {
         when {
             category != null -> viewModel.applyCategory(category)
@@ -66,18 +67,29 @@ fun DealsScreen(
         }
     }
 
-
     Scaffold(
+        containerColor = colors.background,
         topBar = {
             TopAppBar(
-                title = { Text("Deals", style = MaterialTheme.typography.titleLarge) },
+                title = {
+                    Text(
+                        "Deals",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontSize = (22 * fontScale).sp
+                    )
+                },
                 navigationIcon = {
                     if (showBack) {
                         IconButton(onClick = onBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                         }
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = colors.topBarBackground,
+                    titleContentColor = colors.topBarContent,
+                    navigationIconContentColor = colors.topBarContent
+                )
             )
         }
     ) { innerPadding ->
@@ -86,7 +98,6 @@ fun DealsScreen(
                 .padding(innerPadding)
                 .fillMaxSize()
         ) {
-            // Loading 视图
             if (ui.isLoading) {
                 Column(
                     modifier = Modifier.align(Alignment.Center),
@@ -97,7 +108,6 @@ fun DealsScreen(
                     Text("Loading...")
                 }
             }
-            // 错误视图
             else if (ui.error != null) {
                 Column(
                     modifier = Modifier.align(Alignment.Center),
@@ -119,11 +129,9 @@ fun DealsScreen(
                     }
                 }
             }
-            // 主内容
             else {
                 Column(Modifier.fillMaxSize()) {
 
-                    // ---------------- 搜索状态 + 分页指示 ----------------
                     if (ui.searchQuery.isNotBlank()) {
                         Row(
                             modifier = Modifier
@@ -140,7 +148,6 @@ fun DealsScreen(
                         }
                     }
 
-                    // 若当前页没有搜到内容
                     if (ui.searchQuery.isNotBlank() && ui.products.isEmpty()) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
@@ -155,7 +162,6 @@ fun DealsScreen(
                         return@Box
                     }
 
-                    // ---------------- Filter / Sort / Refresh ----------------
                     Row(
                         Modifier
                             .fillMaxWidth()
@@ -179,7 +185,6 @@ fun DealsScreen(
                         )
                     }
 
-                    // ---------------- Product 列表 ----------------
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
@@ -187,7 +192,6 @@ fun DealsScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
 
-                        // 数量提示
                         item {
                             Text(
                                 "${ui.filteredSorted.size} products",
@@ -203,7 +207,6 @@ fun DealsScreen(
                             )
                         }
 
-                        // ---------------- 分页控件 ----------------
                         if (ui.searchQuery.isNotBlank()) {
                             item {
                                 Row(
@@ -231,7 +234,6 @@ fun DealsScreen(
                     }
                 }
 
-                // ---------------- Back to Top ----------------
                 val showScrollTop by remember {
                     derivedStateOf { listState.firstVisibleItemIndex > 4 }
                 }
@@ -245,7 +247,8 @@ fun DealsScreen(
                         .padding(16.dp)
                 ) {
                     SmallFloatingActionButton(
-                        onClick = { scope.launch { listState.animateScrollToItem(0) } }
+                        onClick = { scope.launch { listState.animateScrollToItem(0) } },
+                        containerColor = colors.accent
                     ) {
                         Icon(Icons.Filled.KeyboardArrowUp, "Top")
                     }
@@ -254,7 +257,6 @@ fun DealsScreen(
         }
     }
 
-    // ---------------- BottomSheet: Filter ----------------
     if (filterSheetOpen) {
         FilterSheet(
             priceMin = ui.filters.priceMin,
@@ -280,7 +282,6 @@ fun DealsScreen(
         )
     }
 
-    // ---------------- BottomSheet: Sort ----------------
     if (sortSheetOpen) {
         SortSheet(
             sortField = ui.sort.field,
@@ -291,15 +292,16 @@ fun DealsScreen(
         )
     }
 }
-// ===================================
-// 产品卡片（带图片）
-// ===================================
 
+// Product card with image
 @Composable
 private fun ProductCard(
     product: Product,
     onCompareClick: (Product) -> Unit
 ) {
+    val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
+
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         onClick = { onCompareClick(product) }
@@ -310,51 +312,46 @@ private fun ProductCard(
                 .padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 🖼️ 产品图片
             ProductImage(
                 imageUrl = product.imageUrl,
                 title = product.title,
                 modifier = Modifier.size(100.dp)
             )
 
-            // 产品信息
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight(),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                // 标题
                 Text(
                     text = product.title,
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.SemiBold
                     ),
+                    fontSize = (16 * fontScale).sp,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
 
                 Spacer(Modifier.height(4.dp))
 
-                // 评分
                 StarsRow(rating = product.rating)
 
                 Spacer(Modifier.height(8.dp))
 
-                // 价格
                 Text(
                     text = product.priceText,
                     style = MaterialTheme.typography.titleLarge,
+                    fontSize = (20 * fontScale).sp,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold
                 )
 
-                // 来源信息
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // 平台标签
                     SuggestionChip(
                         onClick = {},
                         label = {
@@ -365,7 +362,6 @@ private fun ProductCard(
                         }
                     )
 
-                    // 包邮图标
                     if (product.freeShipping) {
                         Icon(
                             Icons.Outlined.LocalShipping,
@@ -375,20 +371,18 @@ private fun ProductCard(
                         )
                     }
 
-                    // 有货图标
                     if (product.inStock) {
                         Icon(
                             Icons.Filled.CheckCircle,
                             contentDescription = "In Stock",
                             modifier = Modifier.size(16.dp),
-                            tint = Color(0xFF4CAF50)
+                            tint = colors.success
                         )
                     }
                 }
 
                 Spacer(Modifier.height(8.dp))
 
-                // 比较按钮
                 OutlinedButton(
                     onClick = { onCompareClick(product) },
                     modifier = Modifier.fillMaxWidth()
@@ -400,10 +394,7 @@ private fun ProductCard(
     }
 }
 
-// ===================================
-// 产品图片组件（支持加载、错误、占位）
-// ===================================
-
+// Product image component with loading and error states
 @Composable
 private fun ProductImage(
     imageUrl: String,
@@ -417,7 +408,6 @@ private fun ProductImage(
         contentAlignment = Alignment.Center
     ) {
         if (imageUrl.isNotBlank()) {
-            // 使用 SubcomposeAsyncImage 支持自定义 loading 和 error 状态
             coil.compose.SubcomposeAsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(imageUrl)
@@ -427,7 +417,6 @@ private fun ProductImage(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
                 loading = {
-                    // 加载中显示进度条
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
@@ -439,7 +428,6 @@ private fun ProductImage(
                     }
                 },
                 error = {
-                    // 加载失败显示占位图标
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
@@ -454,7 +442,6 @@ private fun ProductImage(
                 }
             )
         } else {
-            // 没有图片时显示占位图标
             Icon(
                 Icons.Outlined.Image,
                 contentDescription = "No image",
@@ -465,19 +452,18 @@ private fun ProductImage(
     }
 }
 
-// ===================================
-// 评分星星
-// ===================================
-
+// Star rating display
 @Composable
 private fun StarsRow(rating: Float, max: Int = 5) {
+    val colors = AppTheme.colors
+
     Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
         repeat(max) { idx ->
             val filled = idx < rating.toInt()
             Icon(
                 imageVector = if (filled) Icons.Filled.Star else Icons.Outlined.StarBorder,
                 contentDescription = null,
-                tint = if (filled) Color(0xFFFFB300) else MaterialTheme.colorScheme.outline,
+                tint = if (filled) colors.ratingColor else MaterialTheme.colorScheme.outline,
                 modifier = Modifier.size(16.dp)
             )
         }
@@ -490,10 +476,7 @@ private fun StarsRow(rating: Float, max: Int = 5) {
     }
 }
 
-// ===================================
-// Filter Sheet（保持不变）
-// ===================================
-
+// Filter bottom sheet
 @Composable
 private fun FilterSheet(
     priceMin: Float,
@@ -511,13 +494,23 @@ private fun FilterSheet(
     onApply: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val fontScale = AppTheme.fontScale
+
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(16.dp)) {
-            Text("Filter", style = MaterialTheme.typography.titleLarge)
+            Text(
+                "Filter",
+                style = MaterialTheme.typography.titleLarge,
+                fontSize = (22 * fontScale).sp
+            )
             Spacer(Modifier.height(12.dp))
 
-            // Price Range
-            Text("Price Range", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                "Price Range",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = (16 * fontScale).sp
+            )
             Spacer(Modifier.height(8.dp))
 
             var tmpRange by remember { mutableStateOf(priceMin..priceMax) }
@@ -535,8 +528,12 @@ private fun FilterSheet(
 
             Spacer(Modifier.height(16.dp))
 
-            // Platform
-            Text("Platform", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                "Platform",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = (16 * fontScale).sp
+            )
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(
@@ -557,13 +554,16 @@ private fun FilterSheet(
             }
             Spacer(Modifier.height(16.dp))
 
-            // Free shipping / Stock
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Free Shipping", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Free Shipping",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = (16 * fontScale).sp
+                )
                 Switch(checked = onlyFreeShipping, onCheckedChange = onOnlyFreeShippingChange)
             }
             Spacer(Modifier.height(8.dp))
@@ -572,7 +572,11 @@ private fun FilterSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("In Stock", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "In Stock",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = (16 * fontScale).sp
+                )
                 Switch(checked = onlyInStock, onCheckedChange = onOnlyInStockChange)
             }
 
@@ -590,10 +594,7 @@ private fun FilterSheet(
     }
 }
 
-// ===================================
-// Sort Sheet（保持不变）
-// ===================================
-
+// Sort bottom sheet
 @Composable
 private fun SortSheet(
     sortField: SortField,
@@ -602,9 +603,15 @@ private fun SortSheet(
     onOrderChange: (SortOrder) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val fontScale = AppTheme.fontScale
+
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(16.dp)) {
-            Text("Sort", style = MaterialTheme.typography.titleLarge)
+            Text(
+                "Sort",
+                style = MaterialTheme.typography.titleLarge,
+                fontSize = (22 * fontScale).sp
+            )
             Spacer(Modifier.height(16.dp))
 
             Column {
@@ -623,7 +630,11 @@ private fun SortSheet(
             }
 
             Spacer(Modifier.height(12.dp))
-            Text("Order", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Order",
+                style = MaterialTheme.typography.titleMedium,
+                fontSize = (16 * fontScale).sp
+            )
             Spacer(Modifier.height(8.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
