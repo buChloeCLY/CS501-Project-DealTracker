@@ -797,21 +797,15 @@ async function fetchFromEbay(query, page = 1) {
                 query: query,
                 page: page.toString(),
                 countryIso: 'us',
-                minPrice: 0,
-                location: 'us_only',
-                sort: 'price_asc',  // 按价格升序
-                shipping: 'free',   // 优先免费配送
-                seller: 'top_rated',
-                excludeKeywords: 'broken+damaged'
+                minPrice: 0
             },
             headers: {
                 'X-RapidAPI-Key': RAPIDAPI_KEYS.ebay,
                 'X-RapidAPI-Host': 'ebay-data-api.p.rapidapi.com'
-            },
-            timeout: 15000
+            }
         });
 
-        const products = response.data?.items || [];
+        const products = response.data?.data?.items || [];
         console.log(`✅ [eBay] Found ${products.length} products`);
         return products;
 
@@ -852,11 +846,9 @@ async function fetchFromWalmart(query, page = 1) {
                 'X-RapidAPI-Key': RAPIDAPI_KEYS.walmart,
                 'X-RapidAPI-Host': 'walmart-api4.p.rapidapi.com'
             }
-            // 移除 timeout 限制，让请求有足够时间完成
         });
 
         // searchResult 是一个数组，包含多个 item
-        // 每个 item 是一个产品数组，需要遍历所有 item 并合并
         const searchResultArray = response.data?.searchResult || [];
 
         // 合并所有 item 中的产品
@@ -867,36 +859,7 @@ async function fetchFromWalmart(query, page = 1) {
             }
         }
 
-        console.log(`✅ [Walmart] Found ${allProducts.length} products (from ${searchResultArray.length} result groups)`);
-
-        // 如果没找到产品，输出调试信息
-        if (allProducts.length === 0) {
-            console.log(`🔍 [Walmart] Debug - Response structure:`, JSON.stringify(Object.keys(response.data || {})));
-            if (searchResultArray.length > 0) {
-                searchResultArray.forEach((item, index) => {
-                    console.log(`   searchResult[${index}] length: ${Array.isArray(item) ? item.length : 'not an array'}`);
-                });
-            }
-        }
-
-        // 🆕 如果有多个产品，选择与搜索标题最匹配的
-        if (allProducts.length > 1) {
-            const productsWithScore = allProducts
-                .filter(p => p.name && p.price?.current) // 只保留有名称和价格的
-                .map(p => ({
-                    product: p,
-                    similarity: calculateSimilarity(query, p.name)
-                }))
-                .sort((a, b) => b.similarity - a.similarity); // 按相似度降序
-
-            if (productsWithScore.length > 0) {
-                const best = productsWithScore[0];
-                console.log(`📊 [Walmart] Best match: "${best.product.name.substring(0, 60)}..." (similarity: ${(best.similarity * 100).toFixed(1)}%)`);
-                console.log(`   Price: $${best.product.price.current}`);
-                return [best.product]; // 返回最匹配的产品
-            }
-        }
-
+        console.log(`✅ [Walmart] Found ${allProducts.length} products`);
         return allProducts;
 
     } catch (error) {
@@ -907,15 +870,8 @@ async function fetchFromWalmart(query, page = 1) {
                 url: error.config?.url,
                 params: error.config?.params
             });
-
-            // 如果是 404，可能是端点路径错误
-            if (error.response.status === 404) {
-                console.error('⚠️  [Walmart] 404 Error - Check API endpoint URL');
-                console.error('   Current URL: https://walmart-api4.p.rapidapi.com/v1/search');
-                console.error('   Make sure you are subscribed to the correct Walmart API');
-            }
         } else {
-            console.error('❌ [Walmart] API Error:', error.message);
+            console.error('❌ [Walmart] Error:', error.message);
         }
         return [];
     }
@@ -1046,8 +1002,9 @@ function transformEbayProduct(apiProduct) {
         freeShipping: freeShipping ? 1 : 0,
         inStock: inStock ? 1 : 0,
         link: apiProduct.url || '',
-        idInPlatform: apiProduct.itemId || '',  // ⭐ eBay 商品 ID
-        title: apiProduct.title || ''  // ⭐ 用于匹配
+        idInPlatform: apiProduct.itemId || '',
+        title: apiProduct.title || '',
+        condition: apiProduct.condition || ''  // ⭐ 新增：用于二手判断
     };
 }
 
@@ -1124,6 +1081,104 @@ function transformWalmartProduct(apiProduct) {
 }
 
 /**
+ * 检测标题是否包含二手/翻新信息
+ */
+function isUsedProduct(title) {
+    if (!title) return false;
+
+    const lowerTitle = title.toLowerCase();
+    const usedKeywords = [
+        'renewed', 'refurbished', 'pre-owned', 'used', 'open box',
+        'certified refurbished', 'like new', 'second hand', 'secondhand',
+        'reconditioned', 'remanufactured'
+    ];
+
+    return usedKeywords.some(keyword => lowerTitle.includes(keyword));
+}
+
+function findBestWalmartMatch(dbProduct, walmartProducts) {
+    if (!walmartProducts || walmartProducts.length === 0) {
+        return null;
+    }
+
+    console.log(`   🔍 [Walmart] Processing ${walmartProducts.length} products`);
+
+    // ⭐ 步骤 1: 使用 transformWalmartProduct 转换所有商品
+    const transformed = walmartProducts.map(p => {
+        const product = transformWalmartProduct(p);
+        product.title = p.name || p.title || '';
+        return product;
+    });
+
+    // ⭐ 步骤 2: 检测原标题是否为二手
+    const originalIsUsed = isUsedProduct(dbProduct.title);
+    console.log(`   📋 [Walmart] Original is used: ${originalIsUsed}`);
+
+    let candidates = transformed;
+
+    // ⭐ 步骤 3: 如果原标题非二手，过滤二手商品
+    if (!originalIsUsed) {
+        const filtered = transformed.filter(p => !isUsedProduct(p.title));
+
+        if (filtered.length > 0) {
+            candidates = filtered;
+            console.log(`   ✅ [Walmart] Filtered: ${transformed.length} → ${filtered.length} (removed used)`);
+        } else {
+            console.log(`   ⚠️  [Walmart] All products are used, using original list`);
+        }
+    }
+
+    // ⭐ 步骤 4: 价格过滤（移到外面，独立执行）
+    if (dbProduct.price) {
+        const referencePrice = dbProduct.price;
+        const minPrice = referencePrice * 0.3;
+        const maxPrice = referencePrice * 2.5;
+
+        const priceFiltered = candidates.filter(p => {
+            if (p.price < minPrice || p.price > maxPrice) {
+                console.log(`   ⏭️  [Walmart] Price out of range: $${p.price} (ref: $${referencePrice})`);
+                return false;
+            }
+            return true;
+        });
+
+        if (priceFiltered.length > 0) {
+            candidates = priceFiltered;
+            console.log(`   ✅ [Walmart] Price filtered: ${candidates.length} products in range`);
+        } else {
+            console.log(`   ⚠️  [Walmart] All prices out of range, using original list`);
+        }
+    }
+
+    // ⭐ 步骤 5: 计算相似度
+    const scored = candidates.map(product => ({
+        product: product,
+        similarity: calculateSimilarity(dbProduct.title, product.title),
+        price: product.price
+    }));
+
+    // ⭐ 步骤 6: 按相似度降序排序
+    scored.sort((a, b) => b.similarity - a.similarity);
+
+    // ⭐ 步骤 7: 找出最高相似度
+    const topSimilarity = scored[0].similarity;
+
+    // ⭐ 步骤 8: 找出所有相近匹配（差距 <= 0.03）
+    const topMatches = scored.filter(s => s.similarity >= topSimilarity - 0.03);
+
+    // ⭐ 步骤 9: 如果有多个，选最便宜的
+    if (topMatches.length > 1) {
+        topMatches.sort((a, b) => a.price - b.price);
+        console.log(`   ✅ [Walmart] ${topMatches.length} similar matches, cheapest: $${topMatches[0].price}`);
+    }
+
+    const best = topMatches[0];
+    console.log(`   ✅ [Walmart] Best: similarity=${best.similarity.toFixed(2)}, price=$${best.price}`);
+
+    return best.product;
+}
+
+/**
  * 从 eBay 搜索结果中找到最佳匹配
  *
  * @param {Object} dbProduct - 数据库商品 {pid, title, short_title}
@@ -1135,44 +1190,305 @@ function findBestEbayMatch(dbProduct, ebayProducts) {
         return null;
     }
 
-    // 转换所有 eBay 商品
+    console.log(`   🔍 [eBay] Processing ${ebayProducts.length} products`);
+
+    // ⭐ 步骤 1: 使用 transformEbayProduct 转换所有商品
     const transformed = ebayProducts.map(p => transformEbayProduct(p));
 
-    // 计算每个商品的匹配度
-    const scored = transformed.map(ebayProduct => {
-        const similarity = calculateSimilarity(dbProduct.title, ebayProduct.title);
-        return {
-            product: ebayProduct,
-            similarity: similarity,
-            price: ebayProduct.price
-        };
-    });
+    // ⭐ 步骤 2: 检测原标题是否为二手
+    const originalIsUsed = isUsedProduct(dbProduct.title);
+    console.log(`   📋 [eBay] Original is used: ${originalIsUsed}`);
 
-    // 按匹配度降序排序
+    let candidates = transformed;
+
+    // ⭐ 步骤 3: 如果原标题非二手，过滤二手商品
+    if (!originalIsUsed) {
+        const filtered = transformed.filter(p => {
+            // 检查标题
+            const titleIsUsed = isUsedProduct(p.title);
+
+            // 检查 condition 字段
+            const conditionIsUsed = p.condition && (
+                p.condition.toLowerCase().includes('pre-owned') ||
+                p.condition.toLowerCase().includes('used') ||
+                p.condition.toLowerCase().includes('refurbished')
+            );
+
+            return !titleIsUsed && !conditionIsUsed;
+        });
+
+        // 如果过滤后还有商品，使用过滤后的
+        if (filtered.length > 0) {
+            candidates = filtered;
+            console.log(`   ✅ [eBay] Filtered: ${transformed.length} → ${filtered.length} (removed used)`);
+        } else {
+            console.log(`   ⚠️  [eBay] All products are used, using original list`);
+        }
+    }
+
+    // ⭐ 步骤 4: 价格过滤（移到外面，独立执行）
+    if (dbProduct.price) {
+        const referencePrice = dbProduct.price;
+        const minPrice = referencePrice * 0.2;  // 最低不能低于参考价的 20%
+        const maxPrice = referencePrice * 3.0;  // 最高不能超过参考价的 300%
+
+        const priceFiltered = candidates.filter(p => {
+            if (p.price < minPrice || p.price > maxPrice) {
+                console.log(`   ⏭️  [eBay] Price out of range: $${p.price} (ref: $${referencePrice}, range: $${minPrice.toFixed(0)}-$${maxPrice.toFixed(0)})`);
+                return false;
+            }
+            return true;
+        });
+
+        if (priceFiltered.length > 0) {
+            candidates = priceFiltered;
+            console.log(`   ✅ [eBay] Price filtered: ${candidates.length} products in reasonable range`);
+        } else {
+            console.log(`   ⚠️  [eBay] All prices out of range, using original list`);
+        }
+    }
+
+    // ⭐ 步骤 5: 计算相似度
+    const scored = candidates.map(product => ({
+        product: product,
+        similarity: calculateSimilarity(dbProduct.title, product.title),
+        price: product.price
+    }));
+
+    // ⭐ 步骤 6: 按相似度降序排序
     scored.sort((a, b) => b.similarity - a.similarity);
 
-    // 如果没有匹配度 >= 0.6 的商品，返回 null
-    if (scored.length === 0 || scored[0].similarity < 0.6) {
-        console.log(`⚠️  [eBay] No good match found for "${dbProduct.title}" (best similarity: ${scored[0]?.similarity.toFixed(2) || 0})`);
-        return null;
-    }
-
-    // 找出最高匹配度
+    // ⭐ 步骤 7: 找出最高相似度
     const topSimilarity = scored[0].similarity;
 
-    // 找出所有匹配度 >= topSimilarity - 0.05 的商品（相近匹配度）
-    const topMatches = scored.filter(s => s.similarity >= topSimilarity - 0.05);
+    // ⭐ 步骤 8: 找出所有相近匹配（差距 <= 0.03）
+    const topMatches = scored.filter(s => s.similarity >= topSimilarity - 0.03);
 
-    // 如果有多个相近匹配度，选最便宜的
+    // ⭐ 步骤 9: 如果有多个，选最便宜的
     if (topMatches.length > 1) {
         topMatches.sort((a, b) => a.price - b.price);
-        console.log(`✅ [eBay] Found ${topMatches.length} similar matches, choosing cheapest at $${topMatches[0].price}`);
+        console.log(`   ✅ [eBay] ${topMatches.length} similar matches, cheapest: $${topMatches[0].price}`);
     }
 
-    const bestMatch = topMatches[0];
-    console.log(`✅ [eBay] Best match: "${bestMatch.product.title.substring(0, 50)}..." (similarity: ${bestMatch.similarity.toFixed(2)}, price: $${bestMatch.price})`);
+    const best = topMatches[0];
+    console.log(`   ✅ [eBay] Best: similarity=${best.similarity.toFixed(2)}, price=$${best.price}`);
 
-    return bestMatch.product;
+    return best.product;
+}
+
+// ===================================
+// 3. 直接获取 Product Details 的函数
+// ===================================
+
+/**
+ * 通过 Walmart link 获取 product details
+ */
+async function getWalmartProductDetails(productLink) {
+    try {
+        console.log(`   🔗 [Walmart] Fetching details from link`);
+
+        if (!RAPIDAPI_KEYS.walmart) {
+            console.log('   ⚠️  Walmart API key not configured');
+            return null;
+        }
+
+        const response = await axios.get('https://walmart-api4.p.rapidapi.com/details', {
+            params: {
+                url: productLink
+            },
+            headers: {
+                'X-RapidAPI-Key': RAPIDAPI_KEYS.walmart,
+                'X-RapidAPI-Host': 'walmart-api4.p.rapidapi.com'
+            }
+        });
+
+        const rawData = response.data;
+
+        if (!rawData) {
+            console.log('   ⚠️  No data returned');
+            return null;
+        }
+
+        // ⭐ 步骤 1: 找到 ProductGroup 对象
+        let productGroup = null;
+
+        // 情况 1: 直接是数组 [[{...}], {...}]
+        if (Array.isArray(rawData)) {
+            for (const item of rawData) {
+                if (Array.isArray(item)) {
+                    // 嵌套数组
+                    const found = item.find(obj => obj['@type'] === 'ProductGroup');
+                    if (found) {
+                        productGroup = found;
+                        break;
+                    }
+                } else if (item['@type'] === 'ProductGroup') {
+                    productGroup = item;
+                    break;
+                }
+            }
+        } else if (rawData['@type'] === 'ProductGroup') {
+            productGroup = rawData;
+        }
+
+        if (!productGroup) {
+            console.log('   ⚠️  ProductGroup not found in response');
+            return null;
+        }
+
+        // ⭐ 步骤 2: 收集所有 offers（可能在多个 variant 里）
+        const allOffers = [];
+
+        if (productGroup.hasVariant && Array.isArray(productGroup.hasVariant)) {
+            for (const variant of productGroup.hasVariant) {
+                // 跳过 url-only 变体
+                if (variant.url && !variant.offers) continue;
+
+                // 提取 offers
+                if (variant.offers && Array.isArray(variant.offers)) {
+                    allOffers.push(...variant.offers);
+                }
+            }
+        }
+
+        // ⭐ 步骤 3: 提取所有价格
+        const prices = allOffers
+            .map(offer => offer.price)
+            .filter(p => p && p > 0);
+
+        if (prices.length === 0) {
+            console.log('   ⚠️  No valid prices found');
+            return null;
+        }
+
+        // ⭐ 步骤 4: 取最低价
+        const lowestPrice = Math.min(...prices);
+
+        // ⭐ 步骤 5: 找到对应的 offer
+        const bestOffer = allOffers.find(offer => offer.price === lowestPrice);
+
+        // ⭐ 步骤 6: 提取其他字段
+        const inStock = bestOffer.availability === 'https://schema.org/InStock';
+        const freeShipping = bestOffer.shippingDetails?.shippingRate?.value === 0;
+
+        console.log(`   ✅ [Walmart] Details: price=$${lowestPrice}, inStock=${inStock}, freeShipping=${freeShipping}`);
+
+        if (prices.length > 1) {
+            console.log(`   💡 [Walmart] Found ${prices.length} prices, selected lowest: $${lowestPrice}`);
+        }
+
+        return {
+            price: lowestPrice,
+            freeShipping: freeShipping ? 1 : 0,
+            inStock: inStock ? 1 : 0
+        };
+
+    } catch (error) {
+        console.error(`   ❌ [Walmart] Failed to get details:`, error.message);
+        return null;
+    }
+}
+
+/**
+ * 通过 Amazon ASIN 获取 product details
+ */
+async function getAmazonProductDetails(asin) {
+    try {
+        console.log(`   🔗 [Amazon] Fetching details for ASIN: ${asin}`);
+
+        if (!RAPIDAPI_KEYS.amazon) {
+            console.log('   ⚠️  Amazon API key not configured');
+            return null;
+        }
+
+        const response = await axios.get('https://real-time-amazon-data.p.rapidapi.com/product-details', {
+            params: {
+                asin: asin,
+                country: 'US'
+            },
+            headers: {
+                'X-RapidAPI-Key': RAPIDAPI_KEYS.amazon,
+                'X-RapidAPI-Host': 'real-time-amazon-data.p.rapidapi.com'
+            }
+        });
+
+        const data = response.data?.data;
+
+        if (!data) {
+            console.log('   ⚠️  No data returned');
+            return null;
+        }
+
+        // 解析字段
+        const price = parsePrice(data.product_price);
+        const freeShipping = data.is_prime || (data.delivery && data.delivery.toLowerCase().includes('free'));
+        const inStock = data.product_availability && (
+            data.product_availability.toLowerCase().includes('in stock') ||
+            data.product_availability.toLowerCase().includes('available')
+        );
+
+        console.log(`   ✅ [Amazon] Details: price=$${price}, inStock=${inStock}, freeShipping=${freeShipping}`);
+
+        return {
+            price: price,
+            freeShipping: freeShipping ? 1 : 0,
+            inStock: inStock ? 1 : 0
+        };
+
+    } catch (error) {
+        console.error(`   ❌ [Amazon] Failed to get details:`, error.message);
+        return null;
+    }
+}
+
+/**
+ * 通过 eBay link 获取 product details
+ */
+async function getEbayProductDetails(productLink) {
+    try {
+        console.log(`   🔗 [eBay] Fetching details from link`);
+
+        if (!RAPIDAPI_KEYS.ebay) {
+            console.log('   ⚠️  eBay API key not configured');
+            return null;
+        }
+
+        const response = await axios.get('https://ebay-data-api.p.rapidapi.com/item/description', {
+            params: {
+                itemUrl: productLink
+            },
+            headers: {
+                'X-RapidAPI-Key': RAPIDAPI_KEYS.ebay,
+                'X-RapidAPI-Host': 'ebay-data-api.p.rapidapi.com'
+            }
+        });
+
+        const data = response.data?.data;
+
+        if (!data) {
+            console.log('   ⚠️  No data returned');
+            return null;
+        }
+
+        // 解析字段
+        const price = data.price || 0;
+        const freeShipping = data.shippingOptions && data.shippingOptions.some(opt =>
+            opt.shippingCost && opt.shippingCost.price === null || opt.shippingCost.price === 0
+        );
+        const inStock = data.condition && !data.condition.toLowerCase().includes('sold out');
+
+        console.log(`   ✅ [eBay] Details: price=$${price}, inStock=${inStock}, freeShipping=${freeShipping}`);
+
+        return {
+            price: price,
+            freeShipping: freeShipping ? 1 : 0,
+            inStock: inStock ? 1 : 0
+        };
+
+    } catch (error) {
+        console.error(`   ❌ [eBay] Failed to get details:`, error.message);
+        return null;
+    }
 }
 
 // ===================================
@@ -1551,11 +1867,103 @@ app.post('/api/admin/import-initial', async (req, res) => {
         console.log('\n🚀 Starting multi-platform product import...');
 
         const queries = [
-            'iPhone 15 Pro', 'MacBook Air', 'AirPods Pro', 'Apple Watch',
-            'Samsung Galaxy', 'Dell laptop', 'Sony headphones', 'LG TV',
-            'Dyson vacuum', 'KitchenAid mixer', 'Ninja blender', 'Instant Pot',
-            'Lego set', 'Nintendo Switch', 'PlayStation 5', 'Xbox Series',
-            'Fitbit', 'Kindle', 'Ring doorbell', 'Echo Dot'
+            // ========================================
+            // Electronics (10 products)
+            // ========================================
+            'Samsung Galaxy S24',           // 三星手机（多平台）
+            'iPhone 15',                     // 苹果手机（多平台）
+            'iPad Air',                      // 平板（多平台）
+            'MacBook Pro',                   // 笔记本（多平台）
+            'Dell XPS laptop',               // 戴尔笔记本
+            'HP laptop',                     // 惠普笔记本
+            'Sony WH-1000XM5 headphones',    // 索尼耳机
+            'Bose QuietComfort headphones',  // Bose 耳机
+            'LG OLED TV',                    // LG 电视
+            'Samsung 4K TV',                 // 三星电视
+
+            // ========================================
+            // Beauty (4 products)
+            // ========================================
+            'CeraVe moisturizer',            // 护肤品
+            'Neutrogena sunscreen',          // 防晒霜
+            'Maybelline mascara',            // 美宝莲睫毛膏
+            'L\'Oreal foundation',           // 欧莱雅粉底
+
+            // ========================================
+            // Home (5 products)
+            // ========================================
+            'Dyson vacuum cleaner',          // 戴森吸尘器
+            'Shark vacuum',                  // Shark 吸尘器
+            'KitchenAid stand mixer',        // 厨师机
+            'Ninja blender',                 // Ninja 料理机
+            'Instant Pot',                   // 电压力锅
+
+            // ========================================
+            // Food (3 products)
+            // ========================================
+            'Starbucks coffee beans',        // 星巴克咖啡豆
+            'Ghirardelli chocolate',         // 吉尔德利巧克力
+            'KIND protein bars',             // KIND 蛋白棒
+
+            // ========================================
+            // Fashion (4 products)
+            // ========================================
+            'Nike running shoes',            // 耐克跑鞋
+            'Adidas sneakers',               // 阿迪达斯运动鞋
+            'Levi\'s jeans',                 // Levi's 牛仔裤
+            'North Face jacket',             // 北面夹克
+
+            // ========================================
+            // Sports (4 products)
+            // ========================================
+            'Fitbit fitness tracker',        // Fitbit 智能手环
+            'Garmin smartwatch',             // Garmin 智能手表
+            'yoga mat',                      // 瑜伽垫
+            'resistance bands',              // 阻力带
+
+            // ========================================
+            // Books (3 products)
+            // ========================================
+            'Atomic Habits book',            // 畅销书
+            'Harry Potter book set',         // 哈利波特套装
+            'a song of ice and fire book set',
+
+            // ========================================
+            // Toys (4 products)
+            // ========================================
+            'LEGO Star Wars set',            // 乐高星战
+            'Hot Wheels track',              // 风火轮赛道
+            'Barbie doll',                   // 芭比娃娃
+            'Rubik\'s cube',                 // 魔方
+
+            // ========================================
+            // Health (3 products)
+            // ========================================
+            'Omron blood pressure monitor',  // 欧姆龙血压计
+            'Braun thermometer',             // 博朗体温计
+            'multivitamin gummies',          // 复合维生素软糖
+
+            // ========================================
+            // Outdoors (3 products)
+            // ========================================
+            'Coleman camping tent',          // Coleman 帐篷
+            'Yeti cooler',                   // Yeti 冷藏箱
+            'Stanley thermos',               // Stanley 保温杯
+
+            // ========================================
+            // Office (4 products)
+            // ========================================
+            'Logitech wireless mouse',       // 罗技鼠标
+            'mechanical keyboard',           // 机械键盘
+            'office chair',                  // 办公椅
+            'standing desk',                 // 升降桌
+
+            // ========================================
+            // Pets (3 products)
+            // ========================================
+            'dog food',                      // 狗粮
+            'cat litter',                    // 猫砂
+            'pet carrier'                    // 宠物包
         ];
 
         const importedProducts = [];
@@ -1608,15 +2016,15 @@ app.post('/api/admin/import-initial', async (req, res) => {
 
                 console.log(`   💰 Amazon: $${amazonProduct.price}`);
 
-                // Step 4: 用原始完整标题搜索 ebay
-                console.log(`   🔍 Searching eBay with: "${amazonProduct.fullTitle}"`);
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                // Step 4: 用短标题搜索 ebay
+                console.log(`   🔍 Searching eBay with: "${amazonProduct.shortTitle}"`);
+                await new Promise(resolve => setTimeout(resolve, 5000));
 
                 const ebayProducts = await fetchFromEbay(amazonProduct.shortTitle, 1);
 
                 if (ebayProducts.length > 0) {
                     // ⭐ 使用智能匹配
-                    const ebayProduct = findBestEbayMatch({ title: amazonProduct.fullTitle }, ebayProducts);
+                    const ebayProduct = findBestEbayMatch({ title: amazonProduct.fullTitle, price: amazonProduct.price }, ebayProducts);
 
                     if (ebayProduct && ebayProduct.price > 0) {
                         await pool.query(`
@@ -1628,22 +2036,25 @@ app.post('/api/admin/import-initial', async (req, res) => {
                     }
                 }
 
-                // Step 5: 用原始完整标题搜索 Walmart 价格
-                console.log(`   🔍 Searching Walmart with: "${amazonProduct.fullTitle}"`);
+                // Step 5: 用短标题搜索 Walmart 价格
+                console.log(`   🔍 Searching Walmart with: "${amazonProduct.shortTitle}"`);
+                await new Promise(resolve => setTimeout(resolve, 5000));
 
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                const walmartProducts = await fetchFromWalmart(amazonProduct.fullTitle, 1);
+                const walmartProducts = await fetchFromWalmart(amazonProduct.shortTitle, 1);
 
                 if (walmartProducts.length > 0) {
-                    const walmartProduct = transformWalmartProduct(walmartProducts[0]);
+                    // ⭐ 智能匹配（自动过滤二手）
+                    const walmartProduct = findBestWalmartMatch({ title: amazonProduct.fullTitle, price: amazonProduct.price }, walmartProducts);
 
-                    if (walmartProduct.price > 0) {
+                    if (walmartProduct && walmartProduct.price > 0) {
                         await pool.query(`
                             INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, link)
                             VALUES (?, ?, ?, ?, ?, NOW(), ?)
-                        `, [pid, 'Walmart', walmartProduct.price, walmartProduct.freeShipping, walmartProduct.inStock, walmartProduct.link]);
+                        `, [pid, 'Walmart', walmartProduct.price, 1, 1, walmartProduct.link]);
 
                         console.log(`   💰 Walmart: $${walmartProduct.price}`);
+                    } else {
+                        console.log(`   ⚠️  No suitable Walmart match found`);
                     }
                 }
 
@@ -1656,7 +2067,7 @@ app.post('/api/admin/import-initial', async (req, res) => {
                 });
 
                 // 防止 API 限流
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                await new Promise(resolve => setTimeout(resolve, 5000));
 
             } catch (error) {
                 console.error(`❌ Failed to import product:`, error.message);
@@ -1684,9 +2095,40 @@ app.post('/api/admin/import-initial', async (req, res) => {
 // 🆕 更新所有产品的价格（多平台）
 app.post('/api/admin/update-all-prices', async (req, res) => {
     try {
-        console.log('🔄 Starting multi-platform price update...');
+        console.log('🔄 Starting multi-platform price update (using direct details)...');
 
-        const [dbProducts] = await pool.query('SELECT pid, title FROM products');
+        const [dbProducts] = await pool.query(`
+            SELECT p.pid, p.title,
+                   pr_amazon.idInPlatform AS amazon_asin,
+                   pr_walmart.link AS walmart_link,
+                   pr_ebay.link AS ebay_link
+            FROM products p
+            LEFT JOIN (
+                SELECT pid, idInPlatform, link
+                FROM price
+                WHERE platform = 'Amazon'
+                  AND id IN (
+                      SELECT MAX(id) FROM price WHERE platform = 'Amazon' GROUP BY pid
+                  )
+            ) pr_amazon ON p.pid = pr_amazon.pid
+            LEFT JOIN (
+                SELECT pid, link
+                FROM price
+                WHERE platform = 'Walmart'
+                  AND id IN (
+                      SELECT MAX(id) FROM price WHERE platform = 'Walmart' GROUP BY pid
+                  )
+            ) pr_walmart ON p.pid = pr_walmart.pid
+            LEFT JOIN (
+                SELECT pid, link
+                FROM price
+                WHERE platform = 'eBay'
+                  AND id IN (
+                      SELECT MAX(id) FROM price WHERE platform = 'eBay' GROUP BY pid
+                  )
+            ) pr_ebay ON p.pid = pr_ebay.pid
+        `);
+
         console.log(`📊 Found ${dbProducts.length} products to update`);
 
         let updatedCount = 0;
@@ -1695,58 +2137,59 @@ app.post('/api/admin/update-all-prices', async (req, res) => {
         for (const dbProduct of dbProducts) {
             try {
                 console.log(`\n📦 [${updatedCount + 1}/${dbProducts.length}] ${dbProduct.title.substring(0, 60)}...`);
-                console.log(`   🔍 Searching with: "${dbProduct.title}"`);
 
-                // 更新 Amazon 价格
-                const amazonProducts = await fetchFromAmazon(dbProduct.title, 1);
-                if (amazonProducts.length > 0) {
-                    const amazonProduct = transformAmazonProduct(amazonProducts[0]);
-                    if (amazonProduct.price > 0) {
+                // ⭐ 更新 Amazon 价格（使用 ASIN）
+                if (dbProduct.amazon_asin) {
+                    const amazonDetails = await getAmazonProductDetails(dbProduct.amazon_asin);
+
+                    if (amazonDetails && amazonDetails.price > 0) {
                         await pool.query(`
                             INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, idInPlatform, link)
                             VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)
-                        `, [dbProduct.pid, 'Amazon', amazonProduct.price, amazonProduct.freeShipping, amazonProduct.inStock, amazonProduct.idInPlatform, amazonProduct.link]);
+                        `, [dbProduct.pid, 'Amazon', amazonDetails.price, amazonDetails.freeShipping,
+                            amazonDetails.inStock, dbProduct.amazon_asin, dbProduct.amazon_link || '']);
 
-                        console.log(`   💰 Amazon: $${amazonProduct.price}`);
+                        console.log(`   💰 Amazon: $${amazonDetails.price}`);
                     }
+
+                    await new Promise(resolve => setTimeout(resolve, 5000));
                 }
 
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                // ⭐ 更新 Walmart 价格（使用 link）
+                if (dbProduct.walmart_link) {
+                    const walmartDetails = await getWalmartProductDetails(dbProduct.walmart_link);
 
-                // 更新 ebay 价格
-                const ebayProducts = await fetchFromEbay(dbProduct.title, 1);
-
-                if (ebayProducts.length > 0) {
-                    const ebayProduct = findBestEbayMatch(dbProduct, ebayProducts);
-
-                    if (ebayProduct && ebayProduct.price > 0) {
-                        await pool.query(`
-                            INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, idInPlatform, link)
-                            VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)
-                        `, [dbProduct.pid, 'eBay', ebayProduct.price, ebayProduct.freeShipping, ebayProduct.inStock, ebayProduct.idInPlatform, ebayProduct.link]);
-
-                        console.log(`   💰 eBay: $${ebayProduct.price}`);
-                    }
-                }
-
-                await new Promise(resolve => setTimeout(resolve, 2000));
-
-                // 更新 Walmart 价格
-                const walmartProducts = await fetchFromWalmart(dbProduct.title, 1);
-                if (walmartProducts.length > 0) {
-                    const walmartProduct = transformWalmartProduct(walmartProducts[0]);
-                    if (walmartProduct.price > 0) {
+                    if (walmartDetails && walmartDetails.price > 0) {
                         await pool.query(`
                             INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, link)
                             VALUES (?, ?, ?, ?, ?, NOW(), ?)
-                        `, [dbProduct.pid, 'Walmart', walmartProduct.price, walmartProduct.freeShipping, walmartProduct.inStock, walmartProduct.link]);
+                        `, [dbProduct.pid, 'Walmart', walmartDetails.price, walmartDetails.freeShipping,
+                            walmartDetails.inStock, dbProduct.walmart_link]);
 
-                        console.log(`   💰 Walmart: $${walmartProduct.price}`);
+                        console.log(`   💰 Walmart: $${walmartDetails.price}`);
                     }
+
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                }
+
+                // ⭐ 更新 eBay 价格（使用 link）
+                if (dbProduct.ebay_link) {
+                    const ebayDetails = await getEbayProductDetails(dbProduct.ebay_link);
+
+                    if (ebayDetails && ebayDetails.price > 0) {
+                        await pool.query(`
+                            INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, link)
+                            VALUES (?, ?, ?, ?, ?, NOW(), ?)
+                        `, [dbProduct.pid, 'eBay', ebayDetails.price, ebayDetails.freeShipping,
+                            ebayDetails.inStock, dbProduct.ebay_link]);
+
+                        console.log(`   💰 eBay: $${ebayDetails.price}`);
+                    }
+
+                    await new Promise(resolve => setTimeout(resolve, 5000));
                 }
 
                 updatedCount++;
-                await new Promise(resolve => setTimeout(resolve, 2000));
 
             } catch (error) {
                 failedCount++;
@@ -1758,14 +2201,14 @@ app.post('/api/admin/update-all-prices', async (req, res) => {
 
         res.json({
             success: true,
-            message: `Updated prices for ${updatedCount}/${dbProducts.length} products`,
+            message: `Updated ${updatedCount}/${dbProducts.length} products`,
             updatedCount,
             failedCount,
             totalProducts: dbProducts.length
         });
 
     } catch (error) {
-        console.error('Batch update failed:', error);
+        console.error('Update failed:', error);
         res.status(500).json({
             error: 'Update failed',
             details: error.message
@@ -1808,19 +2251,20 @@ app.post('/api/admin/add-walmart-prices', async (req, res) => {
 
                 // 搜索 Walmart
                 console.log(`   🔍 Searching Walmart with: "${dbProduct.title}"`);
-                await new Promise(resolve => setTimeout(resolve, 2000)); // 防止限流
+                await new Promise(resolve => setTimeout(resolve, 5000));
 
                 const walmartProducts = await fetchFromWalmart(dbProduct.title, 1);
 
                 if (walmartProducts.length > 0) {
-                    const walmartProduct = transformWalmartProduct(walmartProducts[0]);
+                    // ⭐ 智能匹配
+                    const walmartProduct = findBestWalmartMatch(dbProduct, walmartProducts);
 
-                    if (walmartProduct.price > 0) {
+                    if (walmartProduct && walmartProduct.price > 0) {
                         // 插入到 price 表
                         await pool.query(`
                             INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, link)
                             VALUES (?, ?, ?, ?, ?, NOW(), ?)
-                        `, [dbProduct.pid, 'Walmart', walmartProduct.price, walmartProduct.freeShipping, walmartProduct.inStock, walmartProduct.link]);
+                        `, [dbProduct.pid, 'Walmart', walmartProduct.price, 1, 1, walmartProduct.link]);
 
                         console.log(`   ✅ Added Walmart price: $${walmartProduct.price}`);
                         addedCount++;
@@ -1828,12 +2272,10 @@ app.post('/api/admin/add-walmart-prices', async (req, res) => {
                         results.push({
                             pid: dbProduct.pid,
                             title: dbProduct.title.substring(0, 50),
-                            walmart_price: walmartProduct.price,
-                            free_shipping: walmartProduct.freeShipping === 1,
-                            in_stock: walmartProduct.inStock === 1
+                            walmart_price: walmartProduct.price
                         });
                     } else {
-                        console.log(`   ⚠️  Invalid price (0), skipping...`);
+                        console.log(`   ⚠️  No suitable match`);
                         failedCount++;
                     }
                 } else {
@@ -1900,7 +2342,7 @@ app.post('/api/admin/sync-ebay-prices', async (req, res) => {
 
                 if (ebayProducts.length > 0) {
                     // 智能匹配
-                    const bestMatch = findBestEbayMatch(dbProduct, ebayProducts);
+                    const bestMatch = findBestEbayMatch({ title: dbProduct.title, price: dbProduct.price }, ebayProducts);
 
                     if (bestMatch && bestMatch.price > 0) {
                         // 检查是否已存在
@@ -1958,7 +2400,7 @@ app.post('/api/admin/sync-ebay-prices', async (req, res) => {
                 }
 
                 // 延迟避免 API 限流
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                await new Promise(resolve => setTimeout(resolve, 5000));
 
             } catch (error) {
                 failedCount++;
@@ -2236,71 +2678,87 @@ cron.schedule('0 3 * * *', async () => {
     console.log(`📅 ${new Date().toLocaleString()}`);
 
     try {
-        const [dbProducts] = await pool.query('SELECT pid, title FROM products');
+        const [dbProducts] = await pool.query(`
+            SELECT p.pid, p.title,
+                   pr_amazon.idInPlatform AS amazon_asin,
+                   pr_walmart.link AS walmart_link,
+                   pr_ebay.link AS ebay_link
+            FROM products p
+            LEFT JOIN (
+                SELECT pid, idInPlatform
+                FROM price
+                WHERE platform = 'Amazon'
+                  AND id IN (SELECT MAX(id) FROM price WHERE platform = 'Amazon' GROUP BY pid)
+            ) pr_amazon ON p.pid = pr_amazon.pid
+            LEFT JOIN (
+                SELECT pid, link
+                FROM price
+                WHERE platform = 'Walmart'
+                  AND id IN (SELECT MAX(id) FROM price WHERE platform = 'Walmart' GROUP BY pid)
+            ) pr_walmart ON p.pid = pr_walmart.pid
+            LEFT JOIN (
+                SELECT pid, link
+                FROM price
+                WHERE platform = 'eBay'
+                  AND id IN (SELECT MAX(id) FROM price WHERE platform = 'eBay' GROUP BY pid)
+            ) pr_ebay ON p.pid = pr_ebay.pid
+        `);
 
         let updatedCount = 0;
 
         for (const dbProduct of dbProducts) {
             try {
-                // 1) 更新 Amazon 价格
-                const amazonProducts = await fetchFromAmazon(dbProduct.title, 1);
-                if (amazonProducts.length > 0) {
-                    const amazonProduct = transformAmazonProduct(amazonProducts[0]);
-                    if (amazonProduct.price > 0) {
+                // 1) 更新 Amazon
+                if (dbProduct.amazon_asin) {
+                    const amazonDetails = await getAmazonProductDetails(dbProduct.amazon_asin);
+                    if (amazonDetails && amazonDetails.price > 0) {
                         await pool.query(`
-                            INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, idInPlatform, link)
-                            VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)
-                        `, [dbProduct.pid, 'Amazon', amazonProduct.price, amazonProduct.freeShipping, amazonProduct.inStock, amazonProduct.idInPlatform, amazonProduct.link]);
+                            INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, idInPlatform)
+                            VALUES (?, ?, ?, ?, ?, NOW(), ?)
+                        `, [dbProduct.pid, 'Amazon', amazonDetails.price, amazonDetails.freeShipping,
+                            amazonDetails.inStock, dbProduct.amazon_asin]);
                     }
+                    await new Promise(resolve => setTimeout(resolve, 5000));
                 }
 
-                await new Promise(resolve => setTimeout(resolve, 2000));
-
-                // 2) 更新 ebay
-                const ebayProducts = await fetchFromEbay(dbProduct.title, 1);
-
-                if (ebayProducts.length > 0) {
-                    const ebayProduct = findBestEbayMatch(dbProduct, ebayProducts);
-
-                    if (ebayProduct && ebayProduct.price > 0) {
-                        await pool.query(`
-                            INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, idInPlatform, link)
-                            VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)
-                        `, [dbProduct.pid, 'eBay', ebayProduct.price, ebayProduct.freeShipping, ebayProduct.inStock, ebayProduct.idInPlatform, ebayProduct.link]);
-                    }
-                }
-
-                await new Promise(resolve => setTimeout(resolve, 2000));
-
-                // 3) 更新 Walmart
-                const walmartProducts = await fetchFromWalmart(dbProduct.title, 1);
-                if (walmartProducts.length > 0) {
-                    const walmartProduct = transformWalmartProduct(walmartProducts[0]);
-                    if (walmartProduct.price > 0) {
+                // 2) 更新 Walmart
+                if (dbProduct.walmart_link) {
+                    const walmartDetails = await getWalmartProductDetails(dbProduct.walmart_link);
+                    if (walmartDetails && walmartDetails.price > 0) {
                         await pool.query(`
                             INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, link)
                             VALUES (?, ?, ?, ?, ?, NOW(), ?)
-                        `, [dbProduct.pid, 'Walmart', walmartProduct.price, walmartProduct.freeShipping, walmartProduct.inStock, walmartProduct.link]);
+                        `, [dbProduct.pid, 'Walmart', walmartDetails.price, walmartDetails.freeShipping,
+                            walmartDetails.inStock, dbProduct.walmart_link]);
                     }
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                }
+
+                // 3) 更新 eBay
+                if (dbProduct.ebay_link) {
+                    const ebayDetails = await getEbayProductDetails(dbProduct.ebay_link);
+                    if (ebayDetails && ebayDetails.price > 0) {
+                        await pool.query(`
+                            INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, link)
+                            VALUES (?, ?, ?, ?, ?, NOW(), ?)
+                        `, [dbProduct.pid, 'eBay', ebayDetails.price, ebayDetails.freeShipping,
+                            ebayDetails.inStock, dbProduct.ebay_link]);
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 5000));
                 }
 
                 updatedCount++;
-                await new Promise(resolve => setTimeout(resolve, 2000));
 
             } catch (error) {
-                console.error(`❌ Failed to update ${dbProduct.title.substring(0, 40)}:`, error.message);
+                console.error(`❌ Failed to update ${dbProduct.title}:`, error.message);
             }
         }
 
         console.log(`✅ [Scheduled Task] Completed: ${updatedCount}/${dbProducts.length} products updated`);
 
-        // ⭐ 更新完 price 表之后，再同步 products 的最低价 / 包邮 / 库存字段
-        try {
-            const syncResult = await syncLowestPrices();
-            console.log(`✅ [Scheduled Task] Sync lowest prices done: ${syncResult.updatedCount}/${syncResult.totalProducts} products updated`);
-        } catch (syncError) {
-            console.error('❌ [Scheduled Task] Sync lowest prices failed:', syncError);
-        }
+        // ⭐ 同步最低价
+        const syncResult = await syncLowestPrices();
+        console.log(`✅ [Scheduled Task] Sync lowest prices: ${syncResult.updatedCount}/${syncResult.totalProducts}`);
 
     } catch (error) {
         console.error('❌ [Scheduled Task] Failed:', error);
