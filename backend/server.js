@@ -2487,14 +2487,19 @@ app.post('/api/wishlist', async (req, res) => {
     try {
         const { uid, pid, target_price } = req.body;
 
-        if (!uid || !pid || target_price == null) {
-            return res.status(400).json({ error: 'uid, pid and target_price are required' });
+        if (!uid || !pid) {
+            return res.status(400).json({ error: 'uid and pid are required' });
         }
 
-        // 确保 target_price 是数字
-        const tp = parseFloat(target_price);
-        if (isNaN(tp) || tp <= 0) {
-            return res.status(400).json({ error: 'Invalid target_price' });
+        // 声明 tp 在外部作用域
+        let tp = null;
+
+        // 如果提供了 target_price，则验证并转换
+        if (target_price != null) {
+            tp = parseFloat(target_price);
+            if (isNaN(tp) || tp <= 0) {
+                return res.status(400).json({ error: 'Invalid target_price' });
+            }
         }
 
         // 插入或更新（uid+pid 唯一）
@@ -2512,7 +2517,6 @@ app.post('/api/wishlist', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
-
 // 从 wishlist 删除某个商品
 app.delete('/api/wishlist', async (req, res) => {
     try {
