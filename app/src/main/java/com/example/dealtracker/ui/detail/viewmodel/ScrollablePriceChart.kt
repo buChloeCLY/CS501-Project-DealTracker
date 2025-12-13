@@ -31,13 +31,14 @@ fun ScrollablePriceChart(
     val colors = AppTheme.colors
     val fontScale = AppTheme.fontScale
 
-    var scrollOffset by remember { mutableStateOf(0f) }
+
     var selectedPoint by remember { mutableStateOf<PricePoint?>(null) }
 
     val windowSize = 7
     val totalDataPoints = priceHistory.size
 
     val maxScroll = (totalDataPoints - windowSize).coerceAtLeast(0)
+    var scrollOffset by remember { mutableStateOf(maxScroll.toFloat()) }
     val startIndex = scrollOffset.toInt().coerceIn(0, maxScroll)
     val endIndex = (startIndex + windowSize).coerceAtMost(totalDataPoints)
     val visibleData = if (priceHistory.isNotEmpty()) {
@@ -314,7 +315,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawVolatileMarker(
         canvas.nativeCanvas.drawText(
             "${if (isIncrease) "+" else "-"}${"%.1f".format(changePercent)}%",
             point.x,
-            if (isIncrease) point.y - 35f else point.y + 40f,
+            if (isIncrease) point.y - 35f else point.y + 50f,
             paint
         )
     }

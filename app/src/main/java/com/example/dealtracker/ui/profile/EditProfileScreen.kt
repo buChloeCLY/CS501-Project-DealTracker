@@ -136,7 +136,12 @@ fun EditProfileScreen(navController: NavHostController) {
                         ) {
                             genderOptions.forEach { option ->
                                 DropdownMenuItem(
-                                    text = { Text(option) },
+                                    text = {
+                                        Text(
+                                            option,
+                                            fontSize = (16 * fontScale).sp
+                                        )
+                                    },
                                     onClick = {
                                         gender = option
                                         expanded = false
@@ -284,11 +289,15 @@ fun EditProfileScreen(navController: NavHostController) {
             title = {
                 Text(
                     text = "Success",
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    fontSize = (18 * fontScale).sp
                 )
             },
             text = {
-                Text("Your profile has been updated successfully!")
+                Text(
+                    "Your profile has been updated successfully!",
+                    fontSize = (14 * fontScale).sp
+                )
             },
             confirmButton = {
                 TextButton(
@@ -300,7 +309,8 @@ fun EditProfileScreen(navController: NavHostController) {
                     Text(
                         "OK",
                         color = colors.accent,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        fontSize = (14 * fontScale).sp
                     )
                 }
             }
@@ -314,11 +324,15 @@ fun EditProfileScreen(navController: NavHostController) {
                 Text(
                     text = "Error",
                     fontWeight = FontWeight.Bold,
-                    color = colors.error
+                    color = colors.error,
+                    fontSize = (18 * fontScale).sp
                 )
             },
             text = {
-                Text(errorMessage)
+                Text(
+                    errorMessage,
+                    fontSize = (14 * fontScale).sp
+                )
             },
             confirmButton = {
                 TextButton(
@@ -327,7 +341,8 @@ fun EditProfileScreen(navController: NavHostController) {
                     Text(
                         "OK",
                         color = colors.accent,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        fontSize = (14 * fontScale).sp
                     )
                 }
             }
@@ -364,7 +379,8 @@ fun ProfileTextField(
             placeholder = {
                 Text(
                     placeholder,
-                    color = colors.tertiaryText
+                    color = colors.tertiaryText,
+                    fontSize = (14 * fontScale).sp
                 )
             },
             singleLine = true,
@@ -411,7 +427,8 @@ fun ProfilePasswordField(
             placeholder = {
                 Text(
                     placeholder,
-                    color = colors.tertiaryText
+                    color = colors.tertiaryText,
+                    fontSize = (14 * fontScale).sp
                 )
             },
             visualTransformation = PasswordVisualTransformation(),

@@ -30,6 +30,7 @@ import com.example.dealtracker.ui.theme.ThemeManager
 fun SettingsScreen(navController: NavHostController) {
     val context = LocalContext.current
     val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
 
     var selectedFontSize by remember { mutableStateOf(FontSizeManager.getFontSize(context)) }
     val isDarkMode by ThemeManager.isDarkMode(context).collectAsState(initial = false)
@@ -40,7 +41,8 @@ fun SettingsScreen(navController: NavHostController) {
                 title = {
                     Text(
                         "Settings",
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        fontSize = (20 * fontScale).sp
                     )
                 },
                 navigationIcon = {
@@ -99,13 +101,13 @@ fun SettingsScreen(navController: NavHostController) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Font Size",
-                                fontSize = 16.sp,
+                                fontSize = (16 * fontScale).sp,
                                 fontWeight = FontWeight.Medium,
                                 color = colors.primaryText
                             )
                             Text(
                                 text = selectedFontSize.displayName,
-                                fontSize = 13.sp,
+                                fontSize = (13 * fontScale).sp,
                                 color = colors.secondaryText
                             )
                         }
@@ -157,6 +159,7 @@ fun FontSizeOption(
     modifier: Modifier = Modifier
 ) {
     val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
 
     Card(
         modifier = modifier
@@ -195,7 +198,7 @@ fun FontSizeOption(
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = fontSize.displayName,
-                fontSize = 12.sp,
+                fontSize = (12 * fontScale).sp,
                 color = if (isSelected) colors.accent else colors.secondaryText
             )
         }
@@ -228,6 +231,7 @@ fun SettingsClickableItem(
     onClick: () -> Unit
 ) {
     val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
 
     Row(
         modifier = Modifier
@@ -248,13 +252,13 @@ fun SettingsClickableItem(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                fontSize = 16.sp,
+                fontSize = (16 * fontScale).sp,
                 fontWeight = FontWeight.Medium,
                 color = colors.primaryText
             )
             Text(
                 text = subtitle,
-                fontSize = 13.sp,
+                fontSize = (13 * fontScale).sp,
                 color = colors.secondaryText
             )
         }
@@ -277,6 +281,7 @@ fun SettingsSwitchItem(
     onCheckedChange: (Boolean) -> Unit
 ) {
     val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
 
     Row(
         modifier = Modifier
@@ -296,13 +301,13 @@ fun SettingsSwitchItem(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                fontSize = 16.sp,
+                fontSize = (16 * fontScale).sp,
                 fontWeight = FontWeight.Medium,
                 color = colors.primaryText
             )
             Text(
                 text = subtitle,
-                fontSize = 13.sp,
+                fontSize = (13 * fontScale).sp,
                 color = colors.secondaryText
             )
         }
