@@ -31,14 +31,14 @@ fun ScrollablePriceChart(
     val colors = AppTheme.colors
     val fontScale = AppTheme.fontScale
 
-
-    var selectedPoint by remember { mutableStateOf<PricePoint?>(null) }
-
     val windowSize = 7
     val totalDataPoints = priceHistory.size
-
     val maxScroll = (totalDataPoints - windowSize).coerceAtLeast(0)
+
+    // Default to showing the most recent data (end of list)
     var scrollOffset by remember { mutableStateOf(maxScroll.toFloat()) }
+    var selectedPoint by remember { mutableStateOf<PricePoint?>(null) }
+
     val startIndex = scrollOffset.toInt().coerceIn(0, maxScroll)
     val endIndex = (startIndex + windowSize).coerceAtMost(totalDataPoints)
     val visibleData = if (priceHistory.isNotEmpty()) {
@@ -89,6 +89,8 @@ fun ScrollablePriceChart(
                             .pointerInput(Unit) {
                                 detectDragGestures { change, dragAmount ->
                                     change.consume()
+                                    // Drag right = see older data (decrease offset)
+                                    // Drag left = see newer data (increase offset)
                                     scrollOffset = (scrollOffset - dragAmount.x / 20f)
                                         .coerceIn(0f, maxScroll.toFloat())
                                 }
@@ -100,7 +102,6 @@ fun ScrollablePriceChart(
                                         visibleData,
                                         size.width.toFloat(),
                                         size.height.toFloat()
-
                                     )
                                 }
                             }
@@ -108,7 +109,7 @@ fun ScrollablePriceChart(
                         val width = size.width
                         val height = size.height
                         val padding = 40f
-                        val bottomPadding = 35f
+                        val bottomPadding = 50f
                         val chartWidth = width - padding * 2
                         val chartHeight = height - bottomPadding - padding
 
@@ -166,6 +167,7 @@ fun ScrollablePriceChart(
                             }
                         }
 
+                        // Draw X-axis date labels at bottom
                         val labelStep = if (visibleData.size > 5) 2 else 1
                         visibleData.forEachIndexed { index, point ->
                             if (index % labelStep == 0 || index == visibleData.size - 1) {
@@ -177,13 +179,13 @@ fun ScrollablePriceChart(
                                         } else {
                                             android.graphics.Color.GRAY
                                         }
-                                        textSize = 24f
+                                        textSize = 22f
                                         textAlign = android.graphics.Paint.Align.CENTER
                                     }
                                     canvas.nativeCanvas.drawText(
                                         formatDate(point.date),
                                         x,
-                                        height - 15f,
+                                        height - 12f,
                                         paint
                                     )
                                 }
@@ -315,7 +317,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawVolatileMarker(
         canvas.nativeCanvas.drawText(
             "${if (isIncrease) "+" else "-"}${"%.1f".format(changePercent)}%",
             point.x,
-            if (isIncrease) point.y - 35f else point.y + 50f,
+            if (isIncrease) point.y + 40f else point.y - 40f,
             paint
         )
     }
@@ -388,7 +390,7 @@ private fun findNearestPoint(
     height: Float
 ): PricePoint? {
     val padding = 40f
-    val bottomPadding = 35f
+    val bottomPadding = 50f
     val chartWidth = width - padding * 2
     val chartHeight = height - bottomPadding - padding
 
