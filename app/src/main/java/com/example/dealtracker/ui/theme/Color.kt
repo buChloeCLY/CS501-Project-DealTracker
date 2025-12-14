@@ -6,8 +6,8 @@ import androidx.compose.ui.graphics.Color
 object LightColorScheme {
     val primary = Color(0xFFFF6B35)
     val onPrimary = Color.White
-    val primaryContainer = Color(0xFFFCE4D6)
-    val onPrimaryContainer = Color(0xFF2C1810)
+    val primaryContainer = Color(0xFFF3EDF7)
+    val onPrimaryContainer = Color.Black
 
     val secondary = Color(0xFF4CAF50)
     val onSecondary = Color.White
@@ -33,9 +33,8 @@ object LightColorScheme {
 object DarkColorScheme {
     val primary = Color(0xFFFF8A65)
     val onPrimary = Color(0xFF2C1810)
-    val primaryContainer = Color(0xFF5D2C1F)
-    val onPrimaryContainer = Color(0xFFFFDAD1)
-
+    val primaryContainer = Color(0xFF1F1D23)
+    val onPrimaryContainer = Color.White
     val secondary = Color(0xFF81C784)
     val onSecondary = Color(0xFF1B5E20)
     val secondaryContainer = Color(0xFF2E7D32)
@@ -89,7 +88,7 @@ class AppColorScheme(
     val topBarBackground = if (isDark) dark.primaryContainer else light.primaryContainer
     val topBarContent = if (isDark) dark.onPrimaryContainer else light.onPrimaryContainer
 
-    val bottomBarBackground = if (isDark) dark.surfaceDark else light.surfaceLight
+    val bottomBarBackground = if (isDark) dark.primaryContainer else light.primaryContainer
     val bottomBarSelected = if (isDark) dark.primary else light.primary
-    val bottomBarUnselected = if (isDark) dark.onSurfaceVariantDark else light.onSurfaceVariantLight
+    val bottomBarUnselected = if (isDark) Color.White else Color.Black
 }

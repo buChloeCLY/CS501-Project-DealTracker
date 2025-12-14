@@ -403,7 +403,7 @@ fun DealItem(product: Product, onClick: () -> Unit) {
             )
             Text(
                 product.priceText,
-                color = colors.success,
+                color = colors.accent,
                 fontSize = (16 * fontScale).sp,
                 fontWeight = FontWeight.Bold
             )
