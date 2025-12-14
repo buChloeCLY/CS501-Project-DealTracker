@@ -167,25 +167,11 @@ fun ScrollablePriceChart(
                             }
                         }
 
-                        // Draw date labels with smart positioning
+                        // Draw X-axis date labels at bottom
                         val labelStep = if (visibleData.size > 5) 2 else 1
                         visibleData.forEachIndexed { index, point ->
                             if (index % labelStep == 0 || index == visibleData.size - 1) {
                                 val x = padding + (index.toFloat() / (visibleData.size - 1).coerceAtLeast(1)) * chartWidth
-                                val normalizedPrice = if (axis.max > axis.min) {
-                                    (point.price - axis.min) / (axis.max - axis.min)
-                                } else 0.5
-                                val y = padding + chartHeight - (normalizedPrice * chartHeight).toFloat()
-
-                                // If point is in lower half, put label above; if upper half, put below
-                                val labelY = if (normalizedPrice < 0.5) {
-                                    // Low point - label above
-                                    y - 15f
-                                } else {
-                                    // High point - label below
-                                    y + 30f
-                                }
-
                                 drawIntoCanvas { canvas ->
                                     val paint = android.graphics.Paint().apply {
                                         color = if (colors.isDark) {
@@ -199,7 +185,7 @@ fun ScrollablePriceChart(
                                     canvas.nativeCanvas.drawText(
                                         formatDate(point.date),
                                         x,
-                                        labelY,
+                                        height - 12f,
                                         paint
                                     )
                                 }
@@ -331,7 +317,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawVolatileMarker(
         canvas.nativeCanvas.drawText(
             "${if (isIncrease) "+" else "-"}${"%.1f".format(changePercent)}%",
             point.x,
-            if (isIncrease) point.y - 35f else point.y + 40f,
+            if (isIncrease) point.y + 40f else point.y - 40f,
             paint
         )
     }
