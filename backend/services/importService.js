@@ -3,81 +3,83 @@ const pool = require('../config/database');
 const { fetchFromAmazon, fetchFromEbay, fetchFromWalmart, transformAmazonProduct, findBestEbayMatch, findBestWalmartMatch } = require('./platformService');
 
 // Default product queries for initial import
-const DEFAULT_QUERIES = [
+const queryToCategoryMap = {
     // Electronics (10 products)
-    'Samsung Galaxy S24',
-    'iPhone 15',
-    'iPad Air',
-    'MacBook Pro',
-    'Dell XPS laptop',
-    'HP laptop',
-    'Sony WH-1000XM5 headphones',
-    'Bose QuietComfort headphones',
-    'LG OLED TV',
-    'Samsung 4K TV',
+    'Samsung Galaxy S24': 'Electronics',
+    'iPhone 15': 'Electronics',
+    'iPad Air': 'Electronics',
+    'MacBook Pro': 'Electronics',
+    'Dell XPS laptop': 'Electronics',
+    'HP laptop': 'Electronics',
+    'Sony WH-1000XM5 headphones': 'Electronics',
+    'Bose QuietComfort headphones': 'Electronics',
+    'LG OLED TV': 'Electronics',
+    'Samsung 4K TV': 'Electronics',
 
     // Beauty (4 products)
-    'CeraVe moisturizer',
-    'Neutrogena sunscreen',
-    'Maybelline mascara',
-    'L\'Oreal foundation',
+    'CeraVe moisturizer': 'Beauty',
+    'Neutrogena sunscreen': 'Beauty',
+    'Maybelline mascara': 'Beauty',
+    'L\'Oreal foundation': 'Beauty',
 
     // Home (5 products)
-    'Dyson vacuum cleaner',
-    'Shark vacuum',
-    'KitchenAid stand mixer',
-    'Ninja blender',
-    'Instant Pot',
+    'Dyson vacuum cleaner': 'Home',
+    'Shark vacuum': 'Home',
+    'KitchenAid stand mixer': 'Home',
+    'Ninja blender': 'Home',
+    'Instant Pot': 'Home',
 
     // Food (3 products)
-    'Starbucks coffee beans',
-    'Ghirardelli chocolate',
-    'KIND protein bars',
+    'Starbucks coffee beans': 'Food',
+    'Ghirardelli chocolate': 'Food',
+    'KIND protein bars': 'Food',
 
     // Fashion (4 products)
-    'Nike running shoes',
-    'Adidas sneakers',
-    'Levi\'s jeans',
-    'North Face jacket',
+    'Nike running shoes': 'Fashion',
+    'Adidas sneakers': 'Fashion',
+    'Levi\'s jeans': 'Fashion',
+    'North Face jacket': 'Fashion',
 
     // Sports (4 products)
-    'Fitbit fitness tracker',
-    'Garmin smartwatch',
-    'yoga mat',
-    'resistance bands',
+    'Fitbit fitness tracker': 'Sports',
+    'Garmin smartwatch': 'Sports',
+    'yoga mat': 'Sports',
+    'resistance bands': 'Sports',
 
     // Books (3 products)
-    'Atomic Habits book',
-    'Harry Potter book set',
-    'a song of ice and fire book set',
+    'Atomic Habits book': 'Books',
+    'Harry Potter book set': 'Books',
+    'a song of ice and fire book set': 'Books',
 
     // Toys (4 products)
-    'LEGO Star Wars set',
-    'Hot Wheels track',
-    'Barbie doll',
-    'Rubik\'s cube',
+    'LEGO Star Wars set': 'Toys',
+    'Hot Wheels track': 'Toys',
+    'Barbie doll': 'Toys',
+    'Rubik\'s cube': 'Toys',
 
     // Health (3 products)
-    'Omron blood pressure monitor',
-    'Braun thermometer',
-    'multivitamin gummies',
+    'Omron blood pressure monitor': 'Health',
+    'Braun thermometer': 'Health',
+    'multivitamin gummies': 'Health',
 
-    // Sports/Outdoors (3 products - changed from Outdoors category)
-    'Coleman camping tent',
-    'Yeti cooler',
-    'Stanley thermos',
+    // Outdoors (3 products)
+    'Coleman camping tent': 'Outdoors',
+    'Yeti cooler': 'Outdoors',
+    'Stanley thermos': 'Outdoors',
 
     // Office (4 products)
-    'Logitech wireless mouse',
-    'mechanical keyboard',
-    'office chair',
-    'standing desk',
+    'Logitech wireless mouse': 'Office',
+    'mechanical keyboard': 'Office',
+    'office chair': 'Office',
+    'standing desk': 'Office',
 
     // Pets (3 products)
-    'dog food',
-    'cat litter',
-    'pet carrier'
-];
+    'dog food': 'Pets',
+    'cat litter': 'Pets',
+    'pet carrier': 'Pets'
+};
+
+const DEFAULT_QUERIES = Object.keys(queryToCategoryMap);
 
 // Import products from multiple platforms
 // Uses queries array or default queries
@@ -89,6 +91,7 @@ async function importInitialProducts(queries = DEFAULT_QUERIES) {
 
     for (const query of queries) {
         console.log(`\nProcessing: "${query}"`);
+        const category = queryToCategoryMap[query];
 
         // Step 1: Fetch from Amazon
         const amazonProducts = await fetchFromAmazon(query, 1);
@@ -97,7 +100,7 @@ async function importInitialProducts(queries = DEFAULT_QUERIES) {
             continue;
         }
 
-        const amazonProduct = transformAmazonProduct(amazonProducts[0]);
+        const amazonProduct = transformAmazonProduct(amazonProducts[0], category);
 
         if (amazonProduct.price === 0) {
             console.log(`Skipping product with price 0`);
@@ -119,7 +122,7 @@ async function importInitialProducts(queries = DEFAULT_QUERIES) {
                 amazonProduct.freeShipping,
                 amazonProduct.inStock,
                 amazonProduct.information,
-                amazonProduct.category,
+                category,
                 amazonProduct.imageUrl
             ]);
 
@@ -179,7 +182,7 @@ async function importInitialProducts(queries = DEFAULT_QUERIES) {
                 pid: pid,
                 short_title: amazonProduct.shortTitle,
                 amazon_price: amazonProduct.price,
-                category: amazonProduct.category
+                category: category
             });
 
             // Prevent API rate limiting

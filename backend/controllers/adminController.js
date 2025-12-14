@@ -3,7 +3,11 @@ const pool = require('../config/database');
 const {
     getAmazonProductDetails,
     getEbayProductDetails,
-    getWalmartProductDetails
+    getWalmartProductDetails,
+    fetchFromWalmart,
+    findBestWalmartMatch,
+    fetchFromEbay,
+    findBestEbayMatch
 } = require('../services/platformService');
 const { importInitialProducts } = require('../services/importService');
 
@@ -122,8 +126,7 @@ async function updateAllPrices(req, res) {
             }
         }
 
-        // Sync lowest prices to products table
-        await syncLowestPrices();
+        console.log(`\nUpdate completed: ${updatedCount} updated, ${failedCount} failed`);
 
         res.json({
             success: true,
@@ -137,6 +140,202 @@ async function updateAllPrices(req, res) {
             success: false,
             error: 'Update failed',
             detail: error.message
+        });
+    }
+}
+
+async function addWalmartPrices(req, res) {
+    try {
+        console.log('\n Starting Walmart price supplement...');
+
+        const [dbProducts] = await pool.query('SELECT pid, title FROM products');
+        console.log(` Found ${dbProducts.length} products`);
+
+        let addedCount = 0;
+        let skippedCount = 0;
+        let failedCount = 0;
+        const results = [];
+
+        for (const dbProduct of dbProducts) {
+            try {
+                console.log(`\n [${addedCount + skippedCount + failedCount + 1}/${dbProducts.length}] ${dbProduct.title.substring(0, 60)}...`);
+
+                const [existing] = await pool.query(`
+                    SELECT id FROM price
+                    WHERE pid = ? AND platform = 'Walmart'
+                    ORDER BY date DESC
+                    LIMIT 1
+                `, [dbProduct.pid]);
+
+                if (existing.length > 0) {
+                    console.log(`     Walmart price already exists, skipping...`);
+                    skippedCount++;
+                    continue;
+                }
+
+                console.log(`    Searching Walmart with: "${dbProduct.title}"`);
+                await new Promise(resolve => setTimeout(resolve, 5000));
+
+                const walmartProducts = await fetchFromWalmart(dbProduct.title, 1);
+
+                if (walmartProducts.length > 0) {
+                    const walmartProduct = findBestWalmartMatch(dbProduct, walmartProducts);
+
+                    if (walmartProduct && walmartProduct.price > 0) {
+                        await pool.query(`
+                            INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, link)
+                            VALUES (?, ?, ?, ?, ?, NOW(), ?)
+                        `, [dbProduct.pid, 'Walmart', walmartProduct.price, 1, 1, walmartProduct.link]);
+
+                        console.log(`   Added Walmart price: $${walmartProduct.price}`);
+                        addedCount++;
+
+                        results.push({
+                            pid: dbProduct.pid,
+                            title: dbProduct.title.substring(0, 50),
+                            walmart_price: walmartProduct.price
+                        });
+                    } else {
+                        console.log(`     No suitable match`);
+                        failedCount++;
+                    }
+                } else {
+                    console.log(`     No Walmart products found`);
+                    failedCount++;
+                }
+
+            } catch (error) {
+                failedCount++;
+                console.error(`    Failed: ${error.message}`);
+            }
+        }
+
+        console.log(`\n Walmart supplement completed:`);
+        console.log(`   Added: ${addedCount}`);
+        console.log(`   Skipped (already exists): ${skippedCount}`);
+        console.log(`   Failed: ${failedCount}`);
+        console.log(`   Total: ${dbProducts.length}`);
+
+        res.json({
+            success: true,
+            message: `Added ${addedCount} Walmart prices, skipped ${skippedCount}, failed ${failedCount}`,
+            addedCount,
+            skippedCount,
+            failedCount,
+            totalProducts: dbProducts.length,
+            results: results.slice(0, 10)
+        });
+
+    } catch (error) {
+        console.error('Walmart supplement failed:', error);
+        res.status(500).json({
+            error: 'Walmart supplement failed',
+            details: error.message
+        });
+    }
+}
+
+async function syncEBayPrices(req, res) {
+    try {
+        console.log('\n Starting eBay price sync for all products...');
+        console.log('='.repeat(70));
+
+        const [dbProducts] = await pool.query('SELECT pid, title, short_title FROM products');
+        console.log(` Found ${dbProducts.length} products to sync`);
+
+        let syncedCount = 0;
+        let failedCount = 0;
+        const syncLog = [];
+
+        for (const dbProduct of dbProducts) {
+            try {
+                const searchQuery = dbProduct.short_title || dbProduct.title;
+
+                console.log(`\n [${syncedCount + failedCount + 1}/${dbProducts.length}] Searching eBay for: "${searchQuery.substring(0, 50)}"`);
+
+                const ebayProducts = await fetchFromEbay(searchQuery, 1);
+
+                if (ebayProducts.length > 0) {
+                    const bestMatch = findBestEbayMatch({ title: dbProduct.title }, ebayProducts);
+
+                    if (bestMatch && bestMatch.price > 0) {
+                        const [existing] = await pool.query(
+                            'SELECT id FROM price WHERE pid = ? AND platform = ? AND date >= DATE_SUB(NOW(), INTERVAL 1 DAY)',
+                            [dbProduct.pid, 'eBay']
+                        );
+
+                        if (existing.length > 0) {
+                            await pool.query(`
+                                UPDATE price
+                                SET price = ?, free_shipping = ?, in_stock = ?, link = ?, idInPlatform = ?, date = NOW()
+                                WHERE id = ?
+                            `, [
+                                bestMatch.price,
+                                bestMatch.freeShipping,
+                                bestMatch.inStock,
+                                bestMatch.link,
+                                bestMatch.idInPlatform,
+                                existing[0].id
+                            ]);
+                            console.log(`   Updated eBay price: $${bestMatch.price}`);
+                        } else {
+                            await pool.query(`
+                                INSERT INTO price (pid, platform, price, free_shipping, in_stock, link, idInPlatform, date)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+                            `, [
+                                dbProduct.pid,
+                                'eBay',
+                                bestMatch.price,
+                                bestMatch.freeShipping,
+                                bestMatch.inStock,
+                                bestMatch.link,
+                                bestMatch.idInPlatform
+                            ]);
+                            console.log(`    Inserted eBay price: $${bestMatch.price}`);
+                        }
+
+                        syncedCount++;
+                        syncLog.push({
+                            pid: dbProduct.pid,
+                            title: dbProduct.title.substring(0, 40),
+                            ebayPrice: bestMatch.price,
+                            ebayId: bestMatch.idInPlatform
+                        });
+                    } else {
+                        console.log(`     No suitable match found`);
+                        failedCount++;
+                    }
+                } else {
+                    console.log(`     No results from eBay`);
+                    failedCount++;
+                }
+
+                await new Promise(resolve => setTimeout(resolve, 5000));
+
+            } catch (error) {
+                failedCount++;
+                console.error(`    Error syncing ${dbProduct.title}:`, error.message);
+            }
+        }
+
+        console.log('\n' + '='.repeat(70));
+        console.log(` eBay sync completed: ${syncedCount} synced, ${failedCount} failed`);
+        console.log('='.repeat(70) + '\n');
+
+        res.json({
+            success: true,
+            message: `Synced ${syncedCount}/${dbProducts.length} products`,
+            syncedCount,
+            failedCount,
+            totalProducts: dbProducts.length,
+            syncLog: syncLog.slice(0, 10)
+        });
+
+    } catch (error) {
+        console.error('eBay sync failed:', error);
+        res.status(500).json({
+            error: 'eBay sync failed',
+            details: error.message
         });
     }
 }
@@ -244,5 +443,7 @@ module.exports = {
     importInitialProducts: importInitialProductsEndpoint,
     updateAllPrices,
     syncLowestPrices,
-    syncLowestPricesEndpoint
+    syncLowestPricesEndpoint,
+    addWalmartPrices,
+    syncEBayPrices
 };

@@ -62,7 +62,8 @@ function extractKeyInfo(title) {
         /pixel\s*\d+\s*(pro|xl)?/i,
         /macbook\s*(pro|air)/i,
         /ipad\s*(pro|air|mini)?/i,
-        /airpods\s*(pro|max)?/i
+        /airpods\s*(pro|max)?/i,
+        /echo\s*(dot|show|studio)?/i
     ];
 
     for (const pattern of modelPatterns) {
@@ -89,6 +90,19 @@ function extractKeyInfo(title) {
             info.color = color;
             info.specs.push(color);
             break;
+        }
+    }
+
+    const specPatterns = [
+        /pro max/i, /pro/i, /plus/i, /mini/i, /ultra/i,
+        /unlocked/i, /renewed/i, /refurbished/i,
+        /5g/i, /wifi/i, /cellular/i
+    ];
+
+    for (const pattern of specPatterns) {
+        const match = title.match(pattern);
+        if (match) {
+            info.specs.push(match[0].toLowerCase());
         }
     }
 
@@ -224,30 +238,92 @@ function calculateSimilarity(str1, str2) {
 
 // Extract short title from full product title
 function extractShortTitle(fullTitle) {
-    let title = fullTitle;
+    if (!fullTitle) return 'Unknown Product';
 
-    const removePatterns = [
-        /\(.*?\)/g,
-        /\[.*?\]/g,
-        /-\s*(Unlocked|Factory Unlocked|GSM Unlocked)/i,
-        /-\s*(Renewed|Certified Refurbished|Like New)/i,
-        /-\s*(International Version|US Version|Global Version)/i,
-        /-\s*with.*$/i,
-        /,\s*\d+GB.*$/i
-    ];
+    let cleaned = fullTitle
+        .replace(/\(.*?\)/g, '')
+        .replace(/[-–—]\s*(Unlocked|GSM|CDMA|Certified|Refurbished|Pre-Owned|Factory|International|US Version).*/gi, '')
+        .replace(/\s*,\s*(Free Shipping|Fast Delivery|Best Price|Top Rated|Best Seller).*/gi, '')
+        .replace(/\s+(with|for|by)\s+.*/gi, '')
+        .replace(/\b(Limited Edition|Special Edition|Exclusive)\b/gi, '')
+        .replace(/\b(Verizon|AT&T|T-Mobile|Sprint|US Cellular)\b(?!\s*Unlocked)/gi, '')
+        .replace(/\b(US Version|International Version|Global Version)\b/gi, '')
+        .replace(/[•●○▪▫]/g, ' ')
+        .replace(/[-–—]/g, ' ')
+        .replace(/[,;:]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
 
-    for (const pattern of removePatterns) {
-        title = title.replace(pattern, '');
+    const words = cleaned.split(/[\s,]+/).filter(w =>
+        w.length > 1 &&
+        !/^(the|and|or|with|for|by|in|on|at|to|from|of)$/i.test(w)
+    );
+
+    const maxWords = 15;
+    let shortWords = words.slice(0, maxWords);
+
+    const color = extractColorDetailed(fullTitle);
+    if (color && shortWords.length < maxWords) {
+        const colorWords = color.split(/\s+/);
+        const colorInTitle = colorWords.every(cw =>
+            shortWords.some(sw => sw.toLowerCase() === cw.toLowerCase())
+        );
+
+        if (!colorInTitle) {
+            if (shortWords.length + colorWords.length <= maxWords) {
+                shortWords.push(...colorWords);
+            }
+        }
     }
 
-    title = title.replace(/\s+/g, ' ').trim();
+    const storageMatches = [...fullTitle.matchAll(/\b(\d+)\s*(GB|TB|MB)(?:\s*RAM)?\b/gi)];
+    const storageInfo = [];
 
-    if (title.length > 80) {
-        const words = title.split(' ');
-        title = words.slice(0, 10).join(' ');
+    for (const match of storageMatches) {
+        const value = match[1];
+        const unit = match[2].toUpperCase();
+        const isRAM = match[0].toLowerCase().includes('ram');
+
+        const storageStr = isRAM ? `${value}${unit} RAM` : `${value}${unit}`;
+
+        const alreadyIncluded = shortWords.some(w =>
+            w.toLowerCase().includes(value.toLowerCase()) &&
+            w.toLowerCase().includes(unit.toLowerCase())
+        );
+
+        if (!alreadyIncluded && shortWords.length < maxWords) {
+            storageInfo.push(storageStr);
+        }
     }
 
-    return title;
+    const uniqueStorage = [...new Set(storageInfo)];
+    for (const storage of uniqueStorage) {
+        if (shortWords.length < maxWords) {
+            const storageWords = storage.split(/\s+/);
+            if (shortWords.length + storageWords.length <= maxWords) {
+                shortWords.push(...storageWords);
+            }
+        }
+    }
+
+    const configs = extractConfigs(fullTitle);
+    for (const config of configs) {
+        if (shortWords.length < maxWords) {
+            const configWords = config.split(/\s+/);
+
+            const configInTitle = configWords.every(cw =>
+                shortWords.some(sw => sw.toLowerCase() === cw.toLowerCase())
+            );
+
+            if (!configInTitle && shortWords.length + configWords.length <= maxWords) {
+                shortWords.push(...configWords);
+            }
+        }
+    }
+
+    const result = shortWords.join(' ');
+
+    return result.length > 250 ? result.substring(0, 247) + '...' : result;
 }
 
 // Extract detailed color from title
@@ -303,167 +379,6 @@ function extractConfigs(title) {
     return configs.slice(0, 3);
 }
 
-// Map Amazon category_path to our category system
-function mapAmazonCategory(categoryPath) {
-    for (let i = categoryPath.length - 1; i >= 0; i--) {
-        const category = categoryPath[i];
-        const categoryName = category.name.toLowerCase();
-
-        if (categoryName.includes('cell phone') ||
-            categoryName.includes('smartphone') ||
-            categoryName.includes('electronics') ||
-            categoryName.includes('computer') ||
-            categoryName.includes('tablet') ||
-            categoryName.includes('laptop') ||
-            categoryName.includes('camera') ||
-            categoryName.includes('tv') ||
-            categoryName.includes('audio') ||
-            categoryName.includes('headphone') ||
-            categoryName.includes('wearable') ||
-            categoryName.includes('smart home') ||
-            categoryName.includes('video game')) {
-            return 'Electronics';
-        }
-
-        if (categoryName.includes('beauty') ||
-            categoryName.includes('makeup') ||
-            categoryName.includes('skincare') ||
-            categoryName.includes('cosmetic') ||
-            categoryName.includes('fragrance') ||
-            categoryName.includes('personal care')) {
-            return 'Beauty';
-        }
-
-        if (categoryName.includes('home') ||
-            categoryName.includes('kitchen') ||
-            categoryName.includes('furniture') ||
-            categoryName.includes('bedding') ||
-            categoryName.includes('appliance') ||
-            categoryName.includes('garden') ||
-            categoryName.includes('patio')) {
-            return 'Home';
-        }
-
-        if (categoryName.includes('grocery') ||
-            categoryName.includes('food') ||
-            categoryName.includes('beverage') ||
-            categoryName.includes('snack') ||
-            categoryName.includes('gourmet')) {
-            return 'Food';
-        }
-
-        if (categoryName.includes('clothing') ||
-            categoryName.includes('shoes') ||
-            categoryName.includes('fashion') ||
-            categoryName.includes('jewelry') ||
-            categoryName.includes('watch') ||
-            categoryName.includes('accessories') ||
-            categoryName.includes('handbag') ||
-            categoryName.includes('luggage')) {
-            return 'Fashion';
-        }
-
-        if (categoryName.includes('sport') ||
-            categoryName.includes('fitness') ||
-            categoryName.includes('outdoor') ||
-            categoryName.includes('exercise') ||
-            categoryName.includes('athletic')) {
-            return 'Sports';
-        }
-
-        if (categoryName.includes('book') ||
-            categoryName.includes('kindle') ||
-            categoryName.includes('magazine') ||
-            categoryName.includes('textbook')) {
-            return 'Books';
-        }
-
-        if (categoryName.includes('toy') ||
-            categoryName.includes('game') ||
-            categoryName.includes('puzzle')) {
-            return 'Toys';
-        }
-
-        if (categoryName.includes('health') ||
-            categoryName.includes('medical') ||
-            categoryName.includes('vitamin') ||
-            categoryName.includes('supplement') ||
-            categoryName.includes('wellness')) {
-            return 'Health';
-        }
-
-        if (categoryName.includes('office') ||
-            categoryName.includes('school') ||
-            categoryName.includes('stationery')) {
-            return 'Office';
-        }
-
-        if (categoryName.includes('pet') ||
-            categoryName.includes('dog') ||
-            categoryName.includes('cat') ||
-            categoryName.includes('animal')) {
-            return 'Pets';
-        }
-    }
-
-    return null;
-}
-
-// Categorize by keywords (fallback method)
-function categorizeByKeywords(title) {
-    const lower = title.toLowerCase();
-
-    if (lower.match(/phone|laptop|tablet|computer|headphone|speaker|camera|tv|monitor|keyboard|mouse|smartwatch|earbuds|airpods|ipad|macbook|gaming|console|playstation|xbox|nintendo|electronics|cable|charger|adapter|router|printer/)) {
-        return 'Electronics';
-    }
-    if (lower.match(/beauty|makeup|skincare|cosmetic|perfume|fragrance|lipstick|foundation|serum|moisturizer|shampoo|conditioner|lotion|cream|mascara|eyeliner|nail polish/)) {
-        return 'Beauty';
-    }
-    if (lower.match(/furniture|kitchen|home|bedding|decor|lamp|table|sofa|pillow|blanket|curtain|rug|vacuum|appliance|cookware|utensil|storage|organizer/)) {
-        return 'Home';
-    }
-    if (lower.match(/food|snack|coffee|tea|chocolate|candy|grocery|organic|protein|chips|cookies|cereal|pasta|sauce|spice/)) {
-        return 'Food';
-    }
-    if (lower.match(/clothing|shoes|dress|shirt|pants|jacket|coat|boots|sneakers|fashion|bag|wallet|jewelry|sunglasses|hat|scarf|gloves|belt|tie|jeans/)) {
-        return 'Fashion';
-    }
-    if (lower.match(/sports|fitness|gym|yoga|exercise|bike|bicycle|treadmill|dumbbell|weights|running|tennis|basketball|soccer|football|swimming|resistance band|cooler|thermos|tent|camping/)) {
-        return 'Sports';
-    }
-    if (lower.match(/book|novel|textbook|kindle|ebook|magazine|comic|manga|cookbook|guide|dictionary|encyclopedia|bestseller|paperback|hardcover/)) {
-        return 'Books';
-    }
-    if (lower.match(/toy|doll|lego|puzzle|board game|action figure|stuffed animal|playset|barbie|hot wheels|nerf|pokemon|minecraft|rubik/)) {
-        return 'Toys';
-    }
-    if (lower.match(/health|medical|medicine|thermometer|blood pressure|first aid|bandage|supplements|probiotic|immune|pain relief|aspirin|allergy|vitamin|multivitamin/)) {
-        return 'Health';
-    }
-    if (lower.match(/office|desk|pen|pencil|notebook|paper|stapler|folder|calculator|planner|marker|highlighter|binder|supplies|chair.*office|standing desk/)) {
-        return 'Office';
-    }
-    if (lower.match(/pet|dog|cat|puppy|kitten|fish|bird|hamster|collar|leash|food.*pet|treat|bed.*pet|cage|aquarium|litter|carrier.*pet/)) {
-        return 'Pets';
-    }
-
-    return 'Electronics';
-}
-
-// Categorize product using Amazon category_path or fallback to keywords
-function categorizeProduct(title, apiProduct = null) {
-    if (apiProduct && apiProduct.category_path && Array.isArray(apiProduct.category_path)) {
-        const mappedCategory = mapAmazonCategory(apiProduct.category_path);
-        if (mappedCategory) {
-            console.log(`[Category] Using Amazon path: ${mappedCategory}`);
-            return mappedCategory;
-        }
-    }
-
-    console.log(`[Category] Fallback to keyword matching`);
-    return categorizeByKeywords(title);
-}
-
 // Generate product information string
 function generateInformation(product) {
     const info = [];
@@ -498,12 +413,16 @@ function generateInformation(product) {
 
 // Check if product is used/refurbished
 function isUsedProduct(title) {
+    if (!title) return false;
+
+    const lowerTitle = title.toLowerCase();
     const usedKeywords = [
-        'renewed', 'refurbished', 'used', 'pre-owned', 'open box',
-        'like new', 'certified refurbished', 'seller refurbished'
+        'renewed', 'refurbished', 'pre-owned', 'used', 'open box',
+        'certified refurbished', 'like new', 'second hand', 'secondhand',
+        'reconditioned', 'remanufactured'
     ];
-    const lower = title.toLowerCase();
-    return usedKeywords.some(keyword => lower.includes(keyword));
+
+    return usedKeywords.some(keyword => lowerTitle.includes(keyword));
 }
 
 module.exports = {
@@ -517,9 +436,6 @@ module.exports = {
     levenshteinDistance,
     extractColorDetailed,
     extractConfigs,
-    mapAmazonCategory,
-    categorizeByKeywords,
-    categorizeProduct,
     generateInformation,
     isUsedProduct
 };

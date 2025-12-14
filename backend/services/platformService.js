@@ -1,7 +1,7 @@
 // Platform API services for fetching product data from Amazon, eBay, and Walmart
 const axios = require('axios');
 const { RAPIDAPI_KEYS, API_HOSTS } = require('../config/api');
-const { parsePrice, parseRating, calculateSimilarity, extractShortTitle, categorizeProduct, generateInformation, isUsedProduct } = require('../utils/helpers');
+const { parsePrice, parseRating, calculateSimilarity, extractShortTitle, generateInformation, isUsedProduct } = require('../utils/helpers');
 
 // Fetch Amazon products by search query
 // Returns array of raw Amazon API products
@@ -9,7 +9,7 @@ async function fetchFromAmazon(query, page = 1) {
     try {
         console.log(`[Amazon] Searching: "${query}" (page ${page})`);
 
-        if (!RAPIDAPI_KEYS.amazon || RAPIDAPI_KEYS.amazon === 'YOUR_RAPIDAPI_KEY_HERE') {
+        if (!RAPIDAPI_KEYS.amazon || RAPIDAPI_KEYS.amazon === 'API_KEY') {
             throw new Error('Amazon RapidAPI Key is not configured');
         }
 
@@ -41,7 +41,7 @@ async function fetchFromEbay(query, page = 1) {
     try {
         console.log(`[eBay] Searching: "${query}" (page ${page})`);
 
-        if (!RAPIDAPI_KEYS.ebay || RAPIDAPI_KEYS.ebay === 'YOUR_RAPIDAPI_KEY_HERE') {
+        if (!RAPIDAPI_KEYS.ebay || RAPIDAPI_KEYS.ebay === 'API_KEY') {
             console.log('[eBay] API key not configured, skipping...');
             return [];
         }
@@ -126,7 +126,7 @@ async function fetchFromWalmart(query, page = 1) {
 }
 
 // Transform Amazon API product to standardized format
-function transformAmazonProduct(apiProduct) {
+function transformAmazonProduct(apiProduct, category) {
     const fullTitle = apiProduct.product_title || 'Unknown Product';
     const shortTitle = extractShortTitle(fullTitle);
 
@@ -175,7 +175,7 @@ function transformAmazonProduct(apiProduct) {
         freeShipping: apiProduct.is_prime ? 1 : 0,
         inStock: apiProduct.product_availability?.toLowerCase().includes('in stock') ? 1 : 0,
         information: generateInformation(apiProduct),
-        category: categorizeProduct(fullTitle, apiProduct),
+        category: category,
         imageUrl: apiProduct.product_photo || '',
         idInPlatform: apiProduct.asin || '',
         link: apiProduct.product_url || ''
@@ -190,7 +190,7 @@ function transformEbayProduct(apiProduct) {
                         apiProduct['delivery-date']?.toLowerCase().includes('free');
 
     const inStock = !apiProduct.condition?.toLowerCase().includes('sold out');
-
+    //reserve information
     const info = [];
 
     if (apiProduct.itemId) {
@@ -214,52 +214,74 @@ function transformEbayProduct(apiProduct) {
     }
 
     return {
-        title: apiProduct.title || 'Unknown Product',
+        title: apiProduct.title || '',
         price: price,
         platform: 'eBay',
         freeShipping: freeShipping ? 1 : 0,
         inStock: inStock ? 1 : 0,
-        information: info.join(' • ') || 'No additional information',
-        imageUrl: apiProduct.imageUrl || '',
         idInPlatform: apiProduct.itemId || '',
         link: apiProduct.url || '',
-        condition: apiProduct.condition || 'Unknown'
+        condition: apiProduct.condition || ''
     };
 }
 
 // Transform Walmart API product to standardized format
 function transformWalmartProduct(apiProduct) {
-    const title = apiProduct.name || apiProduct.title || 'Unknown Product';
-    const price = parseFloat(apiProduct.primaryOffer?.minPrice || apiProduct.price || 0);
+    const title = apiProduct.name || 'Unknown Product';
+    const priceValue = apiProduct.price?.current || apiProduct.price || 0;
+    const price = typeof priceValue === 'string' ? parsePrice(priceValue) : parseFloat(priceValue);
 
-    const info = [];
+    let freeShipping = false;
 
-    if (apiProduct.rating) {
-        info.push(`Rating: ${apiProduct.rating}/5`);
+    if (apiProduct.fulfillmentBadgeGroups && Array.isArray(apiProduct.fulfillmentBadgeGroups)) {
+        for (const badge of apiProduct.fulfillmentBadgeGroups) {
+            if (badge.text && typeof badge.text === 'string') {
+                const text = badge.text.toLowerCase();
+                if (text.includes('free shipping')) {
+                    freeShipping = true;
+                    break;
+                }
+            }
+        }
     }
 
-    if (apiProduct.numberOfReviews) {
-        info.push(`${apiProduct.numberOfReviews} reviews`);
+    // reserve：check fulfillmentType
+    if (!freeShipping && apiProduct.fulfillmentType) {
+        const fulfillment = String(apiProduct.fulfillmentType).toLowerCase();
+        freeShipping = fulfillment.includes('free') || fulfillment.includes('2-day');
     }
 
-    if (apiProduct.brand) {
-        info.push(`Brand: ${apiProduct.brand}`);
+    // reserve：check shippingOption
+    if (!freeShipping && apiProduct.shippingOption) {
+        const shipping = String(apiProduct.shippingOption).toLowerCase();
+        freeShipping = shipping.includes('free');
     }
 
-    if (apiProduct.primaryOffer?.offerType) {
-        info.push(`Type: ${apiProduct.primaryOffer.offerType}`);
+    let inStock = true;
+
+    if (apiProduct.isOutOfStock !== undefined) {
+        inStock = apiProduct.isOutOfStock === false;
     }
+    // reserve：check availabilityStatusDisplayValue
+    else if (apiProduct.availabilityStatusDisplayValue) {
+        const avail = String(apiProduct.availabilityStatusDisplayValue).toLowerCase();
+        inStock = avail.includes('in stock') || avail.includes('available');
+    }
+    // reserve：check availabilityStatus
+    else if (apiProduct.availabilityStatus) {
+        const avail = String(apiProduct.availabilityStatus).toLowerCase();
+        inStock = avail.includes('in_stock') || avail.includes('available');
+    }
+
+    const link = apiProduct.productLink || '';
 
     return {
         title: title,
         price: price,
         platform: 'Walmart',
-        freeShipping: 1,
-        inStock: 1,
-        information: info.join(' • ') || 'No additional information',
-        imageUrl: apiProduct.imageInfo?.thumbnailUrl || apiProduct.image || '',
-        idInPlatform: apiProduct.itemId || apiProduct.usItemId || '',
-        link: apiProduct.productPageUrl || apiProduct.canonicalUrl || ''
+        freeShipping: freeShipping ? 1 : 0,
+        inStock: inStock ? 1 : 0,
+        link: link
     };
 }
 
@@ -375,8 +397,8 @@ function findBestEbayMatch(dbProduct, ebayProducts) {
 
     if (dbProduct.price) {
         const referencePrice = dbProduct.price;
-        const minPrice = referencePrice * 0.2;
-        const maxPrice = referencePrice * 3.0;
+        const minPrice = referencePrice * 0.3;
+        const maxPrice = referencePrice * 2.5;
 
         const priceFiltered = candidates.filter(p => {
             if (p.price < minPrice || p.price > maxPrice) {
@@ -418,101 +440,197 @@ function findBestEbayMatch(dbProduct, ebayProducts) {
 }
 
 // Fetch Amazon product details by ASIN
-// Returns: { price, rating, reviews, inStock, freeShipping, title }
+// Returns: { price, inStock, freeShipping }
 async function getAmazonProductDetails(asin) {
-    if (!asin || asin === 'N/A') return null;
-
     try {
+        console.log(`   [Amazon] Fetching details for ASIN: ${asin}`);
+
+        if (!RAPIDAPI_KEYS.amazon) {
+            console.log('   Amazon API key not configured');
+            return null;
+        }
+
         const response = await axios.get('https://real-time-amazon-data.p.rapidapi.com/product-details', {
-            params: { asin, country: 'US' },
+            params: {
+                asin: asin,
+                country: 'US'
+            },
             headers: {
                 'X-RapidAPI-Key': RAPIDAPI_KEYS.amazon,
-                'X-RapidAPI-Host': API_HOSTS.amazon
+                'X-RapidAPI-Host': 'real-time-amazon-data.p.rapidapi.com'
             }
         });
 
         const data = response.data?.data;
-        if (!data) return null;
+
+        if (!data) {
+            console.log('   No data returned');
+            return null;
+        }
+
+        const price = parsePrice(data.product_price);
+        const freeShipping = data.is_prime || (data.delivery && data.delivery.toLowerCase().includes('free'));
+        const inStock = data.product_availability && (
+            data.product_availability.toLowerCase().includes('in stock') ||
+            data.product_availability.toLowerCase().includes('available')
+        );
+
+        console.log(`   [Amazon] Details: price=$${price}, inStock=${inStock}, freeShipping=${freeShipping}`);
 
         return {
-            price: parsePrice(data.product_price),
-            rating: parseRating(data.product_star_rating),
-            reviews: parseInt(data.product_num_ratings) || 0,
-            inStock: data.product_availability !== 'Out of Stock',
-            freeShipping: data.delivery?.includes('FREE') || false,
-            title: data.product_title
+            price: price,
+            freeShipping: freeShipping ? 1 : 0,
+            inStock: inStock ? 1 : 0
         };
+
     } catch (error) {
-        console.error(`Amazon API error for ASIN ${asin}:`, error.message);
+        console.error(`   [Amazon] Failed to get details:`, error.message);
         return null;
     }
 }
 
-// Fetch eBay product details by item ID
-// Returns: { price, shipping, inStock, freeShipping }
-async function getEbayProductDetails(itemUrl) {
-    if (!itemUrl || itemUrl === 'N/A') return null;
-
-    const itemIdMatch = itemUrl.match(/\/itm\/(\d+)/);
-    if (!itemIdMatch) return null;
-
-    const itemId = itemIdMatch[1];
-
+// Fetch eBay product details by product url
+// Returns: { price, inStock, freeShipping }
+async function getEbayProductDetails(productLink) {
     try {
-        const response = await axios.get('https://real-time-ebay-data.p.rapidapi.com/item-details', {
-            params: { itemId },
+        console.log(`   [eBay] Fetching details from link`);
+
+        if (!RAPIDAPI_KEYS.ebay) {
+            console.log('   eBay API key not configured');
+            return null;
+        }
+
+        const response = await axios.get('https://ebay-data-api.p.rapidapi.com/item/description', {
+            params: {
+                itemUrl: productLink
+            },
             headers: {
                 'X-RapidAPI-Key': RAPIDAPI_KEYS.ebay,
-                'X-RapidAPI-Host': API_HOSTS.ebay
+                'X-RapidAPI-Host': 'ebay-data-api.p.rapidapi.com'
             }
         });
 
         const data = response.data?.data;
-        if (!data) return null;
 
-        const price = parsePrice(data.price?.value);
-        const shipping = parsePrice(data.shippingCost?.value);
+        if (!data) {
+            console.log('   No data returned');
+            return null;
+        }
+
+        const price = data.price || 0;
+        const freeShipping = data.shippingOptions && data.shippingOptions.some(opt =>
+            opt.shippingCost && opt.shippingCost.price === null || opt.shippingCost.price === 0
+        );
+        const inStock = data.condition && !data.condition.toLowerCase().includes('sold out');
+
+        console.log(`   [eBay] Details: price=$${price}, inStock=${inStock}, freeShipping=${freeShipping}`);
 
         return {
-            price: price + shipping,
-            shipping,
-            inStock: data.quantity > 0,
-            freeShipping: shipping === 0
+            price: price,
+            freeShipping: freeShipping ? 1 : 0,
+            inStock: inStock ? 1 : 0
         };
+
     } catch (error) {
-        console.error(`eBay API error for item ${itemId}:`, error.message);
+        console.error(`   [eBay] Failed to get details:`, error.message);
         return null;
     }
 }
 
-// Fetch Walmart product details by item ID
-// Returns: { price, inStock }
-async function getWalmartProductDetails(itemUrl) {
-    if (!itemUrl || itemUrl === 'N/A') return null;
-
-    const itemIdMatch = itemUrl.match(/\/ip\/.*\/(\d+)/);
-    if (!itemIdMatch) return null;
-
-    const itemId = itemIdMatch[1];
-
+// Fetch Walmart product details by product url
+// Returns: { price, inStock, freeShipping }
+async function getWalmartProductDetails(productLink) {
     try {
-        const response = await axios.get('https://walmart-search-and-pricing.p.rapidapi.com/product-details', {
-            params: { itemId },
+        console.log(`   [Walmart] Fetching details from link`);
+
+        if (!RAPIDAPI_KEYS.walmart) {
+            console.log('   Walmart API key not configured');
+            return null;
+        }
+
+        const response = await axios.get('https://walmart-api4.p.rapidapi.com/details', {
+            params: {
+                url: productLink
+            },
             headers: {
                 'X-RapidAPI-Key': RAPIDAPI_KEYS.walmart,
-                'X-RapidAPI-Host': API_HOSTS.walmart
+                'X-RapidAPI-Host': 'walmart-api4.p.rapidapi.com'
             }
         });
 
-        const data = response.data;
-        if (!data) return null;
+        const rawData = response.data;
+
+        if (!rawData) {
+            console.log('   No data returned');
+            return null;
+        }
+
+        let productGroup = null;
+
+        if (Array.isArray(rawData)) {
+            for (const item of rawData) {
+                if (Array.isArray(item)) {
+                    const found = item.find(obj => obj['@type'] === 'ProductGroup');
+                    if (found) {
+                        productGroup = found;
+                        break;
+                    }
+                } else if (item['@type'] === 'ProductGroup') {
+                    productGroup = item;
+                    break;
+                }
+            }
+        } else if (rawData['@type'] === 'ProductGroup') {
+            productGroup = rawData;
+        }
+
+        if (!productGroup) {
+            console.log('   ⚠️  ProductGroup not found in response');
+            return null;
+        }
+
+        const allOffers = [];
+
+        if (productGroup.hasVariant && Array.isArray(productGroup.hasVariant)) {
+            for (const variant of productGroup.hasVariant) {
+                if (variant.url && !variant.offers) continue;
+
+                if (variant.offers && Array.isArray(variant.offers)) {
+                    allOffers.push(...variant.offers);
+                }
+            }
+        }
+
+        const prices = allOffers
+            .map(offer => offer.price)
+            .filter(p => p && p > 0);
+
+        if (prices.length === 0) {
+            console.log('   ⚠️  No valid prices found');
+            return null;
+        }
+
+        const lowestPrice = Math.min(...prices);
+
+        const bestOffer = allOffers.find(offer => offer.price === lowestPrice);
+
+        const inStock = bestOffer.availability === 'https://schema.org/InStock';
+        const freeShipping = bestOffer.shippingDetails?.shippingRate?.value === 0;
+
+        console.log(`   [Walmart] Details: price=$${lowestPrice}, inStock=${inStock}, freeShipping=${freeShipping}`);
+
+        if (prices.length > 1) {
+            console.log(`   [Walmart] Found ${prices.length} prices, selected lowest: $${lowestPrice}`);
+        }
 
         return {
-            price: parsePrice(data.price),
-            inStock: data.availability === 'IN_STOCK'
+            price: lowestPrice,
+            freeShipping: freeShipping ? 1 : 0,
+            inStock: inStock ? 1 : 0
         };
+
     } catch (error) {
-        console.error(`Walmart API error for item ${itemId}:`, error.message);
+        console.error(`   [Walmart] Failed to get details:`, error.message);
         return null;
     }
 }
