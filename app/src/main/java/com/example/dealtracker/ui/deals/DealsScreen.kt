@@ -367,7 +367,7 @@ private fun ProductCard(
                             Icons.Outlined.LocalShipping,
                             contentDescription = "Free Shipping",
                             modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = colors.accent
                         )
                     }
 
@@ -414,7 +414,7 @@ private fun ProductImage(
                     .crossfade(true)
                     .build(),
                 contentDescription = title,
-                contentScale = ContentScale.Crop,
+                contentScale = ContentScale.Inside,
                 modifier = Modifier.fillMaxSize(),
                 loading = {
                     Box(

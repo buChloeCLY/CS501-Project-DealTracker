@@ -376,7 +376,7 @@ fun DealItem(product: Product, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(90.dp)
+            .defaultMinSize(minHeight = 110.dp)
             .background(colors.card, shape = RoundedCornerShape(12.dp))
             .padding(12.dp)
             .clickable { onClick() },
@@ -397,7 +397,9 @@ fun DealItem(product: Product, onClick: () -> Unit) {
                 product.title,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = (14 * fontScale).sp,
-                color = colors.primaryText
+                color = colors.primaryText,
+                maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
             )
             Text(
                 product.priceText,

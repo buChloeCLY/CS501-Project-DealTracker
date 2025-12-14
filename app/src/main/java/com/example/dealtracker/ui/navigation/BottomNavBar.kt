@@ -48,10 +48,10 @@ fun BottomNavBarRouteAware(
             icon = {
                 Icon(
                     Icons.Outlined.Add,
-                    contentDescription = "Lists"
+                    contentDescription = "Wishlists"
                 )
             },
-            label = { Text("Lists") }
+            label = { Text("Wishlists") }
         )
 
         NavigationBarItem(

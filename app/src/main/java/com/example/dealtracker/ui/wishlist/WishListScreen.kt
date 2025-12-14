@@ -118,7 +118,7 @@ fun WishListScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "Wishlist",
+                        "Wishlists",
                         fontSize = (20 * fontScale).sp,
                         fontWeight = FontWeight.Bold
                     )

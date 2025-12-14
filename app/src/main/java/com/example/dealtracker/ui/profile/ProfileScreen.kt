@@ -117,7 +117,7 @@ fun ProfileScreen(navController: NavHostController) {
                 // Logged in menu
                 ProfileMenuItem(
                     icon = Icons.Default.List,
-                    title = "Lists",
+                    title = "Wishlists",
                     onClick = { navController.navigate("wishlist") }
                 )
 
