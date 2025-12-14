@@ -237,64 +237,65 @@ async function addWalmartPrices(req, res) {
 
 async function syncEBayPrices(req, res) {
     try {
-        console.log('\n Starting eBay price sync for all products...');
+        console.log('\n Starting eBay price sync...');
         console.log('='.repeat(70));
 
-        const [dbProducts] = await pool.query('SELECT pid, title, short_title FROM products');
-        console.log(` Found ${dbProducts.length} products to sync`);
+        const [dbProducts] = await pool.query('SELECT pid, title, short_title, price FROM products');
+        console.log(` Found ${dbProducts.length} products`);
 
-        let syncedCount = 0;
+        let addedCount = 0;
+        let skippedCount = 0;
         let failedCount = 0;
         const syncLog = [];
 
         for (const dbProduct of dbProducts) {
             try {
+                console.log(`\n [${addedCount + skippedCount + failedCount + 1}/${dbProducts.length}] ${dbProduct.title.substring(0, 60)}...`);
+
+                const [existing] = await pool.query(`
+                    SELECT id FROM price
+                    WHERE pid = ? AND platform = 'eBay'
+                    ORDER BY date DESC
+                    LIMIT 1
+                `, [dbProduct.pid]);
+
+                if (existing.length > 0) {
+                    console.log(`     eBay price already exists, skipping...`);
+                    skippedCount++;
+                    continue;
+                }
+
                 const searchQuery = dbProduct.short_title || dbProduct.title;
 
-                console.log(`\n [${syncedCount + failedCount + 1}/${dbProducts.length}] Searching eBay for: "${searchQuery.substring(0, 50)}"`);
+                console.log(`    Searching eBay with: "${searchQuery.substring(0, 50)}"`);
+
+                await new Promise(resolve => setTimeout(resolve, 10000));
 
                 const ebayProducts = await fetchFromEbay(searchQuery, 1);
 
                 if (ebayProducts.length > 0) {
-                    const bestMatch = findBestEbayMatch(dbProduct, ebayProducts);
+                    const bestMatch = findBestEbayMatch({
+                        title: dbProduct.title,
+                        price: dbProduct.price
+                    }, ebayProducts);
 
                     if (bestMatch && bestMatch.price > 0) {
-                        const [existing] = await pool.query(
-                            'SELECT id FROM price WHERE pid = ? AND platform = ? AND date >= DATE_SUB(NOW(), INTERVAL 1 DAY)',
-                            [dbProduct.pid, 'eBay']
-                        );
+                        await pool.query(`
+                            INSERT INTO price (pid, platform, price, free_shipping, in_stock, link, idInPlatform, date)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+                        `, [
+                            dbProduct.pid,
+                            'eBay',
+                            bestMatch.price,
+                            bestMatch.freeShipping,
+                            bestMatch.inStock,
+                            bestMatch.link,
+                            bestMatch.idInPlatform
+                        ]);
 
-                        if (existing.length > 0) {
-                            await pool.query(`
-                                UPDATE price
-                                SET price = ?, free_shipping = ?, in_stock = ?, link = ?, idInPlatform = ?, date = NOW()
-                                WHERE id = ?
-                            `, [
-                                bestMatch.price,
-                                bestMatch.freeShipping,
-                                bestMatch.inStock,
-                                bestMatch.link,
-                                bestMatch.idInPlatform,
-                                existing[0].id
-                            ]);
-                            console.log(`   Updated eBay price: $${bestMatch.price}`);
-                        } else {
-                            await pool.query(`
-                                INSERT INTO price (pid, platform, price, free_shipping, in_stock, link, idInPlatform, date)
-                                VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
-                            `, [
-                                dbProduct.pid,
-                                'eBay',
-                                bestMatch.price,
-                                bestMatch.freeShipping,
-                                bestMatch.inStock,
-                                bestMatch.link,
-                                bestMatch.idInPlatform
-                            ]);
-                            console.log(`    Inserted eBay price: $${bestMatch.price}`);
-                        }
+                        console.log(`    Added eBay price: $${bestMatch.price}`);
+                        addedCount++;
 
-                        syncedCount++;
                         syncLog.push({
                             pid: dbProduct.pid,
                             title: dbProduct.title.substring(0, 40),
@@ -310,8 +311,6 @@ async function syncEBayPrices(req, res) {
                     failedCount++;
                 }
 
-                await new Promise(resolve => setTimeout(resolve, 5000));
-
             } catch (error) {
                 failedCount++;
                 console.error(`    Error syncing ${dbProduct.title}:`, error.message);
@@ -319,13 +318,18 @@ async function syncEBayPrices(req, res) {
         }
 
         console.log('\n' + '='.repeat(70));
-        console.log(` eBay sync completed: ${syncedCount} synced, ${failedCount} failed`);
+        console.log(` eBay sync completed:`);
+        console.log(`   Added: ${addedCount}`);
+        console.log(`   Skipped (already exists): ${skippedCount}`);
+        console.log(`   Failed: ${failedCount}`);
+        console.log(`   Total: ${dbProducts.length}`);
         console.log('='.repeat(70) + '\n');
 
         res.json({
             success: true,
-            message: `Synced ${syncedCount}/${dbProducts.length} products`,
-            syncedCount,
+            message: `Added ${addedCount} eBay prices, skipped ${skippedCount}, failed ${failedCount}`,
+            addedCount,
+            skippedCount,
             failedCount,
             totalProducts: dbProducts.length,
             syncLog: syncLog.slice(0, 10)
