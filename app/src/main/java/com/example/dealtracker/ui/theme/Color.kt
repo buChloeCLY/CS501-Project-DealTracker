@@ -4,10 +4,10 @@ import androidx.compose.ui.graphics.Color
 
 // Light Mode Colors
 object LightColorScheme {
-    val primary = Color(0xFFFF6B35)
+    val primary = Color(0xFFFF6B35) // most of the text
     val onPrimary = Color.White
     val primaryContainer = Color(0xFFF3EDF7)
-    val onPrimaryContainer = Color.Black
+    val onPrimaryContainer = Color.Black // like the texts on category cards
 
     val secondary = Color(0xFF4CAF50)
     val onSecondary = Color.White
