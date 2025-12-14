@@ -8,5 +8,6 @@ router.post('/update-all-prices', adminController.updateAllPrices);
 router.post('/sync-lowest-prices', adminController.syncLowestPricesEndpoint);
 router.post('/add-walmart-prices', adminController.addWalmartPrices);
 router.post('/sync-ebay-prices', adminController.syncEBayPrices);
+router.post('/test-ai-short-titles', adminController.test);
 
 module.exports = router;

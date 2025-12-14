@@ -10,6 +10,7 @@ const {
     findBestEbayMatch
 } = require('../services/platformService');
 const { importInitialProducts } = require('../services/importService');
+const { extractShortTitle } = require('../utils/helpers');
 
 // Import initial products from multiple platforms
 // POST /api/admin/import-initial
@@ -148,7 +149,7 @@ async function addWalmartPrices(req, res) {
     try {
         console.log('\n Starting Walmart price supplement...');
 
-        const [dbProducts] = await pool.query('SELECT pid, title FROM products');
+        const [dbProducts] = await pool.query('SELECT pid, title, short_title, price FROM products');
         console.log(` Found ${dbProducts.length} products`);
 
         let addedCount = 0;
@@ -173,19 +174,19 @@ async function addWalmartPrices(req, res) {
                     continue;
                 }
 
-                console.log(`    Searching Walmart with: "${dbProduct.title}"`);
+                console.log(`    Searching Walmart with: "${dbProduct.short_title}"`);
                 await new Promise(resolve => setTimeout(resolve, 5000));
 
-                const walmartProducts = await fetchFromWalmart(dbProduct.title, 1);
+                const walmartProducts = await fetchFromWalmart(dbProduct.short_title, 1);
 
                 if (walmartProducts.length > 0) {
-                    const walmartProduct = findBestWalmartMatch(dbProduct, walmartProducts);
+                    const walmartProduct = await findBestWalmartMatch(dbProduct, walmartProducts);
 
                     if (walmartProduct && walmartProduct.price > 0) {
                         await pool.query(`
                             INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, link)
                             VALUES (?, ?, ?, ?, ?, NOW(), ?)
-                        `, [dbProduct.pid, 'Walmart', walmartProduct.price, 1, 1, walmartProduct.link]);
+                        `, [dbProduct.pid, 'Walmart', walmartProduct.price, walmartProduct.freeShipping, walmartProduct.inStock, walmartProduct.link]);
 
                         console.log(`   Added Walmart price: $${walmartProduct.price}`);
                         addedCount++;
@@ -265,16 +266,16 @@ async function syncEBayPrices(req, res) {
                     continue;
                 }
 
-                const searchQuery = dbProduct.short_title || dbProduct.title;
+                const searchQuery = dbProduct.short_title;
 
-                console.log(`    Searching eBay with: "${searchQuery.substring(0, 50)}"`);
+                console.log(`    Searching eBay with: "${searchQuery}"`);
 
                 await new Promise(resolve => setTimeout(resolve, 10000));
 
                 const ebayProducts = await fetchFromEbay(searchQuery, 1);
 
                 if (ebayProducts.length > 0) {
-                    const bestMatch = findBestEbayMatch({
+                    const bestMatch = await findBestEbayMatch({
                         title: dbProduct.title,
                         price: dbProduct.price
                     }, ebayProducts);
@@ -368,20 +369,26 @@ async function syncLowestPrices() {
                     SELECT platform, MAX(date) AS max_date
                     FROM price
                     WHERE pid = ?
+                      AND platform IN ('Amazon', 'Walmart')
                     GROUP BY platform
                 ) p2
                     ON p1.platform = p2.platform AND p1.date = p2.max_date
                 WHERE p1.pid = ?
+                  AND p1.platform IN ('Amazon', 'Walmart')
                 ORDER BY p1.price ASC
             `, [product.pid, product.pid]);
 
             if (rows.length === 0) {
-                console.log(`[PID ${product.pid}] No price rows, skipped`);
+                console.log(`  [PID ${product.pid}] No Amazon/Walmart prices found, skipped`);
                 skippedCount++;
                 continue;
             }
 
             const best = rows[0];
+            const lowestPricePlatforms = rows.filter(r => r.price === lowestPrice);
+            const platformNames = lowestPricePlatforms.map(p => p.platform).join(', ');
+            const freeShipping = lowestPricePlatforms.some(p => p.free_shipping === 1 || p.free_shipping === true);
+            const inStock = lowestPricePlatforms.some(p => p.in_stock === 1 || p.in_stock === true);
 
             await pool.query(`
                 UPDATE products
@@ -394,9 +401,9 @@ async function syncLowestPrices() {
                 WHERE pid = ?
             `, [
                 best.price,
-                best.platform,
-                best.free_shipping ? 1 : 0,
-                best.in_stock ? 1 : 0,
+                platformNames,
+                free_shipping ? 1 : 0,
+                in_stock ? 1 : 0,
                 product.pid
             ]);
 
@@ -443,11 +450,110 @@ async function syncLowestPricesEndpoint(req, res) {
     }
 }
 
+async function test(req, res) {
+    try {
+        console.log('\n Starting AI short title update...');
+        console.log('='.repeat(100));
+
+        const [products] = await pool.query('SELECT pid, title, short_title FROM products ORDER BY pid');
+        console.log(` Found ${products.length} products to update\n`);
+
+        const results = [];
+        let updatedCount = 0;
+        let failedCount = 0;
+        let skippedCount = 0;
+
+        for (let i = 0; i < products.length; i++) {
+            const product = products[i];
+
+            console.log(`\n[${ i + 1}/${products.length}] PID: ${product.pid}`);
+            console.log('─'.repeat(100));
+            console.log(` Full Title:     ${product.title}`);
+            console.log(` Current Short:  ${product.short_title || '(empty)'}`);
+
+            try {
+                const aiShortTitle = await extractShortTitle(product.title);
+                console.log(` AI Short:       ${aiShortTitle}`);
+
+               if (!aiShortTitle || aiShortTitle.trim().length === 0) {
+                    console.log(`  AI returned empty, skipping update`);
+                    skippedCount++;
+                    results.push({
+                        pid: product.pid,
+                        fullTitle: product.title,
+                        oldShort: product.short_title,
+                        newShort: null,
+                        status: 'skipped',
+                        reason: 'AI returned empty'
+                    });
+                    continue;
+               }
+
+                await pool.query(
+                    'UPDATE products SET short_title = ? WHERE pid = ?',
+                    [aiShortTitle, product.pid]
+                );
+
+                console.log(` Updated in database`);
+                updatedCount++;
+
+                results.push({
+                    pid: product.pid,
+                    fullTitle: product.title,
+                    oldShort: product.short_title,
+                    newShort: aiShortTitle,
+                    status: 'updated'
+                });
+
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+            } catch (error) {
+                console.log(` AI Failed:      ${error.message}`);
+                failedCount++;
+                results.push({
+                    pid: product.pid,
+                    fullTitle: product.title,
+                    oldShort: product.short_title,
+                    newShort: null,
+                    status: 'failed',
+                    error: error.message
+                });
+            }
+        }
+
+        console.log('\n' + '='.repeat(100));
+        console.log(` Update completed:`);
+        console.log(`   Updated: ${updatedCount}`);
+        console.log(`   Skipped: ${skippedCount}`);
+        console.log(`   Failed: ${failedCount}`);
+        console.log(`   Total: ${products.length}`);
+        console.log('='.repeat(100) + '\n');
+
+        res.json({
+            success: true,
+            message: `Updated ${updatedCount} products, skipped ${skippedCount}, failed ${failedCount}`,
+            updatedCount,
+            skippedCount,
+            failedCount,
+            totalProducts: products.length,
+            results: results.slice(0, 20)
+        });
+
+    } catch (error) {
+        console.error('Update failed:', error);
+        res.status(500).json({
+            error: 'Update failed',
+            details: error.message
+        });
+    }
+}
+
 module.exports = {
     importInitialProducts: importInitialProductsEndpoint,
     updateAllPrices,
     syncLowestPrices,
     syncLowestPricesEndpoint,
     addWalmartPrices,
-    syncEBayPrices
+    syncEBayPrices,
+    test
 };

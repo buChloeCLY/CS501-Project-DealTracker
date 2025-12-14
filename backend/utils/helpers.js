@@ -1,6 +1,11 @@
 // Utility functions for password, price parsing, and text matching
 const crypto = require('crypto');
 
+const OpenAI = require('openai');
+const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY
+});
+
 // Hash password using SHA-256
 function hashPassword(password) {
     return crypto.createHash('sha256').update(password).digest('hex');
@@ -20,454 +25,72 @@ function parseRating(ratingStr) {
     return match ? parseFloat(match[1]) : 0;
 }
 
-// Clean title by removing marketing phrases and extra symbols
-function cleanTitle(title) {
-    return title
-        .toLowerCase()
-        .replace(/\(.*?\)/g, '')
-        .replace(/[-–—]/g, ' ')
-        .replace(/[,;:]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
-
-// Extract key information from product title (brand, model, specs)
-function extractKeyInfo(title) {
-    const lower = title.toLowerCase();
-    const info = {
-        brand: null,
-        model: null,
-        storage: null,
-        color: null,
-        specs: []
-    };
-
-    const brands = {
-        // Electronics
-        'apple': 'apple',
-        'samsung': 'samsung',
-        'dell': 'dell',
-        'hp': 'hp',
-        'sony': 'sony',
-        'bose': 'bose',
-        'lg': 'lg',
-
-        // Beauty
-        'cerave': 'cerave',
-        'neutrogena': 'neutrogena',
-        'maybelline': 'maybelline',
-        'l\'oreal': 'loreal',
-        'loreal': 'loreal',
-
-        // Home
-        'dyson': 'dyson',
-        'shark': 'shark',
-        'kitchenaid': 'kitchenaid',
-        'ninja': 'ninja',
-        'instant pot': 'instantpot',
-
-        // Food
-        'starbucks': 'starbucks',
-        'ghirardelli': 'ghirardelli',
-        'kind': 'kind',
-
-        // Fashion
-        'nike': 'nike',
-        'adidas': 'adidas',
-        'levi\'s': 'levis',
-        'levis': 'levis',
-        'north face': 'northface',
-        'the north face': 'northface',
-
-        // Sports
-        'fitbit': 'fitbit',
-        'garmin': 'garmin',
-
-        // Toys
-        'lego': 'lego',
-        'hot wheels': 'hotwheels',
-        'barbie': 'barbie',
-        'rubik\'s': 'rubiks',
-        'rubiks': 'rubiks',
-
-        // Health
-        'omron': 'omron',
-        'braun': 'braun',
-
-        // Outdoors
-        'coleman': 'coleman',
-        'yeti': 'yeti',
-        'stanley': 'stanley',
-
-        // Office
-        'logitech': 'logitech'
-    };
-
-    for (const [brandKey, brandValue] of Object.entries(brands)) {
-        if (lower.includes(brandKey)) {
-            info.brand = brandValue;
-            break;
-        }
-    }
-
-    const modelPatterns = [
-        // Apple
-        /iphone\s*1[0-9]\s*(pro\s*max|pro|plus)?/i,
-        /ipad\s*(pro|air|mini)?/i,
-        /macbook\s*(pro|air)/i,
-        /airpods\s*(pro|max)?/i,
-
-        // Samsung
-        /galaxy\s*s2[0-9]\s*(ultra|plus|fe)?/i,
-
-        // Dell/HP
-        /xps\s*1[0-9]/i,
-        /envy|pavilion|spectre/i,
-
-        // Sony/Bose
-        /wh-1000xm[0-9]/i,
-        /quietcomfort\s*(ultra|45|35)?/i,
-
-        // LG/Samsung TV
-        /oled\s*[a-z]?[0-9]/i,
-        /qled|neo qled/i,
-
-        // KitchenAid/Ninja
-        /stand\s*mixer/i,
-        /blender/i,
-
-        // Fitness
-        /charge\s*[0-9]/i,
-        /forerunner|fenix|vivoactive/i,
-
-        // LEGO
-        /star\s*wars|harry\s*potter|city|technic/i,
-
-        // Books
-        /atomic\s*habits/i,
-        /harry\s*potter/i,
-        /song\s*of\s*ice\s*and\s*fire/i
-    ];
-
-    for (const pattern of modelPatterns) {
-        const match = title.match(pattern);
-        if (match) {
-            info.model = match[0].toLowerCase().trim();
-            break;
-        }
-    }
-
-    const storageMatch = title.match(/(\d+)\s*(gb|tb)/i);
-    if (storageMatch) {
-        info.storage = storageMatch[0].toLowerCase();
-        info.specs.push(info.storage);
-    }
-
-    const colors = [
-        'red', 'black', 'white', 'blue', 'green', 'yellow', 'purple',
-        'pink', 'orange', 'gray', 'grey', 'silver', 'gold', 'bronze',
-        'titanium', 'graphite', 'coral', 'lavender', 'onyx', 'starlight',
-        'midnight', 'space gray', 'rose gold'
-    ];
-
-    for (const color of colors) {
-        if (lower.includes(color)) {
-            info.color = color;
-            info.specs.push(color);
-            break;
-        }
-    }
-
-    const specPatterns = [
-        /pro max/i, /pro/i, /plus/i, /mini/i, /ultra/i, /fe/i,
-        /unlocked/i, /renewed/i, /refurbished/i,
-        /5g/i, /wifi/i, /cellular/i,
-        /vacuum/i, /cleaner/i, /mixer/i, /blender/i,
-        /running/i, /fitness/i, /yoga/i,
-        /moisturizer/i, /sunscreen/i, /mascara/i, /foundation/i,
-        /coffee/i, /chocolate/i, /protein/i,
-        /camping/i, /cooler/i, /thermos/i,
-        /wireless/i, /mechanical/i, /standing/i
-    ];
-
-    for (const pattern of specPatterns) {
-        const match = title.match(pattern);
-        if (match) {
-            info.specs.push(match[0].toLowerCase());
-        }
-    }
-
-    return info;
-}
-
-// Calculate Levenshtein distance between two strings
-function levenshteinDistance(str1, str2) {
-    const matrix = [];
-    for (let i = 0; i <= str2.length; i++) {
-        matrix[i] = [i];
-    }
-    for (let j = 0; j <= str1.length; j++) {
-        matrix[0][j] = j;
-    }
-    for (let i = 1; i <= str2.length; i++) {
-        for (let j = 1; j <= str1.length; j++) {
-            if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
-                matrix[i][j] = matrix[i - 1][j - 1];
-            } else {
-                matrix[i][j] = Math.min(
-                    matrix[i - 1][j - 1] + 1,
-                    matrix[i][j - 1] + 1,
-                    matrix[i - 1][j] + 1
-                );
-            }
-        }
-    }
-    return matrix[str2.length][str1.length];
-}
-
-// Compare model similarity
-function compareModels(model1, model2) {
-    if (model1 === model2) return 1.0;
-    const m1 = model1.replace(/\s+/g, '');
-    const m2 = model2.replace(/\s+/g, '');
-    if (m1 === m2) return 0.95;
-
-    const distance = levenshteinDistance(m1, m2);
-    const maxLen = Math.max(m1.length, m2.length);
-    const similarity = 1 - (distance / maxLen);
-    return Math.max(0, similarity);
-}
-
-// Compare specification similarity
-function compareSpecs(info1, info2) {
-    let matchCount = 0;
-    let totalSpecs = 0;
-
-    if (info1.storage && info2.storage) {
-        matchCount += info1.storage === info2.storage ? 1 : 0;
-        totalSpecs++;
-    }
-
-    if (info1.color && info2.color) {
-        matchCount += info1.color === info2.color ? 1 : 0;
-        totalSpecs++;
-    }
-
-    const specs1 = new Set(info1.specs);
-    const specs2 = new Set(info2.specs);
-    const commonSpecs = [...specs1].filter(s => specs2.has(s));
-
-    if (specs1.size > 0 || specs2.size > 0) {
-        const specSimilarity = commonSpecs.length / Math.max(specs1.size, specs2.size);
-        matchCount += specSimilarity;
-        totalSpecs++;
-    }
-
-    return totalSpecs > 0 ? matchCount / totalSpecs : 0;
-}
-
-// Compare word overlap between two strings
-function compareWords(str1, str2) {
-    const words1 = str1.split(/\s+/).filter(w => w.length > 2);
-    const words2 = str2.split(/\s+/).filter(w => w.length > 2);
-
-    if (words1.length === 0 || words2.length === 0) return 0;
-
-    const set1 = new Set(words1);
-    const set2 = new Set(words2);
-    const intersection = [...set1].filter(w => set2.has(w));
-
-    return intersection.length / Math.max(set1.size, set2.size);
-}
-
 // Calculate similarity score between two product titles (0-1 range)
-function calculateSimilarity(str1, str2) {
-    if (!str1 || !str2) return 0;
+async function calculateSimilarity(title1, title2) {
+    const response = await openai.chat.completions.create({
+        model: "gpt-5-nano",
+        messages: [
+            {
+                role: "system",
+                content: `You are a product matching expert. Compare two product titles and return ONLY a similarity score from 0.0000 to 1.0000 (4 decimal places).
 
-    const clean1 = cleanTitle(str1);
-    const clean2 = cleanTitle(str2);
+Scoring criteria (by importance):
+1. Brand (highest priority): Must match exactly
+   - Same brand: continue scoring
+   - Different brand: return 0.0000-0.2000
 
-    if (clean1 === clean2) return 1.0;
+2. Model and product name (high priority): Core product identifier
+   - Same: major score boost
+   - Different: significant penalty
 
-    const info1 = extractKeyInfo(str1);
-    const info2 = extractKeyInfo(str2);
+3. Specifications (medium priority): Storage, color, size and other important features.
 
-    let score = 0;
-    let weights = 0;
+Ignore seller info and marketing words.
+Return ONLY a decimal number between 0.0000 and 1.0000, nothing else.`
+            },
+            {
+                role: "user",
+                content: `Title 1: ${title1}\nTitle 2: ${title2}`
+            }
+        ]
+    });
 
-    // Brand matching (30% weight)
-    if (info1.brand && info2.brand) {
-        if (info1.brand === info2.brand) {
-            score += 0.35;
-        }
-        weights += 0.35;
+    const scoreText = response.choices[0].message.content.trim();
+    const score = parseFloat(scoreText);
+
+    if (isNaN(score) || score < 0 || score > 1) {
+        throw new Error('Invalid AI response');
     }
 
-    // Model matching (40% weight)
-    if (info1.model && info2.model) {
-        const modelSimilarity = compareModels(info1.model, info2.model);
-        score += modelSimilarity * 0.3;
-        weights += 0.3;
-    }
-
-    // Spec matching (20% weight)
-    const specScore = compareSpecs(info1, info2);
-    score += specScore * 0.2;
-    weights += 0.2;
-
-    // Word overlap (10% weight)
-    const wordScore = compareWords(clean1, clean2);
-    score += wordScore * 0.15;
-    weights += 0.15;
-
-    const finalScore = weights > 0 ? score / weights : 0;
-
-    console.log(`Similarity: "${str1.substring(0, 40)}" vs "${str2.substring(0, 40)}" = ${(finalScore * 100).toFixed(1)}%`);
-
-    return finalScore;
+    console.log(` AI Similarity: "${title1.substring(0, 30)}" vs "${title2.substring(0, 30)}" = ${(score * 100).toFixed(2)}%`);
+    return score;
 }
 
 // Extract short title from full product title
-function extractShortTitle(fullTitle) {
-    if (!fullTitle) return 'Unknown Product';
-
-    let cleaned = fullTitle
-        .replace(/\(.*?\)/g, '')
-        .replace(/[-–—]\s*(Unlocked|GSM|CDMA|Certified|Refurbished|Pre-Owned|Factory|International|US Version).*/gi, '')
-        .replace(/\s*,\s*(Free Shipping|Fast Delivery|Best Price|Top Rated|Best Seller).*/gi, '')
-        .replace(/\s+(with|for|by)\s+.*/gi, '')
-        .replace(/\b(Limited Edition|Special Edition|Exclusive)\b/gi, '')
-        .replace(/\b(Verizon|AT&T|T-Mobile|Sprint|US Cellular)\b(?!\s*Unlocked)/gi, '')
-        .replace(/\b(US Version|International Version|Global Version)\b/gi, '')
-        .replace(/[•●○▪▫]/g, ' ')
-        .replace(/[-–—]/g, ' ')
-        .replace(/[,;:]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-    const words = cleaned.split(/[\s,]+/).filter(w =>
-        w.length > 1 &&
-        !/^(the|and|or|with|for|by|in|on|at|to|from|of)$/i.test(w)
-    );
-
-    const maxWords = 15;
-    let shortWords = words.slice(0, maxWords);
-
-    const color = extractColorDetailed(fullTitle);
-    if (color && shortWords.length < maxWords) {
-        const colorWords = color.split(/\s+/);
-        const colorInTitle = colorWords.every(cw =>
-            shortWords.some(sw => sw.toLowerCase() === cw.toLowerCase())
-        );
-
-        if (!colorInTitle) {
-            if (shortWords.length + colorWords.length <= maxWords) {
-                shortWords.push(...colorWords);
+async function extractShortTitle(fullTitle) {
+    const response = await openai.chat.completions.create({
+        model: "gpt-5-nano",
+        messages: [
+            {
+                role: "system",
+                content: `You are a product title optimizer. Extract the core product information from titles, keeping only:
+- Brand name
+- Product model/name
+- Key specifications/configurations (storage, color, important features)
+- Remove marketing words, conditions (renewed, refurbished), seller info, and redundant details
+- Maximum 15 words
+- Return ONLY the cleaned title, no explanation.`
+            },
+            {
+                role: "user",
+                content: `Extract short title from: ${fullTitle}`
             }
-        }
-    }
+        ]
+    });
 
-    const storageMatches = [...fullTitle.matchAll(/\b(\d+)\s*(GB|TB|MB)(?:\s*RAM)?\b/gi)];
-    const storageInfo = [];
-
-    for (const match of storageMatches) {
-        const value = match[1];
-        const unit = match[2].toUpperCase();
-        const isRAM = match[0].toLowerCase().includes('ram');
-
-        const storageStr = isRAM ? `${value}${unit} RAM` : `${value}${unit}`;
-
-        const alreadyIncluded = shortWords.some(w =>
-            w.toLowerCase().includes(value.toLowerCase()) &&
-            w.toLowerCase().includes(unit.toLowerCase())
-        );
-
-        if (!alreadyIncluded && shortWords.length < maxWords) {
-            storageInfo.push(storageStr);
-        }
-    }
-
-    const uniqueStorage = [...new Set(storageInfo)];
-    for (const storage of uniqueStorage) {
-        if (shortWords.length < maxWords) {
-            const storageWords = storage.split(/\s+/);
-            if (shortWords.length + storageWords.length <= maxWords) {
-                shortWords.push(...storageWords);
-            }
-        }
-    }
-
-    const configs = extractConfigs(fullTitle);
-    for (const config of configs) {
-        if (shortWords.length < maxWords) {
-            const configWords = config.split(/\s+/);
-
-            const configInTitle = configWords.every(cw =>
-                shortWords.some(sw => sw.toLowerCase() === cw.toLowerCase())
-            );
-
-            if (!configInTitle && shortWords.length + configWords.length <= maxWords) {
-                shortWords.push(...configWords);
-            }
-        }
-    }
-
-    const result = shortWords.join(' ');
-
-    return result.length > 250 ? result.substring(0, 247) + '...' : result;
-}
-
-// Extract detailed color from title
-function extractColorDetailed(title) {
-    const multiWordColors = [
-        'Natural Titanium', 'Blue Titanium', 'White Titanium', 'Black Titanium',
-        'Space Gray', 'Space Black', 'Rose Gold', 'Midnight Green', 'Pacific Blue',
-        'Sierra Blue', 'Alpine Green', 'Deep Purple', 'Starlight', 'Midnight',
-        'Product Red', 'Jet Black', 'Matte Black', 'Graphite Black'
-    ];
-
-    for (const color of multiWordColors) {
-        const regex = new RegExp(`\\b${color}\\b`, 'i');
-        if (regex.test(title)) {
-            return color;
-        }
-    }
-
-    const singleWordColors = [
-        'Red', 'Black', 'White', 'Blue', 'Green', 'Yellow', 'Purple',
-        'Pink', 'Orange', 'Gray', 'Grey', 'Silver', 'Gold', 'Bronze',
-        'Titanium', 'Graphite', 'Coral', 'Lavender'
-    ];
-
-    for (const color of singleWordColors) {
-        const regex = new RegExp(`\\b${color}\\b`, 'i');
-        if (regex.test(title)) {
-            return color;
-        }
-    }
-
-    return null;
-}
-
-// Extract key configurations from title
-function extractConfigs(title) {
-    const configs = [];
-
-    const keywords = [
-        'Unlocked', '5G', '4G', 'LTE', 'WiFi', 'Wi-Fi', 'WiFi 6', 'Bluetooth',
-        'Dual SIM', 'eSIM', 'Touchscreen', 'Retina', 'OLED', 'AMOLED',
-        'Water Resistant', 'Waterproof', 'Wireless Charging', 'Fast Charging',
-        'Noise Cancelling', 'Active Noise Cancelling', 'ANC'
-    ];
-
-    for (const keyword of keywords) {
-        const regex = new RegExp(`\\b${keyword}\\b`, 'i');
-        if (regex.test(title)) {
-            configs.push(keyword);
-        }
-    }
-
-    return configs.slice(0, 3);
+    const shortTitle = response.choices[0].message.content.trim();
+    console.log(` AI Short Title: "${fullTitle.substring(0, 50)}..." → "${shortTitle}"`);
+    return shortTitle;
 }
 
 // Generate product information string
@@ -520,13 +143,8 @@ module.exports = {
     hashPassword,
     parsePrice,
     parseRating,
-    cleanTitle,
-    extractKeyInfo,
     calculateSimilarity,
     extractShortTitle,
-    levenshteinDistance,
-    extractColorDetailed,
-    extractConfigs,
     generateInformation,
     isUsedProduct
 };

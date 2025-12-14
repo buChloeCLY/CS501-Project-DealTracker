@@ -144,7 +144,7 @@ async function importInitialProducts(queries = DEFAULT_QUERIES) {
             const ebayProducts = await fetchFromEbay(amazonProduct.shortTitle, 1);
 
             if (ebayProducts.length > 0) {
-                const ebayProduct = findBestEbayMatch({ title: amazonProduct.fullTitle, price: amazonProduct.price }, ebayProducts);
+                const ebayProduct = await findBestEbayMatch({ title: amazonProduct.fullTitle, price: amazonProduct.price }, ebayProducts);
 
                 if (ebayProduct && ebayProduct.price > 0) {
                     await pool.query(`
@@ -163,7 +163,7 @@ async function importInitialProducts(queries = DEFAULT_QUERIES) {
             const walmartProducts = await fetchFromWalmart(amazonProduct.shortTitle, 1);
 
             if (walmartProducts.length > 0) {
-                const walmartProduct = findBestWalmartMatch({ title: amazonProduct.fullTitle, price: amazonProduct.price }, walmartProducts);
+                const walmartProduct = await findBestWalmartMatch({ title: amazonProduct.fullTitle, price: amazonProduct.price }, walmartProducts);
 
                 if (walmartProduct && walmartProduct.price > 0) {
                     await pool.query(`

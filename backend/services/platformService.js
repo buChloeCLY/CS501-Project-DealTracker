@@ -286,7 +286,7 @@ function transformWalmartProduct(apiProduct) {
 }
 
 // Find best matching Walmart product
-function findBestWalmartMatch(dbProduct, walmartProducts) {
+async function findBestWalmartMatch(dbProduct, walmartProducts) {
     if (!walmartProducts || walmartProducts.length === 0) {
         return null;
     }
@@ -336,17 +336,17 @@ function findBestWalmartMatch(dbProduct, walmartProducts) {
         }
     }
 
-    const scored = candidates.map(product => ({
+    const scored = await Promise.all( candidates.map(async product => ({
         product: product,
-        similarity: calculateSimilarity(dbProduct.title, product.title),
+        similarity: await calculateSimilarity(dbProduct.title, product.title),
         price: product.price
-    }));
+    })));
 
     scored.sort((a, b) => b.similarity - a.similarity);
 
     const topSimilarity = scored[0].similarity;
 
-    const topMatches = scored.filter(s => s.similarity >= topSimilarity - 0.03);
+    const topMatches = scored.filter(s => s.similarity >= topSimilarity - 0.05);
 
     if (topMatches.length > 1) {
         topMatches.sort((a, b) => a.price - b.price);
@@ -360,7 +360,7 @@ function findBestWalmartMatch(dbProduct, walmartProducts) {
 }
 
 // Find best matching eBay product
-function findBestEbayMatch(dbProduct, ebayProducts) {
+async function findBestEbayMatch(dbProduct, ebayProducts) {
     if (!ebayProducts || ebayProducts.length === 0) {
         return null;
     }
@@ -396,9 +396,12 @@ function findBestEbayMatch(dbProduct, ebayProducts) {
     }
 
     if (dbProduct.price) {
+        console.log(`    [eBay] Has reference price: $${dbProduct.price}`);
         const referencePrice = dbProduct.price;
-        const minPrice = referencePrice * 0.5;
+        const minPrice = referencePrice * 0.2;
         const maxPrice = referencePrice * 2.5;
+
+        console.log(`    [eBay] Price range: $${minPrice.toFixed(2)} - $${maxPrice.toFixed(2)} (ref: $${referencePrice})`);
 
         const priceFiltered = candidates.filter(p => {
             if (p.price < minPrice || p.price > maxPrice) {
@@ -416,17 +419,17 @@ function findBestEbayMatch(dbProduct, ebayProducts) {
         }
     }
 
-    const scored = candidates.map(product => ({
+    const scored = await Promise.all( candidates.map(async product => ({
         product: product,
-        similarity: calculateSimilarity(dbProduct.title, product.title),
+        similarity: await calculateSimilarity(dbProduct.title, product.title),
         price: product.price
-    }));
+    })));
 
     scored.sort((a, b) => b.similarity - a.similarity);
 
     const topSimilarity = scored[0].similarity;
 
-    const topMatches = scored.filter(s => s.similarity >= topSimilarity - 0.03);
+    const topMatches = scored.filter(s => s.similarity >= topSimilarity - 0.05);
 
     if (topMatches.length > 1) {
         topMatches.sort((a, b) => a.price - b.price);
