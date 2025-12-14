@@ -172,8 +172,8 @@ function transformAmazonProduct(apiProduct, category) {
         price: parsePrice(apiProduct.product_price),
         rating: parseRating(apiProduct.product_star_rating),
         platform: 'Amazon',
-        freeShipping: apiProduct.is_prime ? 1 : 0,
-        inStock: apiProduct.product_availability?.toLowerCase().includes('in stock') ? 1 : 0,
+        freeShipping: freeShipping ? 1 : 0,
+        inStock: inStock ? 1 : 0,
         information: generateInformation(apiProduct),
         category: category,
         imageUrl: apiProduct.product_photo || '',
@@ -397,7 +397,7 @@ function findBestEbayMatch(dbProduct, ebayProducts) {
 
     if (dbProduct.price) {
         const referencePrice = dbProduct.price;
-        const minPrice = referencePrice * 0.3;
+        const minPrice = referencePrice * 0.5;
         const maxPrice = referencePrice * 2.5;
 
         const priceFiltered = candidates.filter(p => {

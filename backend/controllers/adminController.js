@@ -256,7 +256,7 @@ async function syncEBayPrices(req, res) {
                 const ebayProducts = await fetchFromEbay(searchQuery, 1);
 
                 if (ebayProducts.length > 0) {
-                    const bestMatch = findBestEbayMatch({ title: dbProduct.title }, ebayProducts);
+                    const bestMatch = findBestEbayMatch(dbProduct, ebayProducts);
 
                     if (bestMatch && bestMatch.price > 0) {
                         const [existing] = await pool.query(
