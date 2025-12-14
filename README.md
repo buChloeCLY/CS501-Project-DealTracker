@@ -306,8 +306,6 @@ Run `app` in Android Studio.
 │   ├── RegisterScreen.kt
 │   └── SettingScreen.kt
 ├── theme
-│   ├── AppColors.kt
-│   ├── AppDimens.kt
 │   ├── Color.kt
 │   ├── Theme.kt
 │   └── Type.kt

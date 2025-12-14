@@ -38,8 +38,6 @@ import coil.request.ImageRequest
 import com.example.dealtracker.domain.model.Category
 import com.example.dealtracker.domain.model.PlatformPrice
 import com.example.dealtracker.ui.detail.viewmodel.ProductViewModel
-import com.example.dealtracker.ui.theme.AppColors
-import com.example.dealtracker.ui.theme.AppDimens
 import com.example.dealtracker.ui.theme.AppTheme
 import com.example.dealtracker.domain.model.Platform
 import com.example.dealtracker.domain.model.Product
@@ -294,7 +292,7 @@ fun ProductDetailScreen(
                                                 )
                                             }
                                         },
-                                    shape = RoundedCornerShape(AppDimens.CornerRadius),
+                                    shape = RoundedCornerShape(16.dp),
                                     colors = CardDefaults.cardColors(containerColor = colors.surface),
                                 ) {
                                     Row(
@@ -397,7 +395,7 @@ private fun PlatformPriceCardList(
                     .clickable {
                         onItemClick(row.link ?: "")
                     },
-                shape = RoundedCornerShape(AppDimens.CornerRadius),
+                shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = AppTheme.colors.card)
             ) {
                 Row(
@@ -417,7 +415,7 @@ private fun PlatformPriceCardList(
                             Text(
                                 row.platformName,
                                 fontWeight = FontWeight.Medium,
-                                color = AppColors.PrimaryText
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
@@ -425,7 +423,7 @@ private fun PlatformPriceCardList(
                     Text(
                         "$${"%.2f".format(row.price)}",
                         fontWeight = FontWeight.Bold,
-                        color = AppColors.Accent
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
