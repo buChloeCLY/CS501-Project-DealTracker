@@ -42,7 +42,7 @@ class MainActivity : ComponentActivity() {
     private var notificationUid: Int = -1
     private var notificationPid: Int = -1
 
-    // ⭐ 保存 Deep Link 的产品 ID
+    //  保存 Deep Link 的产品 ID
     private var deepLinkPid: Int = -1
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -50,23 +50,23 @@ class MainActivity : ComponentActivity() {
 
         // 第 1 步：初始化 UserPreferences
         UserPreferences.init(this)
-        Log.d(TAG, "✅ UserPreferences initialized")
+        Log.d(TAG, " UserPreferences initialized")
 
         // 第 2 步：从 SharedPreferences 恢复用户登录状态
         lifecycleScope.launch {
             val savedUser = UserPreferences.getUser()
             if (savedUser != null) {
                 UserManager.setUser(savedUser)
-                Log.d(TAG, "✅ Restored user from SharedPreferences: uid=${savedUser.uid}")
+                Log.d(TAG, "Restored user from SharedPreferences: uid=${savedUser.uid}")
             } else {
-                Log.d(TAG, "⚠️ No saved user found")
+                Log.d(TAG, "No saved user found")
             }
         }
 
         // 第 3 步：处理通知点击
         handleNotificationClick(intent)
 
-        // ⭐ 第 4 步：处理 Deep Link
+        //  第 4 步：处理 Deep Link
         handleDeepLink(intent)
 
         setContent {
@@ -115,7 +115,7 @@ class MainActivity : ComponentActivity() {
             val pid = extras.getInt("notification_pid", -1)
 
             if (uid > 0 && pid > 0) {
-                Log.d(TAG, "✅ Notification clicked: uid=$uid, pid=$pid")
+                Log.d(TAG, "Notification clicked: uid=$uid, pid=$pid")
 
                 // 保存信息用于导航
                 notificationUid = uid
@@ -133,12 +133,12 @@ class MainActivity : ComponentActivity() {
     private fun handleDeepLink(intent: Intent?) {
         val data = intent?.data
         if (data != null && data.scheme == "dealtracker") {
-            Log.d(TAG, "✅ Deep Link detected: $data")
+            Log.d(TAG, " Deep Link detected: $data")
 
             if (data.host == "product") {
                 val pid = data.lastPathSegment?.toIntOrNull()
                 if (pid != null && pid > 0) {
-                    Log.d(TAG, "✅ Deep Link to product: pid=$pid")
+                    Log.d(TAG, " Deep Link to product: pid=$pid")
                     deepLinkPid = pid
                 }
             }
@@ -192,7 +192,7 @@ fun DealTrackerApp(
         }
     }
 
-    // ⭐ Deep Link 导航
+    // Deep Link 导航
     LaunchedEffect(deepLinkPid) {
         if (deepLinkPid > 0) {
             Log.d("DealTrackerApp", "🔗 Deep Link navigation to product: pid=$deepLinkPid")
@@ -201,9 +201,9 @@ fun DealTrackerApp(
                 navController.navigate("detail/$deepLinkPid") {
                     popUpTo(Routes.HOME) { inclusive = false }
                 }
-                Log.d("DealTrackerApp", "✅ Navigating to product detail: pid=$deepLinkPid")
+                Log.d("DealTrackerApp", " Navigating to product detail: pid=$deepLinkPid")
             } catch (e: Exception) {
-                Log.e("DealTrackerApp", "❌ Deep Link navigation failed: ${e.message}")
+                Log.e("DealTrackerApp", " Deep Link navigation failed: ${e.message}")
             }
         }
     }

@@ -294,7 +294,7 @@ fun CategorySection(onCategoryClick: (String) -> Unit) {
 
     val allCategories = listOf(
         "Electronics", "Beauty", "Home", "Food", "Fashion", "Sports",
-        "Books", "Toys", "Health", "Outdoors", "Office", "Pets"
+        "Books", "Toys", "Health", "Pets"
     )
     val displayedCategories = if (expanded) allCategories else allCategories.take(6)
 
