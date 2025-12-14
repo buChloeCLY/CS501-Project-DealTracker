@@ -42,28 +42,111 @@ function extractKeyInfo(title) {
         specs: []
     };
 
-    const brands = [
-        'apple', 'samsung', 'google', 'sony', 'lg', 'motorola', 'oneplus',
-        'dell', 'hp', 'lenovo', 'asus', 'acer', 'microsoft',
-        'bose', 'beats', 'jbl', 'airpods',
-        'nike', 'adidas', 'puma'
-    ];
+    const brands = {
+        // Electronics
+        'apple': 'apple',
+        'samsung': 'samsung',
+        'dell': 'dell',
+        'hp': 'hp',
+        'sony': 'sony',
+        'bose': 'bose',
+        'lg': 'lg',
 
-    for (const brand of brands) {
-        if (lower.includes(brand)) {
-            info.brand = brand;
+        // Beauty
+        'cerave': 'cerave',
+        'neutrogena': 'neutrogena',
+        'maybelline': 'maybelline',
+        'l\'oreal': 'loreal',
+        'loreal': 'loreal',
+
+        // Home
+        'dyson': 'dyson',
+        'shark': 'shark',
+        'kitchenaid': 'kitchenaid',
+        'ninja': 'ninja',
+        'instant pot': 'instantpot',
+
+        // Food
+        'starbucks': 'starbucks',
+        'ghirardelli': 'ghirardelli',
+        'kind': 'kind',
+
+        // Fashion
+        'nike': 'nike',
+        'adidas': 'adidas',
+        'levi\'s': 'levis',
+        'levis': 'levis',
+        'north face': 'northface',
+        'the north face': 'northface',
+
+        // Sports
+        'fitbit': 'fitbit',
+        'garmin': 'garmin',
+
+        // Toys
+        'lego': 'lego',
+        'hot wheels': 'hotwheels',
+        'barbie': 'barbie',
+        'rubik\'s': 'rubiks',
+        'rubiks': 'rubiks',
+
+        // Health
+        'omron': 'omron',
+        'braun': 'braun',
+
+        // Outdoors
+        'coleman': 'coleman',
+        'yeti': 'yeti',
+        'stanley': 'stanley',
+
+        // Office
+        'logitech': 'logitech'
+    };
+
+    for (const [brandKey, brandValue] of Object.entries(brands)) {
+        if (lower.includes(brandKey)) {
+            info.brand = brandValue;
             break;
         }
     }
 
     const modelPatterns = [
-        /iphone\s*(\d+\s*pro\s*max|\d+\s*pro|\d+\s*plus|\d+)/i,
-        /galaxy\s*s\d+\s*(ultra|plus)?/i,
-        /pixel\s*\d+\s*(pro|xl)?/i,
-        /macbook\s*(pro|air)/i,
+        // Apple
+        /iphone\s*1[0-9]\s*(pro\s*max|pro|plus)?/i,
         /ipad\s*(pro|air|mini)?/i,
+        /macbook\s*(pro|air)/i,
         /airpods\s*(pro|max)?/i,
-        /echo\s*(dot|show|studio)?/i
+
+        // Samsung
+        /galaxy\s*s2[0-9]\s*(ultra|plus|fe)?/i,
+
+        // Dell/HP
+        /xps\s*1[0-9]/i,
+        /envy|pavilion|spectre/i,
+
+        // Sony/Bose
+        /wh-1000xm[0-9]/i,
+        /quietcomfort\s*(ultra|45|35)?/i,
+
+        // LG/Samsung TV
+        /oled\s*[a-z]?[0-9]/i,
+        /qled|neo qled/i,
+
+        // KitchenAid/Ninja
+        /stand\s*mixer/i,
+        /blender/i,
+
+        // Fitness
+        /charge\s*[0-9]/i,
+        /forerunner|fenix|vivoactive/i,
+
+        // LEGO
+        /star\s*wars|harry\s*potter|city|technic/i,
+
+        // Books
+        /atomic\s*habits/i,
+        /harry\s*potter/i,
+        /song\s*of\s*ice\s*and\s*fire/i
     ];
 
     for (const pattern of modelPatterns) {
@@ -82,7 +165,9 @@ function extractKeyInfo(title) {
 
     const colors = [
         'red', 'black', 'white', 'blue', 'green', 'yellow', 'purple',
-        'silver', 'gold', 'rose gold', 'space gray', 'midnight', 'starlight'
+        'pink', 'orange', 'gray', 'grey', 'silver', 'gold', 'bronze',
+        'titanium', 'graphite', 'coral', 'lavender', 'onyx', 'starlight',
+        'midnight', 'space gray', 'rose gold'
     ];
 
     for (const color of colors) {
@@ -94,9 +179,15 @@ function extractKeyInfo(title) {
     }
 
     const specPatterns = [
-        /pro max/i, /pro/i, /plus/i, /mini/i, /ultra/i,
+        /pro max/i, /pro/i, /plus/i, /mini/i, /ultra/i, /fe/i,
         /unlocked/i, /renewed/i, /refurbished/i,
-        /5g/i, /wifi/i, /cellular/i
+        /5g/i, /wifi/i, /cellular/i,
+        /vacuum/i, /cleaner/i, /mixer/i, /blender/i,
+        /running/i, /fitness/i, /yoga/i,
+        /moisturizer/i, /sunscreen/i, /mascara/i, /foundation/i,
+        /coffee/i, /chocolate/i, /protein/i,
+        /camping/i, /cooler/i, /thermos/i,
+        /wireless/i, /mechanical/i, /standing/i
     ];
 
     for (const pattern of specPatterns) {
@@ -207,16 +298,16 @@ function calculateSimilarity(str1, str2) {
     // Brand matching (30% weight)
     if (info1.brand && info2.brand) {
         if (info1.brand === info2.brand) {
-            score += 0.3;
+            score += 0.35;
         }
-        weights += 0.3;
+        weights += 0.35;
     }
 
     // Model matching (40% weight)
     if (info1.model && info2.model) {
         const modelSimilarity = compareModels(info1.model, info2.model);
-        score += modelSimilarity * 0.4;
-        weights += 0.4;
+        score += modelSimilarity * 0.3;
+        weights += 0.3;
     }
 
     // Spec matching (20% weight)
@@ -226,8 +317,8 @@ function calculateSimilarity(str1, str2) {
 
     // Word overlap (10% weight)
     const wordScore = compareWords(clean1, clean2);
-    score += wordScore * 0.1;
-    weights += 0.1;
+    score += wordScore * 0.15;
+    weights += 0.15;
 
     const finalScore = weights > 0 ? score / weights : 0;
 
