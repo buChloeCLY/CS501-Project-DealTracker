@@ -30,6 +30,8 @@ import com.example.dealtracker.ui.theme.DealTrackerTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import com.example.dealtracker.ui.wishlist.viewmodel.WishListViewModel
+import androidx.lifecycle.ViewModelProvider
 
 /**
  * Main application activity, responsible for initialization, theme setup,
@@ -42,6 +44,8 @@ class MainActivity : ComponentActivity() {
     private val requestAudioPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
+    private lateinit var wishListViewModel: WishListViewModel
+
     // Stores notification click information
     private var notificationUid: Int = -1
     private var notificationPid: Int = -1
@@ -51,6 +55,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        wishListViewModel = ViewModelProvider(this)[WishListViewModel::class.java]
 
         // Initialize UserPreferences
         UserPreferences.init(this)
@@ -158,15 +164,9 @@ class MainActivity : ComponentActivity() {
      * @param pid Product ID.
      */
     private fun markNotificationAsRead(uid: Int, pid: Int) {
-        CoroutineScope(Dispatchers.IO).launch {
-            val repository = WishlistRepository()
-            repository.markRead(uid, pid)
-                .onSuccess {
-                    Log.d(TAG, "Successfully marked as read: pid=$pid")
-                }
-                .onFailure { e ->
-                    Log.e(TAG, "Failed to mark as read: ${e.message}")
-                }
+        lifecycleScope.launch {
+            wishListViewModel.markAsRead(uid, pid)
+            Log.d(TAG, "✅ Called ViewModel.markAsRead for pid=$pid")
         }
     }
 

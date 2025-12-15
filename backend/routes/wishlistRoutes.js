@@ -7,6 +7,8 @@ const wishlistController = require('../controllers/wishlistController');
 router.get('/alerts', wishlistController.getPriceAlerts);
 router.get('/', wishlistController.getWishlist);
 router.post('/', wishlistController.addToWishlist);
+router.post('/mark-notified', wishlistController.markAsNotified);
+router.post('/mark-read', wishlistController.markAsRead);
 router.delete('/', wishlistController.removeFromWishlist);
 
 module.exports = router;

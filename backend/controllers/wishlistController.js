@@ -66,14 +66,32 @@ async function addToWishlist(req, res) {
 
         // Insert or update (upsert based on uid+pid unique constraint)
         await pool.query(`
-            INSERT INTO wishlist (uid, pid, target_price)
-            VALUES (?, ?, ?)
+            INSERT INTO wishlist (uid, pid, target_price, alert_status)
+            VALUES (?, ?, ?, 0)
             ON DUPLICATE KEY UPDATE
                 target_price = VALUES(target_price),
+                alert_status = 0,
                 updated_at = CURRENT_TIMESTAMP
         `, [uid, pid, tp]);
 
-        res.json({ success: true });
+        const [priceCheck] = await pool.query(`
+            SELECT MIN(p1.price) AS current_price
+            FROM price p1
+            JOIN (
+                SELECT pid, platform, MAX(date) AS max_date
+                FROM price
+                WHERE pid = ?
+                GROUP BY pid, platform
+            ) latest ON latest.pid = p1.pid
+                       AND latest.platform = p1.platform
+                       AND latest.max_date = p1.date
+            WHERE p1.pid = ?
+        `, [pid, pid]);
+
+        const currentPrice = priceCheck[0]?.current_price;
+        const priceReached = tp && currentPrice && currentPrice <= tp;
+
+        res.json({ success: true, priceReached: priceReached, currentPrice: currentPrice });
     } catch (error) {
         console.error('Add/Update wishlist error:', error);
         res.status(500).json({ error: error.message });
@@ -145,8 +163,13 @@ async function getPriceAlerts(req, res) {
                 GROUP BY w2.pid
             ) lp ON lp.pid = w.pid
             WHERE w.uid = ?
+              AND w.alert_status < 2
               AND lp.current_price IS NOT NULL
               AND lp.current_price <= w.target_price
+              AND (
+                  w.last_alert_time IS NULL
+                  OR w.last_alert_time < DATE_SUB(NOW(), INTERVAL 6 HOUR)
+              )
         `, [uid, uid]);
 
         res.json(rows);
@@ -181,10 +204,62 @@ async function updateTargetPrice(req, res) {
     }
 }
 
+// Mark alert as notified (sent to user)
+// POST /api/wishlist/mark-notified
+// Body: { uid, pid }
+async function markAsNotified(req, res) {
+    try {
+        const { uid, pid } = req.body;
+
+        if (!uid || !pid) {
+            return res.status(400).json({ error: 'uid and pid are required' });
+        }
+
+        // alert_status: 0=no trigger, 1=notified but not read, 2=read
+        await pool.query(`
+            UPDATE wishlist
+            SET alert_status = 1,
+                last_alert_time = NOW()
+            WHERE uid = ? AND pid = ?
+        `, [uid, pid]);
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Mark as notified error:', error);
+        res.status(500).json({ error: error.message });
+    }
+}
+
+// Mark alert as read (user clicked notification)
+// POST /api/wishlist/mark-read
+// Body: { uid, pid }
+async function markAsRead(req, res) {
+    try {
+        const { uid, pid } = req.body;
+
+        if (!uid || !pid) {
+            return res.status(400).json({ error: 'uid and pid are required' });
+        }
+
+        // alert_status: 2=read, notified until the next price change
+        await pool.query(
+            'UPDATE wishlist SET alert_status = 2 WHERE uid = ? AND pid = ?',
+            [uid, pid]
+        );
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Mark as read error:', error);
+        res.status(500).json({ error: error.message });
+    }
+}
+
 module.exports = {
     getWishlist,
     addToWishlist,
     removeFromWishlist,
     getPriceAlerts,
-    updateTargetPrice
+    updateTargetPrice,
+    markAsNotified,
+    markAsRead
 };

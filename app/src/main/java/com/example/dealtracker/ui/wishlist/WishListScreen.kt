@@ -43,11 +43,31 @@ fun WishListScreen(
     val wishList by viewModel.wishList.collectAsState()
     val targetPrices by viewModel.targetPrices.collectAsState()
     val context = LocalContext.current
+    val TAG = "WishListScreen"
 
     LaunchedEffect(currentUserId) {
         if (currentUserId > 0) {
-            Log.d("WishListScreen", "Loading wishlist for uid=$currentUserId")
+            Log.d(TAG, "Loading wishlist for uid=$currentUserId")
+            NotificationHelper.createNotificationChannel(context)
             viewModel.loadWishlist(currentUserId)
+            viewModel.checkAlerts(currentUserId) { alerts ->
+                Log.d(TAG, "Received ${alerts.size} price alerts")
+                alerts.forEach { alert ->
+                    alert.current_price?.let { currentPrice ->
+                        alert.target_price?.let { targetPrice ->
+                            Log.d(TAG, "Showing notification for pid=${alert.pid}")
+                            NotificationHelper.showPriceDropNotification(
+                                context = context,
+                                uid = currentUserId,
+                                pid = alert.pid,
+                                title = alert.title ?: "Product",
+                                currentPrice = currentPrice,
+                                targetPrice = targetPrice
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 
