@@ -43,28 +43,37 @@ async function updateAllPrices(req, res) {
                    pr_ebay.link AS ebay_link
             FROM products p
             LEFT JOIN (
-                SELECT pid, idInPlatform, link
-                FROM price
-                WHERE platform = 'Amazon'
-                  AND id IN (
-                      SELECT MAX(id) FROM price WHERE platform = 'Amazon' GROUP BY pid
-                  )
+                SELECT p1.pid, p1.idInPlatform, p1.link
+                FROM price p1
+                INNER JOIN (
+                    SELECT pid, MAX(date) AS max_date
+                    FROM price
+                    WHERE platform = 'Amazon'
+                    GROUP BY pid
+                ) p2 ON p1.pid = p2.pid AND p1.date = p2.max_date
+                WHERE p1.platform = 'Amazon'
             ) pr_amazon ON p.pid = pr_amazon.pid
             LEFT JOIN (
-                SELECT pid, link
-                FROM price
-                WHERE platform = 'Walmart'
-                  AND id IN (
-                      SELECT MAX(id) FROM price WHERE platform = 'Walmart' GROUP BY pid
-                  )
+                SELECT p1.pid, p1.link
+                FROM price p1
+                INNER JOIN (
+                    SELECT pid, MAX(date) AS max_date
+                    FROM price
+                    WHERE platform = 'Walmart'
+                    GROUP BY pid
+                ) p2 ON p1.pid = p2.pid AND p1.date = p2.max_date
+                WHERE p1.platform = 'Walmart'
             ) pr_walmart ON p.pid = pr_walmart.pid
             LEFT JOIN (
-                SELECT pid, link
-                FROM price
-                WHERE platform = 'eBay'
-                  AND id IN (
-                      SELECT MAX(id) FROM price WHERE platform = 'eBay' GROUP BY pid
-                  )
+                SELECT p1.pid, p1.link
+                FROM price p1
+                INNER JOIN (
+                    SELECT pid, MAX(date) AS max_date
+                    FROM price
+                    WHERE platform = 'eBay'
+                    GROUP BY pid
+                ) p2 ON p1.pid = p2.pid AND p1.date = p2.max_date
+                WHERE p1.platform = 'eBay'
             ) pr_ebay ON p.pid = pr_ebay.pid
         `);
 
@@ -94,6 +103,7 @@ async function updateAllPrices(req, res) {
 
                 // Update Walmart price
                 if (dbProduct.walmart_link) {
+                    console.log(`    Walmart link: ${dbProduct.walmart_link}...`);
                     const walmartDetails = await getWalmartProductDetails(dbProduct.walmart_link);
                     if (walmartDetails && walmartDetails.price > 0) {
                         await pool.query(`
@@ -385,7 +395,7 @@ async function syncLowestPrices() {
             }
 
             const best = rows[0];
-            const lowestPricePlatforms = rows.filter(r => r.price === lowestPrice);
+            const lowestPricePlatforms = rows.filter(r => r.price === best.price);
             const platformNames = lowestPricePlatforms.map(p => p.platform).join(', ');
             const freeShipping = lowestPricePlatforms.some(p => p.free_shipping === 1 || p.free_shipping === true);
             const inStock = lowestPricePlatforms.some(p => p.in_stock === 1 || p.in_stock === true);
@@ -402,15 +412,15 @@ async function syncLowestPrices() {
             `, [
                 best.price,
                 platformNames,
-                free_shipping ? 1 : 0,
-                in_stock ? 1 : 0,
+                freeShipping ? 1 : 0,
+                inStock ? 1 : 0,
                 product.pid
             ]);
 
             updatedCount++;
             console.log(
-                `[PID ${product.pid}] -> ${best.platform}, price=$${best.price}, ` +
-                `free_shipping=${best.free_shipping}, in_stock=${best.in_stock}`
+                `[PID ${product.pid}] -> ${platformNames}, price=$${best.price}, ` +
+                `free_shipping=${freeShipping}, in_stock=${inStock}`
             );
 
         } catch (err) {

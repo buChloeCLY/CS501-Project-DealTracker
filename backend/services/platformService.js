@@ -545,15 +545,20 @@ async function getEbayProductDetails(productLink) {
 async function getWalmartProductDetails(productLink) {
     try {
         console.log(`   [Walmart] Fetching details from link`);
+        let cleanLink = productLink;
+        if (productLink.includes('?')) {
+            cleanLink = productLink.split('?')[0];
+            console.log(`   [Walmart] Cleaned link: ${cleanLink}`);
+        }
 
         if (!RAPIDAPI_KEYS.walmart) {
             console.log('   Walmart API key not configured');
             return null;
         }
 
-        const response = await axios.get('https://walmart-api4.p.rapidapi.com/details', {
+        const response = await axios.get('https://walmart-api4.p.rapidapi.com/details.php', {
             params: {
-                url: productLink
+                url: cleanLink
             },
             headers: {
                 'X-RapidAPI-Key': RAPIDAPI_KEYS.walmart,
@@ -564,70 +569,99 @@ async function getWalmartProductDetails(productLink) {
         const rawData = response.data;
 
         if (!rawData) {
-            console.log('   No data returned');
+            console.log('     API returned null/undefined');
             return null;
         }
 
-        let productGroup = null;
+        if (Array.isArray(rawData) && rawData.length === 0) {
+            console.log('     API returned empty array');
+            return null;
+        }
+
+        let allOffers = [];
 
         if (Array.isArray(rawData)) {
             for (const item of rawData) {
                 if (Array.isArray(item)) {
-                    const found = item.find(obj => obj['@type'] === 'ProductGroup');
-                    if (found) {
-                        productGroup = found;
-                        break;
+                    for (const nestedItem of item) {
+                        if (nestedItem['@type'] === 'ProductGroup') {
+                            if (nestedItem.hasVariant && Array.isArray(nestedItem.hasVariant)) {
+                                for (const variant of nestedItem.hasVariant) {
+                                    if (variant.offers && Array.isArray(variant.offers)) {
+                                        allOffers.push(...variant.offers);
+                                    }
+                                }
+                            }
+                        } else if (nestedItem['@type'] === 'Product') {
+                            if (nestedItem.offers && Array.isArray(nestedItem.offers)) {
+                                allOffers.push(...nestedItem.offers);
+                            }
+                        }
                     }
                 } else if (item['@type'] === 'ProductGroup') {
-                    productGroup = item;
-                    break;
+                    if (item.hasVariant && Array.isArray(item.hasVariant)) {
+                        for (const variant of item.hasVariant) {
+                            if (variant.offers && Array.isArray(variant.offers)) {
+                                allOffers.push(...variant.offers);
+                            }
+                        }
+                    }
+                } else if (item['@type'] === 'Product') {
+                    if (item.offers && Array.isArray(item.offers)) {
+                        allOffers.push(...item.offers);
+                    }
                 }
             }
         } else if (rawData['@type'] === 'ProductGroup') {
-            productGroup = rawData;
-        }
-
-        if (!productGroup) {
-            console.log('ProductGroup not found in response');
-            return null;
-        }
-
-        const allOffers = [];
-
-        if (productGroup.hasVariant && Array.isArray(productGroup.hasVariant)) {
-            for (const variant of productGroup.hasVariant) {
-                if (variant.url && !variant.offers) continue;
-
-                if (variant.offers && Array.isArray(variant.offers)) {
-                    allOffers.push(...variant.offers);
+            if (rawData.hasVariant && Array.isArray(rawData.hasVariant)) {
+                for (const variant of rawData.hasVariant) {
+                    if (variant.offers && Array.isArray(variant.offers)) {
+                        allOffers.push(...variant.offers);
+                    }
                 }
+            }
+        } else if (rawData['@type'] === 'Product') {
+            if (rawData.offers && Array.isArray(rawData.offers)) {
+                allOffers.push(...rawData.offers);
             }
         }
 
-        const prices = allOffers
-            .map(offer => offer.price)
-            .filter(p => p && p > 0);
-
-        if (prices.length === 0) {
-            console.log('No valid prices found');
+        if (allOffers.length === 0) {
+            console.log('     No offers found in response');
             return null;
         }
 
-        const lowestPrice = Math.min(...prices);
+        console.log(`   [Walmart] Found ${allOffers.length} total offers`);
 
-        const bestOffer = allOffers.find(offer => offer.price === lowestPrice);
+        const validPrices = [];
+
+        for (const offer of allOffers) {
+            const price = parseFloat(offer.price);
+            if (price && price > 0) {
+                validPrices.push(price);
+            }
+        }
+
+        if (validPrices.length === 0) {
+            console.log('     No valid prices found in offers');
+            return null;
+        }
+
+        const highestPrice = Math.max(...validPrices);
+
+        const bestOffer = allOffers.find(offer => parseFloat(offer.price) === highestPrice);
 
         const inStock = bestOffer.availability === 'https://schema.org/InStock';
         const freeShipping = bestOffer.shippingDetails?.shippingRate?.value === 0;
 
-        console.log(`   [Walmart] Details: price=$${lowestPrice}, inStock=${inStock}, freeShipping=${freeShipping}`);
+        console.log(`   [Walmart] Details: price=$${highestPrice}, inStock=${inStock}, freeShipping=${freeShipping}`);
 
-        if (prices.length > 1) {
-            console.log(`   [Walmart] Found ${prices.length} prices, selected lowest: $${lowestPrice}`);
+        if (validPrices.length > 1) {
+            console.log(`   [Walmart] Price range: $${Math.min(...validPrices)} - $${highestPrice}`);
         }
 
         return {
-            price: lowestPrice,
+            price: highestPrice,
             freeShipping: freeShipping ? 1 : 0,
             inStock: inStock ? 1 : 0
         };
