@@ -43,6 +43,7 @@ async function getPriceHistory(req, res) {
                     MIN(price) AS price
                 FROM price
                 WHERE pid = ?
+                AND platform != 'eBay'
                 GROUP BY d
                 ORDER BY d DESC
                 LIMIT ?
