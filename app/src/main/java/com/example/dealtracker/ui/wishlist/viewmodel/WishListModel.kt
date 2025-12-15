@@ -3,7 +3,7 @@ package com.example.dealtracker.ui.wishlist.viewmodel
 import com.google.gson.annotations.SerializedName
 
 /**
- * 心愿单项数据模型
+ * Data model for a single wishlist item received from the API.
  */
 data class WishlistItem(
     val wid: Int,
@@ -12,7 +12,7 @@ data class WishlistItem(
     val current_price: Double,
     val target_price: Double?,
 
-    // 使用 @SerializedName 让 Gson 自动转换 0/1 为 Boolean
+    // Use @SerializedName to handle Int (0/1) to Boolean conversion internally
     @SerializedName("alert_enabled")
     private val _alert_enabled: Int = 1,
 
@@ -35,7 +35,7 @@ data class WishlistItem(
     val savings: Double? = null,
     val created_at: String? = null
 ) {
-    // 提供 Boolean 属性供界面使用
+    // Boolean properties for UI consumption
     val alert_enabled: Boolean get() = _alert_enabled == 1
     val in_stock: Boolean get() = _in_stock == 1
     val free_shipping: Boolean get() = _free_shipping == 1
@@ -43,29 +43,29 @@ data class WishlistItem(
 }
 
 /**
- * 添加到心愿单的请求
+ * Request body for adding an item to the wishlist.
  */
 data class AddWishlistRequest(
     val uid: Int,
     val pid: Int,
     val target_price: Double? = null,
-    val alert_enabled: Int = 1,  // 发送时用 Int
+    val alert_enabled: Int = 1,  // Sent as Int to API
     val priority: Int = 2,
     val notes: String? = null
 )
 
 /**
- * 更新心愿单的请求
+ * Request body for updating an existing wishlist item.
  */
 data class UpdateWishlistRequest(
     val target_price: Double? = null,
-    val alert_enabled: Int? = null,  // 发送时用 Int
+    val alert_enabled: Int? = null,  // Sent as Int to API
     val priority: Int? = null,
     val notes: String? = null
 )
 
 /**
- * 心愿单响应
+ * Generic response for wishlist operations (add, update, delete).
  */
 data class WishlistResponse(
     val success: Boolean,
@@ -74,7 +74,7 @@ data class WishlistResponse(
 )
 
 /**
- * 检查心愿单响应
+ * Response when checking if a product is already in the wishlist.
  */
 data class CheckWishlistResponse(
     val in_wishlist: Boolean,
@@ -82,7 +82,7 @@ data class CheckWishlistResponse(
 )
 
 /**
- * 价格提醒响应
+ * Response containing a list of price alerts.
  */
 data class AlertsResponse(
     val total_alerts: Int,
@@ -90,7 +90,7 @@ data class AlertsResponse(
 )
 
 /**
- * 心愿单统计
+ * Data model for aggregated wishlist statistics.
  */
 data class WishlistStats(
     val total_items: Int,

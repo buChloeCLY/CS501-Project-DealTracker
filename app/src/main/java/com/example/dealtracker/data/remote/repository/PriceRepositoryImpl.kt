@@ -8,7 +8,6 @@ import com.example.dealtracker.domain.repository.PriceRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-// 价格仓库实现类
 class PriceRepositoryImpl: PriceRepository {
 
     private val api = RetrofitClient.priceApi
@@ -20,13 +19,12 @@ class PriceRepositoryImpl: PriceRepository {
                 dtoList.map { dto ->
                     PlatformPrice(
                         platformName = dto.platform,
-                        platformIcon = mapPlatformToIcon(dto.platform), // 平台图标映射
+                        platformIcon = mapPlatformToIcon(dto.platform),
                         price = dto.price,
-                        link = dto.link  // ⭐ 添加 link 字段
+                        link = dto.link
                     )
                 }
             } catch (e: Exception) {
-                // TODO: 添加更详细的错误处理
                 println("PriceRepository.getPlatformPrices error: ${e.message}")
                 emptyList()
             }
@@ -53,8 +51,7 @@ class PriceRepositoryImpl: PriceRepository {
     }
 
     /**
-     * 根据平台名称映射图标资源
-     * TODO: 后续可扩展为从服务器获取或使用本地资源
+     * icons of platforms
      */
     private fun mapPlatformToIcon(platformName: String): String {
         return when (platformName.lowercase()) {

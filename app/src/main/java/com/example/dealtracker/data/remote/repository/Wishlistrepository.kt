@@ -8,7 +8,6 @@ import kotlinx.coroutines.withContext
 
 class WishlistRepository {
 
-    // ⭐ 添加获取 Wishlist 的方法
     suspend fun getWishlist(uid: Int): Result<List<WishlistItemResponse>> =
         withContext(Dispatchers.IO) {
             try {
@@ -85,7 +84,7 @@ class WishlistRepository {
             }
         }
 
-    // ⭐ 标记为已推送
+    // mark as notified
     suspend fun markNotified(uid: Int, pid: Int): Result<Unit> =
         withContext(Dispatchers.IO) {
             try {
@@ -102,7 +101,7 @@ class WishlistRepository {
             }
         }
 
-    // ⭐ 标记为已读
+    // mark as read
     suspend fun markRead(uid: Int, pid: Int): Result<Unit> =
         withContext(Dispatchers.IO) {
             try {

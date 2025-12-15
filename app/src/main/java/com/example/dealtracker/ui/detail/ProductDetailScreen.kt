@@ -46,6 +46,15 @@ import com.example.dealtracker.ui.wishlist.viewmodel.WishListViewModel
 import com.example.dealtracker.data.remote.repository.HistoryRepository
 import kotlinx.coroutines.launch
 
+/**
+ * Main Composable for the Product Detail Screen.
+ * @param pid Product ID.
+ * @param name Product name (title).
+ * @param price Current product price.
+ * @param rating Product rating.
+ * @param navController Navigation controller.
+ * @param uid User ID (default 1).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductDetailScreen(
@@ -77,6 +86,7 @@ fun ProductDetailScreen(
         wishList.any { it.pid == pid }
     }
 
+    // Record viewing history
     LaunchedEffect(pid, currentUser) {
         currentUser?.let { user ->
             scope.launch {
@@ -89,6 +99,7 @@ fun ProductDetailScreen(
         }
     }
 
+    // Load price data
     LaunchedEffect(pid) {
         viewModel.loadPlatformPrices(pid = pid)
         viewModel.loadPriceHistory(pid = pid, days = 30)
@@ -137,6 +148,7 @@ fun ProductDetailScreen(
                             return@IconButton
                         }
 
+                        // Create a Product object for wishlist operations
                         val product = Product(
                             pid = pid,
                             title = name,
@@ -198,6 +210,7 @@ fun ProductDetailScreen(
                 hasData = platformPrices.isNotEmpty()
             )
 
+            // Price History Chart section
             when {
                 priceHistory.loading -> {
                     Box(
@@ -237,6 +250,7 @@ fun ProductDetailScreen(
                 }
             }
 
+            // Platform Prices List section
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -259,14 +273,6 @@ fun ProductDetailScreen(
                         color = colors.primaryText,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
-
-                    // debug log
-                    LaunchedEffect(platformPrices) {
-                        android.util.Log.d("ProductDetail", "Total platforms: ${platformPrices.size}")
-                        platformPrices.forEachIndexed { index, platform ->
-                            android.util.Log.d("ProductDetail", "[$index] ${platform.platformName}: $${platform.price}, link=${platform.link}")
-                        }
-                    }
 
                     if (platformPrices.isNotEmpty()) {
                         Column(
@@ -339,6 +345,13 @@ fun ProductDetailScreen(
     }
 }
 
+/**
+ * Displays the product name and current lowest price/platform.
+ * @param name Product name.
+ * @param currentPrice The lowest price.
+ * @param lowestPlatform The name of the platform offering the lowest price.
+ * @param hasData Indicates if platform price data was successfully loaded.
+ */
 @Composable
 private fun ProductHeader(
     name: String,
@@ -380,6 +393,10 @@ private fun ProductHeader(
     }
 }
 
+/**
+ * Displays a list of cards for platform-specific prices.
+ * (Note: Not currently used in ProductDetailScreen, kept for context.)
+ */
 @Composable
 private fun PlatformPriceCardList(
     items: List<PlatformPrice>,
@@ -431,6 +448,9 @@ private fun PlatformPriceCardList(
     }
 }
 
+/**
+ * Prepares and launches an Intent to share the product details.
+ */
 private fun shareProduct(
     context: Context,
     pid: Int,
@@ -465,9 +485,12 @@ private fun shareProduct(
     context.startActivity(Intent.createChooser(shareIntent, "Share via"))
 }
 
+/**
+ * Opens a URL using Chrome Custom Tabs or a regular browser as a fallback.
+ */
 private fun openUrl(context: Context, url: String) {
     try {
-        // 使用Chrome Custom Tabs在App内打开
+        // Use Chrome Custom Tabs
         val builder = androidx.browser.customtabs.CustomTabsIntent.Builder()
         builder.setShowTitle(true)
         builder.setUrlBarHidingEnabled(false)
@@ -477,7 +500,7 @@ private fun openUrl(context: Context, url: String) {
 
         android.util.Log.d("ProductDetail", "Opened URL in Custom Tab: $url")
     } catch (e: Exception) {
-        // 如果Custom Tabs失败，使用普通浏览器
+        // Fallback to regular browser
         try {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
             context.startActivity(intent)
@@ -488,6 +511,10 @@ private fun openUrl(context: Context, url: String) {
     }
 }
 
+/**
+ * Displays the platform icon, loading from URL, local resource, or a default icon.
+ * @param platformIcon The URL or resource name for the icon.
+ */
 @Composable
 private fun PlatformIcon(platformIcon: String) {
     val colors = AppTheme.colors

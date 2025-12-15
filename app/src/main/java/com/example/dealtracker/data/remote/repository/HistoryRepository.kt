@@ -12,7 +12,7 @@ class HistoryRepository {
     private val TAG = "HistoryRepository"
 
     /**
-     * 获取用户浏览历史
+     * get browsing history
      */
     suspend fun getUserHistory(uid: Int): Result<List<History>> = withContext(Dispatchers.IO) {
         try {
@@ -35,7 +35,7 @@ class HistoryRepository {
     }
 
     /**
-     * 添加浏览记录
+     * add browsing history
      */
     suspend fun addHistory(uid: Int, pid: Int): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
@@ -58,7 +58,7 @@ class HistoryRepository {
     }
 
     /**
-     * 删除单条历史记录
+     * delete one single history records
      */
     suspend fun deleteHistory(hid: Int): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
@@ -78,7 +78,7 @@ class HistoryRepository {
     }
 
     /**
-     * 清空用户所有历史记录
+     * clear all history records
      */
     suspend fun clearUserHistory(uid: Int): Result<Boolean> = withContext(Dispatchers.IO) {
         try {

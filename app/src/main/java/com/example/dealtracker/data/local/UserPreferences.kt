@@ -8,8 +8,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * 用户信息持久化 + 设置项持久化
- * 使用 SharedPreferences 保存，同时使用 StateFlow 提供实时可观察状态
+ * Persists user information and settings using SharedPreferences.
+ * Provides real-time observable state via StateFlow.
  */
 object UserPreferences {
 
@@ -23,29 +23,30 @@ object UserPreferences {
     private var prefs: SharedPreferences? = null
     private val gson = Gson()
 
-    // ========== 新增：用于 Compose 自动监听的 Flow ==========
+    // Flow for observing dark mode state
     private val _darkModeFlow = MutableStateFlow(false)
     val darkModeFlow: StateFlow<Boolean> get() = _darkModeFlow
 
+    // Flow for observing font scale state
     private val _fontScaleFlow = MutableStateFlow(1f)
     val fontScaleFlow: StateFlow<Float> get() = _fontScaleFlow
 
     /**
-     * 初始化 SharedPreferences
-     * 在 MainActivity 中调用一次即可
+     * Initializes SharedPreferences. Must be called once before use.
+     * @param context Application context.
      */
     fun init(context: Context) {
         if (prefs == null) {
             prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
 
-            // 初始化 Flow 的值（首次加载时同步 SP）
+            // Initialize Flow values from SharedPreferences
             _darkModeFlow.value = prefs?.getBoolean(KEY_DARK_MODE, false) ?: false
             _fontScaleFlow.value = prefs?.getFloat(KEY_FONT_SCALE, 1f) ?: 1f
         }
     }
 
     /**
-     * 确保已初始化
+     * Ensures UserPreferences has been initialized.
      */
     private fun checkInit() {
         if (prefs == null) {
@@ -53,7 +54,10 @@ object UserPreferences {
         }
     }
 
-    // ========== 用户信息 ==========
+    /**
+     * Saves the user object and sets the logged-in status to true.
+     * @param user The user object to save.
+     */
     fun saveUser(user: User) {
         checkInit()
         val userJson = gson.toJson(user)
@@ -63,6 +67,10 @@ object UserPreferences {
             ?.apply()
     }
 
+    /**
+     * Retrieves the saved user object.
+     * @return The User object or null if not found or if parsing fails.
+     */
     fun getUser(): User? {
         checkInit()
         val json = prefs?.getString(KEY_USER, null) ?: return null
@@ -73,11 +81,18 @@ object UserPreferences {
         }
     }
 
+    /**
+     * Checks if a user is currently logged in.
+     * @return True if logged in, false otherwise.
+     */
     fun isLoggedIn(): Boolean {
         checkInit()
         return prefs?.getBoolean(KEY_IS_LOGGED_IN, false) ?: false
     }
 
+    /**
+     * Clears the saved user information and sets the logged-in status to false.
+     */
     fun clearUser() {
         checkInit()
         prefs?.edit()
@@ -86,40 +101,57 @@ object UserPreferences {
             ?.apply()
     }
 
+    /**
+     * Updates the saved user information.
+     * @param user The updated user object.
+     */
     fun updateUser(user: User) = saveUser(user)
 
-    // ========== 深色模式（Flow + SP） ==========
-
+    /**
+     * Sets the dark mode preference. Updates both the Flow and SharedPreferences.
+     * @param enabled True to enable dark mode, false to disable.
+     */
     fun setDarkMode(enabled: Boolean) {
         checkInit()
 
-        // 更新 Flow（Compose 自动重组）
+        // Update Flow (for observing UI components)
         _darkModeFlow.value = enabled
 
-        // 保存到 SP（持久化）
+        // Save to SP (for persistence)
         prefs?.edit()
             ?.putBoolean(KEY_DARK_MODE, enabled)
             ?.apply()
     }
 
+    /**
+     * Gets the current dark mode preference from SharedPreferences.
+     * @return True if dark mode is enabled, false otherwise.
+     */
     fun isDarkMode(): Boolean {
         checkInit()
         return prefs?.getBoolean(KEY_DARK_MODE, false) ?: false
     }
 
-    // ========== 字体缩放（Flow + SP） ==========
+    /**
+     * Sets the font scale preference. Updates both the Flow and SharedPreferences.
+     * @param scale The font scale value.
+     */
     fun setFontScale(scale: Float) {
         checkInit()
 
-        // 更新 Flow
+        // Update Flow
         _fontScaleFlow.value = scale
 
-        // 持久化
+        // Save to SP
         prefs?.edit()
             ?.putFloat(KEY_FONT_SCALE, scale)
             ?.apply()
     }
 
+    /**
+     * Gets the current font scale preference from SharedPreferences.
+     * @return The font scale value.
+     */
     fun getFontScale(): Float {
         checkInit()
         return prefs?.getFloat(KEY_FONT_SCALE, 1f) ?: 1f

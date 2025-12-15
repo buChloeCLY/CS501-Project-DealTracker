@@ -18,15 +18,10 @@ import com.example.dealtracker.domain.model.Product
 import kotlinx.coroutines.launch
 
 /**
- * ⭐ 产品详情页 - 通过 pid 从 API 加载
- *
- * 用于 Deep Link 和通知点击场景
- * 根据 pid 从 API 加载完整的产品信息
- *
- * 使用场景：
- * 1. Deep Link: dealtracker://product/123
- * 2. 通知点击跳转
- * 3. 其他只有 pid 的场景
+ * Product Detail Screen that loads product data using a Product ID (pid).
+ * Used for Deep Links and notification clicks.
+ * @param pid The ID of the product to load.
+ * @param navController Navigation controller for screen navigation.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,7 +31,7 @@ fun ProductDetailScreenWithPid(
 ) {
     val TAG = "ProductDetailWithPid"
 
-    // ⭐ 状态管理
+    // State management
     var product by remember { mutableStateOf<Product?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -44,21 +39,21 @@ fun ProductDetailScreenWithPid(
     val repository = remember { ProductRepositoryImpl() }
     val scope = rememberCoroutineScope()
 
-    // ⭐ 从 API 加载产品信息
+    // Load product information from API
     LaunchedEffect(pid) {
-        Log.d(TAG, "🔄 Loading product with pid=$pid")
+        Log.d(TAG, "Loading product with pid=$pid")
         isLoading = true
         errorMessage = null
 
         scope.launch {
             repository.getProductById(pid)
                 .onSuccess { loadedProduct ->
-                    Log.d(TAG, "✅ Product loaded: ${loadedProduct.title}")
+                    Log.d(TAG, "Product loaded: ${loadedProduct.title}")
                     product = loadedProduct
                     isLoading = false
                 }
                 .onFailure { error ->
-                    Log.e(TAG, "❌ Failed to load product: ${error.message}")
+                    Log.e(TAG, "Failed to load product: ${error.message}")
                     errorMessage = error.message ?: "Failed to load product"
                     isLoading = false
                 }
@@ -101,17 +96,17 @@ fun ProductDetailScreenWithPid(
             contentAlignment = Alignment.Center
         ) {
             when {
-                // ⭐ 加载中状态
+                // Loading state
                 isLoading -> {
                     LoadingView()
                 }
 
-                // ⭐ 错误状态
+                // Error state
                 errorMessage != null -> {
                     ErrorView(
                         errorMessage = errorMessage!!,
                         onRetry = {
-                            // ⭐ 重试加载
+                            // Retry loading
                             scope.launch {
                                 isLoading = true
                                 errorMessage = null
@@ -129,7 +124,7 @@ fun ProductDetailScreenWithPid(
                     )
                 }
 
-                // ⭐ 成功加载 - 复用现有的产品详情页组件
+                // Success state - Reuse the main detail screen component
                 product != null -> {
                     ProductDetailScreen(
                         pid = product!!.pid,
@@ -145,7 +140,7 @@ fun ProductDetailScreenWithPid(
 }
 
 /**
- * 加载中视图
+ * Displays the loading indicator view.
  */
 @Composable
 private fun LoadingView() {
@@ -169,7 +164,9 @@ private fun LoadingView() {
 }
 
 /**
- * 错误视图
+ * Displays the error message and a retry button.
+ * @param errorMessage The message to display.
+ * @param onRetry Callback function to execute when retry button is clicked.
  */
 @Composable
 private fun ErrorView(
@@ -181,11 +178,6 @@ private fun ErrorView(
         verticalArrangement = Arrangement.Center,
         modifier = Modifier.padding(24.dp)
     ) {
-        Text(
-            text = "❌",
-            fontSize = 48.sp
-        )
-        Spacer(modifier = Modifier.height(16.dp))
         Text(
             text = "Error",
             fontSize = 24.sp,

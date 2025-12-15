@@ -3,8 +3,7 @@ package com.example.dealtracker.ui.navigation
 import android.net.Uri
 
 /**
- * 全局路由定义文件
- * 管理应用中所有可导航的页面路径。
+ * Global object defining all navigable page routes in the application.
  */
 object Routes {
 
@@ -20,7 +19,12 @@ object Routes {
     const val EDIT_PROFILE = "edit_profile"
 
     /**
-     * 商品详情页路由
+     * Constructs the route string for the product detail page with embedded parameters.
+     * @param pid Product ID.
+     * @param name Product name.
+     * @param price Product price.
+     * @param rating Product rating.
+     * @return The formatted URL route string.
      */
     fun detailRoute(pid: Int, name: String, price: Double, rating: Float): String {
         val encodedName = Uri.encode(name)
@@ -29,8 +33,10 @@ object Routes {
     }
 
     /**
-     * Deals 页面带搜索参数
-     * 必须 URL 编码，否则空格、特殊字符会破坏导航
+     * Constructs the route string for the Deals page with a search query parameter.
+     * The query must be URL encoded.
+     * @param query The search query string.
+     * @return The formatted URL route string.
      */
     fun dealsWithQuery(query: String): String {
         val encoded = Uri.encode(query)

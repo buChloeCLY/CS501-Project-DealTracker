@@ -22,7 +22,7 @@ class HistoryViewModel : ViewModel() {
     val uiState: StateFlow<HistoryUiState> = _uiState
 
     /**
-     * 加载用户浏览历史
+     * load user history
      */
     fun loadHistory(uid: Int) {
         _uiState.value = HistoryUiState(isLoading = true)
@@ -46,13 +46,13 @@ class HistoryViewModel : ViewModel() {
     }
 
     /**
-     * 删除单条历史记录
+     * delete history by hid
      */
     fun deleteHistory(hid: Int, uid: Int) {
         viewModelScope.launch {
             repository.deleteHistory(hid).fold(
                 onSuccess = {
-                    // 重新加载历史记录
+                    // reload
                     loadHistory(uid)
                 },
                 onFailure = { error ->
@@ -65,7 +65,7 @@ class HistoryViewModel : ViewModel() {
     }
 
     /**
-     * 清空所有历史记录
+     * clear all history
      */
     fun clearAllHistory(uid: Int) {
         viewModelScope.launch {
@@ -85,9 +85,6 @@ class HistoryViewModel : ViewModel() {
         }
     }
 
-    /**
-     * 清除错误消息
-     */
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }

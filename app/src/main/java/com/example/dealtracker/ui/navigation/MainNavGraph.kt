@@ -25,29 +25,29 @@ import androidx.compose.runtime.getValue
 
 
 /**
- * 主导航图配置
- *
- * 管理应用的页面跳转关系，基于 Navigation Compose。
- * 每个 composable() 定义一个路由对应的页面。
+ * Main navigation graph configuration using Navigation Compose.
+ * Defines all screen routes and their arguments.
+ * @param navController The host controller for navigation operations.
+ * @param modifier Modifier for styling the NavHost.
  */
 @Composable
 fun MainNavGraph(
     navController: NavHostController,
     modifier: Modifier = Modifier
 ) {
-    // NavHost：设置起始页（Home）
+    // NavHost: Sets the start destination (Home)
     NavHost(
         navController = navController,
         startDestination = Routes.HOME,
         modifier = modifier
     ) {
 
-        // ============= 首页 Home =============
+        // ============= Home Screen =============
         composable(Routes.HOME) {
             HomeScreen(navController = navController)
         }
 
-// ============= Deals 页面（普通进入） =============
+// ============= Deals Screen (Default entry) =============
         composable(Routes.DEALS) {
             DealsScreen(
                 showBack = navController.previousBackStackEntry != null,
@@ -67,7 +67,7 @@ fun MainNavGraph(
             )
         }
 
-// ============= Deals 页面（分类进入） =============
+// ============= Deals Screen (Category entry) =============
         composable(
             route = "deals/{category}",
             arguments = listOf(
@@ -80,8 +80,8 @@ fun MainNavGraph(
             DealsScreen(
                 showBack = navController.previousBackStackEntry != null,
                 onBack = { navController.popBackStack() },
-                searchQuery = null, // 不走搜索
-                category = category, // 分类专用参数
+                searchQuery = null, // Do not use search query
+                category = category, // Use category parameter
                 onCompareClick = { product ->
                     navController.navigate(
                         Routes.detailRoute(
@@ -96,7 +96,7 @@ fun MainNavGraph(
         }
 
 
-// ============= Deals 页面（搜索进入） =============
+// ============= Deals Screen (Search entry) =============
         composable(
             route = "deals?query={query}",
             arguments = listOf(
@@ -114,7 +114,7 @@ fun MainNavGraph(
                 showBack = navController.previousBackStackEntry != null,
                 onBack = { navController.popBackStack() },
                 searchQuery = query,
-                category = null,  // 搜索时分类为空
+                category = null,  // Category is null during search
                 onCompareClick = { product ->
                     navController.navigate(
                         Routes.detailRoute(
@@ -128,7 +128,7 @@ fun MainNavGraph(
             )
         }
 
-        // ============= ⭐ 商品详情页（仅 pid - 用于 Deep Link 和通知） =============
+        // ============= Product Detail Screen (pid only - for Deep Link/Notification) =============
         composable(
             route = "detail/{pid}",
             arguments = listOf(
@@ -137,26 +137,26 @@ fun MainNavGraph(
         ) { backStackEntry ->
             val pid = backStackEntry.arguments?.getInt("pid") ?: 1
 
-            // ⭐ 使用新组件，会自动从 API 加载产品信息
+            // Use component that loads product details from API
             ProductDetailScreenWithPid(
                 pid = pid,
                 navController = navController
             )
         }
 
-        // ============= 商品详情页（完整参数 - 向后兼容） =============
+        // ============= Product Detail Screen (Full parameters - backward compatible) =============
         composable(
             route = Routes.DETAIL_BASE +
                     "?pid={pid}&name={name}&price={price}&rating={rating}"
         ) { backStackEntry ->
 
-            // 从路由参数中解析数据
+            // Parse data from route arguments
             val pid = backStackEntry.arguments?.getString("pid")?.toIntOrNull() ?: 1
             val name = backStackEntry.arguments?.getString("name") ?: ""
             val price = backStackEntry.arguments?.getString("price")?.toDoubleOrNull() ?: 0.0
             val rating = backStackEntry.arguments?.getString("rating")?.toFloatOrNull() ?: 0f
 
-            // 渲染详情页（含历史价格图表 + 平台信息）
+            // Render detail page
             ProductDetailScreen(
                 pid = pid,
                 name = name,
@@ -166,7 +166,7 @@ fun MainNavGraph(
             )
         }
 
-        // ------------------------ Wishlist（Lists 标签页） ------------------------
+        // ------------------------ Wishlist (Lists tab) ------------------------
         composable(Routes.LISTS) {
             val currentUser by UserManager.currentUser.collectAsState()
             val uid = currentUser?.uid ?: 0
@@ -177,7 +177,7 @@ fun MainNavGraph(
             )
         }
 
-        // ⭐ 添加：通用 wishlist 路由（不带参数）
+        // Add: Generic wishlist route (no parameters)
         composable("wishlist") {
             val currentUser by UserManager.currentUser.collectAsState()
             val uid = currentUser?.uid ?: 0
@@ -188,7 +188,7 @@ fun MainNavGraph(
             )
         }
 
-        // ⭐ 添加：带 uid 参数的 wishlist 路由（用于通知点击跳转）
+        // Add: Wishlist route with uid parameter (for notification jump)
         composable(
             route = "wishlist/{uid}",
             arguments = listOf(
@@ -206,7 +206,7 @@ fun MainNavGraph(
             )
         }
 
-        // =============  Profile 页面 =============
+        // =============  Profile Screens =============
         composable(Routes.PROFILE) {
             ProfileScreen(navController = navController)
         }

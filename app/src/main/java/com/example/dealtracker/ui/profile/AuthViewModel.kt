@@ -22,9 +22,6 @@ class AuthViewModel : ViewModel() {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
-    /**
-     * 登录
-     */
     fun login(
         email: String,
         password: String,
@@ -48,10 +45,10 @@ class AuthViewModel : ViewModel() {
                         gender = userResponse.gender
                     )
 
-                    // 保存到全局状态
+                    // save global status
                     UserManager.setUser(user)
 
-                    // 保存到持久化存储
+                    // save in persistent storage
                     UserPreferences.saveUser(user)
 
                     onSuccess()
@@ -70,9 +67,6 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    /**
-     * 注册
-     */
     fun register(
         name: String,
         email: String,
@@ -98,10 +92,10 @@ class AuthViewModel : ViewModel() {
                         gender = userResponse.gender
                     )
 
-                    // 保存到全局状态
+                    // save global status
                     UserManager.setUser(user)
 
-                    // 保存到持久化存储
+                    // save in persistent storage
                     UserPreferences.saveUser(user)
 
                     onSuccess()
@@ -120,9 +114,6 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    /**
-     * 清除错误信息
-     */
     fun clearError() {
         _error.value = null
     }

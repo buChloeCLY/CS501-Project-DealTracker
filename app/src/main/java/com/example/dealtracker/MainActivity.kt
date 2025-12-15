@@ -31,6 +31,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
+/**
+ * Main application activity, responsible for initialization, theme setup,
+ * permission requests, and handling deep links/notifications.
+ */
 class MainActivity : ComponentActivity() {
 
     private val TAG = "MainActivity"
@@ -38,21 +42,21 @@ class MainActivity : ComponentActivity() {
     private val requestAudioPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
-    // 保存通知点击的信息
+    // Stores notification click information
     private var notificationUid: Int = -1
     private var notificationPid: Int = -1
 
-    //  保存 Deep Link 的产品 ID
+    // Stores the Product ID from a Deep Link
     private var deepLinkPid: Int = -1
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 第 1 步：初始化 UserPreferences
+        // 1. Initialize UserPreferences
         UserPreferences.init(this)
         Log.d(TAG, " UserPreferences initialized")
 
-        // 第 2 步：从 SharedPreferences 恢复用户登录状态
+        // 2. Restore user login state from SharedPreferences
         lifecycleScope.launch {
             val savedUser = UserPreferences.getUser()
             if (savedUser != null) {
@@ -63,28 +67,28 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // 第 3 步：处理通知点击
+        // 3. Handle notification click
         handleNotificationClick(intent)
 
-        //  第 4 步：处理 Deep Link
+        // 4. Handle Deep Link
         handleDeepLink(intent)
 
         setContent {
-            // 使用 Flow → Compose 自动监听并刷新 UI
+            // Collect theme and font scale settings from UserPreferences Flow
             val darkMode by UserPreferences.darkModeFlow.collectAsState()
             val fontScale by UserPreferences.fontScaleFlow.collectAsState()
 
             CompositionLocalProvider(
-                // 应用全局字体缩放
+                // Apply global font scale
                 LocalDensity provides Density(
                     LocalDensity.current.density,
                     fontScale
                 )
             ) {
-                // 应用主题（darkMode 实时变化）
+                // Apply theme (updates in real-time with darkMode changes)
                 DealTrackerTheme(
                     darkTheme = darkMode,
-                    dynamicColor = false // 避免动态色覆盖 darkMode 设置
+                    dynamicColor = false // Prevent dynamic color from overriding dark mode setting
                 ) {
                     DealTrackerApp(
                         notificationUid = notificationUid,
@@ -95,7 +99,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // 请求麦克风权限
+        // Request microphone permission for voice search
         if (ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.RECORD_AUDIO
@@ -106,7 +110,8 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * 处理通知点击
+     * Handles notification click intent, extracts uid and pid, and marks notification as read.
+     * @param intent The incoming Intent.
      */
     private fun handleNotificationClick(intent: Intent) {
         val extras = intent.extras
@@ -117,18 +122,20 @@ class MainActivity : ComponentActivity() {
             if (uid > 0 && pid > 0) {
                 Log.d(TAG, "Notification clicked: uid=$uid, pid=$pid")
 
-                // 保存信息用于导航
+                // Save information for navigation
                 notificationUid = uid
                 notificationPid = pid
 
-                // 标记为已读
+                // Mark as read
                 markNotificationAsRead(uid, pid)
             }
         }
     }
 
     /**
-     * ⭐ 处理 Deep Link
+     * Handles Deep Link Intent to navigate directly to a product detail screen.
+     * Supports scheme: dealtracker://product/{pid}
+     * @param intent The incoming Intent.
      */
     private fun handleDeepLink(intent: Intent?) {
         val data = intent?.data
@@ -145,6 +152,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Calls the backend to mark a price alert as read.
+     * @param uid User ID.
+     * @param pid Product ID.
+     */
     private fun markNotificationAsRead(uid: Int, pid: Int) {
         CoroutineScope(Dispatchers.IO).launch {
             val repository = WishlistRepository()
@@ -158,6 +170,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Handles subsequent incoming intents (e.g., when the activity is already running).
+     * @param intent The new incoming Intent.
+     */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -166,6 +182,12 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/**
+ * Root Composable for the application UI.
+ * @param notificationUid User ID from notification click.
+ * @param notificationPid Product ID from notification click.
+ * @param deepLinkPid Product ID from deep link.
+ */
 @Composable
 fun DealTrackerApp(
     notificationUid: Int = -1,
@@ -177,7 +199,7 @@ fun DealTrackerApp(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route ?: Routes.HOME
 
-    // 通知点击导航
+    // Navigation triggered by notification click
     LaunchedEffect(notificationUid) {
         if (notificationUid > 0 && notificationPid > 0) {
             Log.d("DealTrackerApp", "🔔 Navigating to Wishlist: uid=$notificationUid")
@@ -192,7 +214,7 @@ fun DealTrackerApp(
         }
     }
 
-    // Deep Link 导航
+    // Navigation triggered by Deep Link
     LaunchedEffect(deepLinkPid) {
         if (deepLinkPid > 0) {
             Log.d("DealTrackerApp", "🔗 Deep Link navigation to product: pid=$deepLinkPid")

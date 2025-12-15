@@ -22,7 +22,11 @@ import com.example.dealtracker.domain.model.PricePoint
 import com.example.dealtracker.ui.theme.AppTheme
 import kotlin.math.*
 
-// Scrollable price history chart with 30-day data, drag gestures, and volatility markers
+/**
+ * Scrollable price history chart component with drag gestures and volatility markers.
+ * @param priceHistory The list of PricePoint data to display.
+ * @param modifier Modifier for styling the component.
+ */
 @Composable
 fun ScrollablePriceChart(
     priceHistory: List<PricePoint>,
@@ -250,7 +254,12 @@ fun ScrollablePriceChart(
     }
 }
 
-// Detect points with significant price volatility
+/**
+ * Detects price points that have experienced significant volatility based on a threshold.
+ * @param data The list of historical price points.
+ * @param threshold The percentage change threshold for detecting volatility.
+ * @return A set of indices where volatility was detected.
+ */
 private fun detectVolatilePoints(
     data: List<PricePoint>,
     threshold: Double
@@ -270,7 +279,9 @@ private fun detectVolatilePoints(
     return volatileIndices
 }
 
-// Draw volatility marker with arrow and percentage
+/**
+ * Draws a volatility marker with an arrow and percentage change.
+ */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawVolatileMarker(
     point: Offset,
     data: List<PricePoint>,
@@ -323,7 +334,9 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawVolatileMarker(
     }
 }
 
-// Draw grid lines
+/**
+ * Draws horizontal grid lines on the chart canvas.
+ */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGridLines(
     axis: AxisInfo,
     padding: Float,
@@ -347,7 +360,9 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGridLines(
     }
 }
 
-// Draw Y-axis labels
+/**
+ * Draws labels for the Y-axis (price).
+ */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawYAxisLabels(
     axis: AxisInfo,
     padding: Float,
@@ -382,7 +397,9 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawYAxisLabels(
     }
 }
 
-// Find nearest data point to tap location
+/**
+ * Finds the nearest data point to the given tap location on the chart.
+ */
 private fun findNearestPoint(
     tapOffset: Offset,
     data: List<PricePoint>,
@@ -424,7 +441,9 @@ private fun findNearestPoint(
     return closestPoint
 }
 
-// Scroll position indicator
+/**
+ * Displays a visual indicator for the current scroll position of the chart data.
+ */
 @Composable
 private fun ScrollIndicator(
     currentPosition: Float,
@@ -448,7 +467,11 @@ private fun ScrollIndicator(
     }
 }
 
-// Format date for display
+/**
+ * Formats the date string for display on the chart's X-axis.
+ * @param date The date string.
+ * @return The formatted date string (MM/DD).
+ */
 private fun formatDate(date: String): String {
     return try {
         val parts = date.split("-")
@@ -462,10 +485,18 @@ private fun formatDate(date: String): String {
     }
 }
 
-// Axis information for chart scaling
+/**
+ * Stores information about the chart axes (min, max, step).
+ */
 private data class AxisInfo(val min: Double, val max: Double, val step: Double)
 
-// Calculate nice axis values
+/**
+ * Calculates 'nice' values for the axis scale (min, max, step) to ensure clean labels.
+ * @param minVal The minimum data value.
+ * @param maxVal The maximum data value.
+ * @param tickCount The desired number of ticks.
+ * @return AxisInfo object with optimized min, max, and step values.
+ */
 private fun niceAxis(minVal: Double, maxVal: Double, tickCount: Int): AxisInfo {
     val d = (maxVal - minVal)
     val rawStep = d / (tickCount - 1).coerceAtLeast(1)

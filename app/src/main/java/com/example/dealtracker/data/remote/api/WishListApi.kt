@@ -3,6 +3,9 @@ package com.example.dealtracker.data.remote.api
 import retrofit2.Response
 import retrofit2.http.*
 
+/**
+ * Data class representing a single item in the user's wishlist response.
+ */
 data class WishlistItemResponse(
     val wid: Int,
     val uid: Int,
@@ -36,39 +39,60 @@ data class WishlistUpsertResponse(
     val currentPrice: Double? = null
 )
 
+/**
+ * API interface for managing user wishlists and price alerts.
+ */
 interface WishlistApi {
 
-    // 获取用户 wishlist
+    /**
+     * Retrieves the user's wishlist.
+     * @param uid User ID.
+     */
     @GET("wishlist")
     suspend fun getWishlist(
         @Query("uid") uid: Int
     ): Response<List<WishlistItemResponse>>
 
-    // 添加/更新 wishlist 项
+    /**
+     * Adds or updates a wishlist item.
+     * @param body The request body containing item details.
+     */
     @POST("wishlist")
     suspend fun upsertWishlist(
         @Body body: WishlistUpsertRequest
     ): Response<WishlistUpsertResponse>
 
-    // 删除 wishlist 项
+    /**
+     * Deletes a wishlist item.
+     * @param body A map containing the item ID to delete.
+     */
     @HTTP(method = "DELETE", path = "wishlist", hasBody = true)
     suspend fun deleteWishlist(
         @Body body: Map<String, Int>
     ): Response<Map<String, Any>>
 
-    // 获取需要推送的提醒
+    /**
+     * Retrieves wishlist items that meet the price alert criteria.
+     * @param uid User ID.
+     */
     @GET("wishlist/alerts")
     suspend fun getAlerts(
         @Query("uid") uid: Int
     ): Response<List<WishlistItemResponse>>
 
-    // ⭐ 标记为"已推送"
+    /**
+     * Marks a price alert as "notified" (sent).
+     * @param body A map containing the item ID.
+     */
     @POST("wishlist/mark-notified")
     suspend fun markNotified(
         @Body body: Map<String, Int>
     ): Response<Map<String, Any>>
 
-    // ⭐ 标记为"已读"（点击通知后调用）
+    /**
+     * Marks a price alert as "read" (user clicked notification).
+     * @param body A map containing the item ID.
+     */
     @POST("wishlist/mark-read")
     suspend fun markRead(
         @Body body: Map<String, Int>

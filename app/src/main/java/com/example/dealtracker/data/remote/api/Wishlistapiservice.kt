@@ -10,24 +10,28 @@ import com.example.dealtracker.ui.wishlist.viewmodel.WishlistStats
 import retrofit2.http.*
 
 /**
- * 心愿单 API 接口
+ * Wishlist API Interface for managing user's tracked deals.
  */
 interface WishlistApiService {
 
     /**
-     * 获取用户的心愿单
+     * Retrieves the user's wishlist items.
+     * @param uid User ID.
      */
     @GET("api/wishlist/{uid}")
     suspend fun getWishlist(@Path("uid") uid: Int): List<WishlistItem>
 
     /**
-     * 添加商品到心愿单
+     * Adds a product to the user's wishlist.
+     * @param request The request body containing product and alert details.
      */
     @POST("api/wishlist")
     suspend fun addToWishlist(@Body request: AddWishlistRequest): WishlistResponse
 
     /**
-     * 更新心愿单项
+     * Updates a specific wishlist item.
+     * @param wid Wishlist item ID.
+     * @param request The update request body.
      */
     @PUT("api/wishlist/{wid}")
     suspend fun updateWishlist(
@@ -36,13 +40,16 @@ interface WishlistApiService {
     ): WishlistResponse
 
     /**
-     * 删除心愿单项
+     * Removes a product from the user's wishlist.
+     * @param wid Wishlist item ID.
      */
     @DELETE("api/wishlist/{wid}")
     suspend fun removeFromWishlist(@Path("wid") wid: Int): WishlistResponse
 
     /**
-     * 检查商品是否在心愿单中
+     * Checks if a specific product is already in the user's wishlist.
+     * @param uid User ID.
+     * @param pid Product ID.
      */
     @GET("api/wishlist/check/{uid}/{pid}")
     suspend fun checkWishlist(
@@ -51,13 +58,15 @@ interface WishlistApiService {
     ): CheckWishlistResponse
 
     /**
-     * 获取价格提醒
+     * Fetches the user's price alerts.
+     * @param uid User ID.
      */
     @GET("api/wishlist/alerts/{uid}")
     suspend fun getAlerts(@Path("uid") uid: Int): AlertsResponse
 
     /**
-     * 获取心愿单统计
+     * Retrieves statistics for the user's wishlist.
+     * @param uid User ID.
      */
     @GET("api/wishlist/stats/{uid}")
     suspend fun getStats(@Path("uid") uid: Int): WishlistStats
