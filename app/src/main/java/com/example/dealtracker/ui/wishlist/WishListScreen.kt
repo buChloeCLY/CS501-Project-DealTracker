@@ -44,6 +44,7 @@ fun WishListScreen(
     val targetPrices by viewModel.targetPrices.collectAsState()
     val context = LocalContext.current
     val TAG = "WishListScreen"
+    var shouldRecheckAfterPermission by remember { mutableStateOf(false) }
 
     LaunchedEffect(currentUserId) {
         if (currentUserId > 0) {
@@ -82,6 +83,28 @@ fun WishListScreen(
                 "Notification enabled! You'll receive price alerts.",
                 Toast.LENGTH_LONG
             ).show()
+            if (shouldRecheckAfterPermission) {
+                shouldRecheckAfterPermission = false
+                Log.d(TAG, "Permission granted, rechecking alerts...")
+                viewModel.checkAlerts(currentUserId) { alerts ->
+                    Log.d(TAG, "Received ${alerts.size} price alerts after permission granted")
+                    alerts.forEach { alert ->
+                        alert.current_price?.let { currentPrice ->
+                            alert.target_price?.let { targetPrice ->
+                                Log.d(TAG, "Showing notification for pid=${alert.pid}")
+                                NotificationHelper.showPriceDropNotification(
+                                    context = context,
+                                    uid = currentUserId,
+                                    pid = alert.pid,
+                                    title = alert.title ?: "Product",
+                                    currentPrice = currentPrice,
+                                    targetPrice = targetPrice
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         } else {
             Toast.makeText(
                 context,
@@ -107,6 +130,7 @@ fun WishListScreen(
     fun requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             Log.d("WishListScreen", "Requesting notification permission...")
+            shouldRecheckAfterPermission = true
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }

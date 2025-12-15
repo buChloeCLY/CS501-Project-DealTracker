@@ -65,6 +65,69 @@ app.get('/health', async (req, res) => {
     }
 });
 
+async function checkAndResetPriceAlerts() {
+    const pool = require('./config/database');
+
+    try {
+        console.log('\n Checking for products that reached target price...');
+
+        const [reachedProducts] = await pool.query(`
+            SELECT
+                w.uid,
+                w.pid,
+                w.target_price,
+                w.alert_status,
+                p.title,
+                lp.current_price
+            FROM wishlist w
+            JOIN products p ON w.pid = p.pid
+            JOIN (
+                SELECT
+                    w2.pid,
+                    MIN(p1.price) AS current_price
+                FROM wishlist w2
+                JOIN price p1 ON p1.pid = w2.pid
+                JOIN (
+                    SELECT pid, platform, MAX(date) AS max_date
+                    FROM price
+                    GROUP BY pid, platform
+                ) latest ON latest.pid = p1.pid
+                           AND latest.platform = p1.platform
+                           AND latest.max_date = p1.date
+                GROUP BY w2.pid
+            ) lp ON lp.pid = w.pid
+            WHERE w.target_price IS NOT NULL
+              AND lp.current_price <= w.target_price
+        `);
+
+        if (reachedProducts.length === 0) {
+            console.log(' No products reached target price');
+            return { resetCount: 0 };
+        }
+
+        console.log(` Found ${reachedProducts.length} products that reached target price`);
+
+        let resetCount = 0;
+        for (const product of reachedProducts) {
+            await pool.query(
+                'UPDATE wishlist SET alert_status = 0 WHERE uid = ? AND pid = ?',
+                [product.uid, product.pid]
+            );
+
+            console.log(`    Reset alert for uid=${product.uid}, pid=${product.pid}: ${product.title}`);
+            console.log(`      Current: $${product.current_price}, Target: $${product.target_price}`);
+            resetCount++;
+        }
+
+        console.log(` Reset ${resetCount} price alerts\n`);
+        return { resetCount, products: reachedProducts };
+
+    } catch (error) {
+        console.error(' Failed to check price alerts:', error);
+        return { resetCount: 0, error: error.message };
+    }
+}
+
 // Scheduled task: Update all prices daily at 3:00 AM EST
 cron.schedule('0 3 * * *', async () => {
     console.log('Running scheduled price update...');
@@ -78,6 +141,9 @@ cron.schedule('0 3 * * *', async () => {
 
         const syncResult = await adminController.syncLowestPrices();
         console.log(`Synced lowest prices: ${syncResult.updatedCount}/${syncResult.totalProducts}`);
+
+        const alertResult = await checkAndResetPriceAlerts();
+        console.log(` Price alerts reset: ${alertResult.resetCount}`);
     } catch (error) {
         console.error('Scheduled task failed:', error);
     }
