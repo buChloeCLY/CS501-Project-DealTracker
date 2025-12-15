@@ -115,9 +115,10 @@ fun ProductDetailScreen(
             android.util.Log.d("ProductDetail", "  link is null: ${platform.link == null}")
         }
     }
+    val nonEbayPrices = platformPrices.filter { it.platformName != "eBay" }
 
-    val currentPrice = platformPrices.minOfOrNull { it.price } ?: price
-    val lowestPlatform = platformPrices.minByOrNull { it.price }
+    val currentPrice = nonEbayPrices.minOfOrNull { it.price } ?: price
+    val lowestPlatform = nonEbayPrices.minByOrNull { it.price }
 
     Scaffold(
         topBar = {
