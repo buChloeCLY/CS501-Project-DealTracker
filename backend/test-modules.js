@@ -25,7 +25,7 @@ console.log('Testing importService module...\n');
 try {
     const importService = require('./services/importService');
 
-    console.log('Module loaded successfully!');
+    console.log('Module loaded successfully');
     console.log('Exported functions:', Object.keys(importService));
     console.log('\nFunction types:');
     console.log('  importInitialProducts:', typeof importService.importInitialProducts);

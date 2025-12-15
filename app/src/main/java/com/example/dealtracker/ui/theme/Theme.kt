@@ -62,10 +62,10 @@ fun DealTrackerTheme(
 ) {
     val context = LocalContext.current
 
-    // 监听Dark Mode变化
+    // Monitor changes in Dark Mode
     val isDarkMode by ThemeManager.isDarkMode(context).collectAsState(initial = darkTheme)
 
-    // 监听字体缩放变化
+    // Monitor font scaling changes
     var fontScale by remember {
         mutableFloatStateOf(FontSizeManager.getCurrentScale())
     }

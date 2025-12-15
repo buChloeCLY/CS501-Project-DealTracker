@@ -588,7 +588,7 @@ async function getWalmartProductDetails(productLink) {
         }
 
         if (!productGroup) {
-            console.log('   ⚠️  ProductGroup not found in response');
+            console.log('ProductGroup not found in response');
             return null;
         }
 
@@ -609,7 +609,7 @@ async function getWalmartProductDetails(productLink) {
             .filter(p => p && p > 0);
 
         if (prices.length === 0) {
-            console.log('   ⚠️  No valid prices found');
+            console.log('No valid prices found');
             return null;
         }
 

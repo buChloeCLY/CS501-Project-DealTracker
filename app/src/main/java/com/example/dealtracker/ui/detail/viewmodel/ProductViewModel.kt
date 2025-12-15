@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.dealtracker.data.remote.repository.PriceRepositoryImpl
 import com.example.dealtracker.domain.model.PlatformPrice
-import com.example.dealtracker.domain.model.PricePoint
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch

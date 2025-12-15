@@ -1,6 +1,5 @@
 package com.example.dealtracker.data.remote.repository
 
-import android.util.Log
 import com.example.dealtracker.domain.model.Product
 import com.example.dealtracker.domain.model.SearchResult
 import com.example.dealtracker.domain.repository.ProductRepository
@@ -44,7 +43,7 @@ class ProductRepositoryImpl : ProductRepository {
         }
 
     /**
-     * ⭐ 分页搜索（唯一搜索接口）
+     * Page Search (Unique Search Interface)
      */
     override suspend fun searchProductsPaged(
         query: String,

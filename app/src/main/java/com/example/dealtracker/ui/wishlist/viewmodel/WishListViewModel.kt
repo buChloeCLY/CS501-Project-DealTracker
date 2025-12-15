@@ -36,13 +36,13 @@ class WishListViewModel(
      * @param uid User ID.
      */
     fun loadWishlist(uid: Int) {
-        Log.d(TAG, "🔄 Loading wishlist for uid=$uid")
+        Log.d(TAG, "Loading wishlist for uid=$uid")
 
         viewModelScope.launch {
             val result = wishlistRepository.getWishlist(uid)
 
             result.onSuccess { items ->
-                Log.d(TAG, "✅ Loaded ${items.size} wishlist items from backend")
+                Log.d(TAG, "Loaded ${items.size} wishlist items from backend")
 
                 // Clear old data
                 WishListHolder.clear()
@@ -59,7 +59,7 @@ class WishListViewModel(
                                 targetPriceMap[item.pid] = targetPrice
                             }
 
-                            Log.d(TAG, "✅ Loaded product: ${product.title}, target: ${item.target_price}")
+                            Log.d(TAG, "Loaded product: ${product.title}, target: ${item.target_price}")
                         }
                         .onFailure { e ->
                             Log.e(TAG, "Failed to load product ${item.pid}: ${e.message}")
@@ -97,7 +97,7 @@ class WishListViewModel(
                 targetPrice = null,
                 alertEnabled = alertEnabled
             ).onSuccess {
-                Log.d(TAG, "✅ Added to wishlist without target_price")
+                Log.d(TAG, "Added to wishlist without target_price")
             }.onFailure { e ->
                 Log.e(TAG, "Failed to add: ${e.message}")
             }
@@ -132,10 +132,10 @@ class WishListViewModel(
                 _targetPrices.value = _targetPrices.value + (pid to targetPrice)
 
                 if (response.priceReached == true) {
-                    Log.d(TAG, "✅ Price already reached for pid=$pid, will trigger notification")
+                    Log.d(TAG, "Price already reached for pid=$pid, will trigger notification")
                     onSuccess?.invoke(true)
                 } else {
-                    Log.d(TAG, "⏳ Price not reached yet for pid=$pid")
+                    Log.d(TAG, "Price not reached yet for pid=$pid")
                     onSuccess?.invoke(false)
                 }
             }.onFailure { e ->
@@ -151,20 +151,20 @@ class WishListViewModel(
      * @param pid Product ID.
      */
     fun removeProduct(uid: Int, pid: Int) {
-        Log.d(TAG, "🗑️ Removing product: pid=$pid")
+        Log.d(TAG, "Removing product: pid=$pid")
 
         // 1. Remove from local memory
         WishListHolder.remove(pid)
 
         // 2. Clear target price
         _targetPrices.value = _targetPrices.value - pid
-        Log.d(TAG, "✅ Cleared target price for pid=$pid")
+        Log.d(TAG, "Cleared target price for pid=$pid")
 
         // 3. Delete from backend
         viewModelScope.launch {
             wishlistRepository.deleteWishlist(uid, pid)
                 .onSuccess {
-                    Log.d(TAG, "✅ Deleted from backend: pid=$pid")
+                    Log.d(TAG, "Deleted from backend: pid=$pid")
                 }
                 .onFailure { e ->
                     Log.e(TAG, "Failed to delete from backend: ${e.message}")
@@ -186,7 +186,7 @@ class WishListViewModel(
             val result = wishlistRepository.getAlerts(uid)
             result.onSuccess { alerts ->
                 if (alerts.isNotEmpty()) {
-                    Log.d(TAG, "🔔 Found ${alerts.size} alerts to notify")
+                    Log.d(TAG, "Found ${alerts.size} alerts to notify")
 
                     // 1. Trigger notification callback
                     onAlerts(alerts)
@@ -211,7 +211,7 @@ class WishListViewModel(
         viewModelScope.launch {
             wishlistRepository.markNotified(uid, pid)
                 .onSuccess {
-                    Log.d(TAG, "✅ Marked as notified: pid=$pid")
+                    Log.d(TAG, "Marked as notified: pid=$pid")
                 }
                 .onFailure { e ->
                     Log.e(TAG, "Failed to mark notified: ${e.message}")
@@ -228,7 +228,7 @@ class WishListViewModel(
         viewModelScope.launch {
             wishlistRepository.markRead(uid, pid)
                 .onSuccess {
-                    Log.d(TAG, "✅ Marked as read: pid=$pid, will not notify again")
+                    Log.d(TAG, "Marked as read: pid=$pid, will not notify again")
                 }
                 .onFailure { e ->
                     Log.e(TAG, "Failed to mark read: ${e.message}")

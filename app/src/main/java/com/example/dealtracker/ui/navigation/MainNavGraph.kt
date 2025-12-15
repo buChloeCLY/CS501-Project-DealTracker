@@ -80,7 +80,7 @@ fun MainNavGraph(
             DealsScreen(
                 showBack = navController.previousBackStackEntry != null,
                 onBack = { navController.popBackStack() },
-                searchQuery = null, // Do not use search query
+                searchQuery = null,
                 category = category, // Use category parameter
                 onCompareClick = { product ->
                     navController.navigate(
@@ -177,7 +177,7 @@ fun MainNavGraph(
             )
         }
 
-        // Add: Generic wishlist route (no parameters)
+        // Generic wishlist route (no parameters)
         composable("wishlist") {
             val currentUser by UserManager.currentUser.collectAsState()
             val uid = currentUser?.uid ?: 0
@@ -188,7 +188,7 @@ fun MainNavGraph(
             )
         }
 
-        // Add: Wishlist route with uid parameter (for notification jump)
+        // Wishlist route with uid parameter (for notification jump)
         composable(
             route = "wishlist/{uid}",
             arguments = listOf(

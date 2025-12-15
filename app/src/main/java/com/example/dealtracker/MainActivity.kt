@@ -52,11 +52,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 1. Initialize UserPreferences
+        // Initialize UserPreferences
         UserPreferences.init(this)
         Log.d(TAG, " UserPreferences initialized")
 
-        // 2. Restore user login state from SharedPreferences
+        // Restore user login state from SharedPreferences
         lifecycleScope.launch {
             val savedUser = UserPreferences.getUser()
             if (savedUser != null) {
@@ -67,10 +67,10 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // 3. Handle notification click
+        // Handle notification click
         handleNotificationClick(intent)
 
-        // 4. Handle Deep Link
+        // Handle Deep Link
         handleDeepLink(intent)
 
         setContent {
@@ -162,7 +162,7 @@ class MainActivity : ComponentActivity() {
             val repository = WishlistRepository()
             repository.markRead(uid, pid)
                 .onSuccess {
-                    Log.d(TAG, "✅ Successfully marked as read: pid=$pid")
+                    Log.d(TAG, "Successfully marked as read: pid=$pid")
                 }
                 .onFailure { e ->
                     Log.e(TAG, "Failed to mark as read: ${e.message}")
@@ -202,7 +202,7 @@ fun DealTrackerApp(
     // Navigation triggered by notification click
     LaunchedEffect(notificationUid) {
         if (notificationUid > 0 && notificationPid > 0) {
-            Log.d("DealTrackerApp", "🔔 Navigating to Wishlist: uid=$notificationUid")
+            Log.d("DealTrackerApp", "Navigating to Wishlist: uid=$notificationUid")
 
             try {
                 navController.navigate("wishlist/$notificationUid") {
@@ -217,7 +217,7 @@ fun DealTrackerApp(
     // Navigation triggered by Deep Link
     LaunchedEffect(deepLinkPid) {
         if (deepLinkPid > 0) {
-            Log.d("DealTrackerApp", "🔗 Deep Link navigation to product: pid=$deepLinkPid")
+            Log.d("DealTrackerApp", " Deep Link navigation to product: pid=$deepLinkPid")
 
             try {
                 navController.navigate("detail/$deepLinkPid") {

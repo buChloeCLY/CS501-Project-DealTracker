@@ -93,7 +93,7 @@ async function importInitialProducts(queries = DEFAULT_QUERIES) {
         console.log(`\nProcessing: "${query}"`);
         const category = queryToCategoryMap[query];
 
-        // Step 1: Fetch from Amazon
+        // Fetch from Amazon
         const amazonProducts = await fetchFromAmazon(query, 1);
         if (amazonProducts.length === 0) {
             console.log(`No Amazon products found for "${query}"`);
@@ -108,7 +108,7 @@ async function importInitialProducts(queries = DEFAULT_QUERIES) {
         }
 
         try {
-            // Step 2: Insert product into products table
+            // Insert product into products table
             const [productResult] = await pool.query(`
                 INSERT INTO products
                 (short_title, title, price, rating, platform, free_shipping, in_stock, information, category, image_url)
@@ -129,7 +129,7 @@ async function importInitialProducts(queries = DEFAULT_QUERIES) {
             const pid = productResult.insertId;
             console.log(`[${totalImported + 1}] Created product: ${amazonProduct.shortTitle} (pid=${pid})`);
 
-            // Step 3: Insert Amazon price into price table
+            // Insert Amazon price into price table
             await pool.query(`
                 INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, idInPlatform, link)
                 VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)
@@ -137,7 +137,7 @@ async function importInitialProducts(queries = DEFAULT_QUERIES) {
 
             console.log(`  Amazon: $${amazonProduct.price}`);
 
-            // Step 4: Search eBay
+            // Search eBay
             console.log(`  Searching eBay with: "${amazonProduct.shortTitle}"`);
             await new Promise(resolve => setTimeout(resolve, 5000));
 
@@ -156,7 +156,7 @@ async function importInitialProducts(queries = DEFAULT_QUERIES) {
                 }
             }
 
-            // Step 5: Search Walmart
+            // Search Walmart
             console.log(`  Searching Walmart with: "${amazonProduct.shortTitle}"`);
             await new Promise(resolve => setTimeout(resolve, 5000));
 

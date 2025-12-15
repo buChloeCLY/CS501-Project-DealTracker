@@ -7,7 +7,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
-import com.example.dealtracker.R
 import com.example.dealtracker.MainActivity
 
 /**
@@ -74,7 +73,7 @@ object NotificationHelper {
         // Build the notification
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("🎉 Price Drop Alert!")
+            .setContentTitle("Price Drop Alert!")
             .setContentText("$title is now $${"%.2f".format(currentPrice)} (Target: $${"%.2f".format(targetPrice)})")
             .setStyle(
                 NotificationCompat.BigTextStyle()
