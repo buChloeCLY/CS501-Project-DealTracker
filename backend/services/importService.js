@@ -3,6 +3,7 @@ const pool = require('../config/database');
 const { fetchFromAmazon, fetchFromEbay, fetchFromWalmart, transformAmazonProduct, findBestEbayMatch, findBestWalmartMatch } = require('./platformService');
 
 // Default product queries for initial import
+// AI made the query list
 const queryToCategoryMap = {
     // Electronics (10 products)
     'Samsung Galaxy S24': 'Electronics',

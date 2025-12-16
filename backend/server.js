@@ -71,6 +71,7 @@ async function checkAndResetPriceAlerts() {
     try {
         console.log('\n Checking for products that reached target price...');
 
+        // AI suggested the sql
         const [reachedProducts] = await pool.query(`
             SELECT
                 w.uid,

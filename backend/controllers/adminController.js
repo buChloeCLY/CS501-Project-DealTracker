@@ -36,6 +36,7 @@ async function updateAllPrices(req, res) {
     try {
         console.log('Starting multi-platform price update...');
 
+        // AI suggested the sql
         const [dbProducts] = await pool.query(`
             SELECT p.pid, p.title,
                    pr_amazon.idInPlatform AS amazon_asin,
@@ -364,6 +365,7 @@ async function syncLowestPrices() {
     let updatedCount = 0;
     let skippedCount = 0;
 
+    // AI suggested the sql
     for (const product of products) {
         try {
             const [rows] = await pool.query(`

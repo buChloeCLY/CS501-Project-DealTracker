@@ -26,6 +26,7 @@ function parseRating(ratingStr) {
 }
 
 // Calculate similarity score between two product titles (0-1 range)
+// Use openai for nlp
 async function calculateSimilarity(title1, title2) {
     const response = await openai.chat.completions.create({
         model: "gpt-5-nano",
@@ -67,6 +68,7 @@ Return ONLY a decimal number between 0.0000 and 1.0000, nothing else.`
 }
 
 // Extract short title from full product title
+// Use openai for nlp
 async function extractShortTitle(fullTitle) {
     const response = await openai.chat.completions.create({
         model: "gpt-5-nano",

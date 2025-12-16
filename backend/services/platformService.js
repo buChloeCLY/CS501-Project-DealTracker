@@ -563,6 +563,7 @@ async function getWalmartProductDetails(productLink) {
 
         let allOffers = [];
 
+        // AI performed the field parsing for the API.
         if (Array.isArray(rawData)) {
             for (const item of rawData) {
                 if (Array.isArray(item)) {
