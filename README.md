@@ -48,10 +48,10 @@ Server running on http://localhost:8080
 Daily update scheduled at 3:00 AM EST
 ```
 
-Import Initial Data
+If you want to use admin interface, update OpenAI API key in /backend/.env
 
 ```
-curl -X POST http://localhost:8080/api/admin/import-initial
+OPENAI_API_KEY=your-own-openai-key
 ```
 
 #### 3. Run Application
@@ -164,3 +164,4 @@ Run `app` in Android Studio.
 ## AI Usage
 - AI tools are be used to speed up development
 - All AI-generated code are reviewed, tested, and verified by the developer.
+- For detailed AI reflections, please refer to the final report.
