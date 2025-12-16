@@ -39,11 +39,16 @@ fun BottomNavBarRouteAware(
             colors = itemColors
         )
 
+        // Treat all Deals sub-routes (Deals, Deals search, Deals category) as "Deals tab selected"
+        val isDealsRoute = currentRoute.startsWith(Routes.DEALS)
+
         NavigationBarItem(
-            selected = currentRoute == Routes.DEALS,
+            selected = isDealsRoute,
             onClick = {
-                // Always navigate to the default Deals screen from bottom tab
-                onTabSelected(Routes.DEALS)
+                // If already on any Deals-related route, do nothing to avoid resetting to default deals
+                if (!isDealsRoute) {
+                    onTabSelected(Routes.DEALS)
+                }
             },
             icon = { Icon(Icons.Outlined.LocalOffer, contentDescription = "Deals") },
             label = { Text("Deals") },
