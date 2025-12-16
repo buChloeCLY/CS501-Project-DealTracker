@@ -1,7 +1,7 @@
 package com.example.dealtracker.data.remote.dto
 
 /**
- * 价格 DTO - 用于 /price/:pid 端点
+ * price DTO - for /price/:pid
  */
 data class PriceDto(
     val id: Int,
@@ -15,17 +15,14 @@ data class PriceDto(
 )
 
 /**
- * 🆕 最低价信息 DTO - 用于 /api/products/:pid/lowest-price 端点
+ * lowestPrice DTO - for /api/products/:pid/lowest-price
  */
 data class LowestPriceDto(
     val lowestPrice: Double,
-    val platforms: List<PlatformPriceInfo>,  // 所有最低价平台
-    val allPrices: List<PlatformPriceInfo>   // 所有平台价格
+    val platforms: List<PlatformPriceInfo>,
+    val allPrices: List<PlatformPriceInfo>
 )
 
-/**
- * 平台价格详情
- */
 data class PlatformPriceInfo(
     val platform: String,
     val price: Double,

@@ -6,45 +6,30 @@ import com.example.dealtracker.domain.model.Product
 import com.google.gson.annotations.SerializedName
 
 /**
- * 产品数据传输对象 v2.0
- * 支持 short_title 和多平台价格
- *
- * 对应后端 /api/products 的 JSON 字段：
- * {
- *   "pid": 2,
- *   "short_title": "...",
- *   "title": "...",
- *   "price": 298,
- *   "rating": 4.5,
- *   "platform": "Amazon" 或 "Amazon, Walmart",
- *   "free_shipping": 1,
- *   "in_stock": 1,
- *   "information": "...",
- *   "category": "Electronics",
- *   "image_url": "..."
- * }
+ * Data Transfer Object (DTO) for product information from the API.
  */
 data class ProductDTO(
     val pid: Int,
-    val short_title: String?,      // 短标题（和后端字段名一致）
-    val title: String,             // 完整标题
-    val price: Double,             // 当前最低价
-    val rating: Float,             // 评分（只用 Amazon）
-    val platform: String,          // 当前最低价平台（可能是逗号分隔）
+    val short_title: String?,      // Shortened title.
+    val title: String,             // Full product title.
+    val price: Double,             // Current lowest price.
+    val rating: Float,             // Product rating.
+    val platform: String,          // Platform(s) providing the lowest price (comma-separated).
     @SerializedName("free_shipping")
-    val freeShippingRaw: Int,      // 0 / 1 → Boolean 由 toProduct() 负责转换
+    val freeShippingRaw: Int,      // Raw int (0/1) for free shipping status.
     @SerializedName("in_stock")
-    val inStockRaw: Int,           // 0 / 1 → Boolean 由 toProduct() 负责转换
-    val information: String?,      // 详细信息
-    val category: String,          // 分类（字符串枚举）
+    val inStockRaw: Int,           // Raw int (0/1) for in-stock status.
+    val information: String?,      // Detailed product information.
+    val category: String,          // Product category name.
     @SerializedName("image_url")
-    val imageUrl: String?          // 图片 URL
+    val imageUrl: String?          // Product image URL.
 ) {
     /**
-     * 转换为领域模型 Product
+     * Converts the ProductDTO to the domain model Product.
+     * @return The Product domain model object.
      */
     fun toProduct(): Product {
-        // 处理 platform 字段（可能是 "Amazon" 或 "Amazon, Walmart"）
+        // Handle platform field (e.g., "Amazon" or "Amazon, Walmart")
         val platformList = platform
             .split(",")
             .map { it.trim() }
@@ -53,12 +38,12 @@ data class ProductDTO(
         val primaryPlatform = try {
             Platform.valueOf(platformList.firstOrNull() ?: "Amazon")
         } catch (e: IllegalArgumentException) {
-            Platform.Amazon // 默认平台
+            Platform.Amazon
         }
 
         return Product(
             pid = pid,
-            // 优先使用 short_title，如果为空则使用 title 的前 100 字符
+            // Use short_title if available, otherwise truncate full title
             title = short_title?.takeIf { it.isNotBlank() }
                 ?: (if (title.length > 100) title.take(100) + "..." else title),
             fullTitle = title,
@@ -66,13 +51,13 @@ data class ProductDTO(
             rating = rating,
             platform = primaryPlatform,
             platformList = if (platformList.isNotEmpty()) platformList else listOf(primaryPlatform.name),
-            freeShipping = (freeShippingRaw == 1),   // ⭐ 0/1 → Boolean
-            inStock = (inStockRaw == 1),             // ⭐ 0/1 → Boolean
+            freeShipping = (freeShippingRaw == 1),
+            inStock = (inStockRaw == 1),
             information = information,
             category = try {
                 Category.valueOf(category)
             } catch (e: IllegalArgumentException) {
-                Category.Electronics // 默认类别
+                Category.Electronics
             },
             imageUrl = imageUrl ?: ""
         )
@@ -80,7 +65,9 @@ data class ProductDTO(
 
     companion object {
         /**
-         * 从领域模型创建 DTO（如果以后需要反向发到后端）
+         * Creates a ProductDTO from the domain model Product.
+         * @param product The Product domain model.
+         * @return The ProductDTO object.
          */
         fun fromProduct(product: Product): ProductDTO {
             return ProductDTO(
@@ -89,7 +76,7 @@ data class ProductDTO(
                 title = product.fullTitle ?: product.title,
                 price = product.price,
                 rating = product.rating,
-                // 如果有多个平台，用逗号拼起来
+                // Concatenate platform list into a comma-separated string
                 platform = product.platformList.joinToString(", "),
                 freeShippingRaw = if (product.freeShipping) 1 else 0,
                 inStockRaw = if (product.inStock) 1 else 0,
@@ -102,7 +89,10 @@ data class ProductDTO(
 }
 
 /**
- * API 响应包装类
+ * Generic API response wrapper.
+ * @param success Indicates if the request was successful.
+ * @param data The response payload.
+ * @param message Optional error or status message.
  */
 data class ApiResponse<T>(
     val success: Boolean,
@@ -112,7 +102,7 @@ data class ApiResponse<T>(
 )
 
 /**
- * 分页请求参数
+ * Request parameters for pagination.
  */
 data class PageRequest(
     val page: Int = 0,
@@ -122,7 +112,7 @@ data class PageRequest(
 )
 
 /**
- * 分页响应数据
+ * Response body for paginated data.
  */
 data class PageResponse<T>(
     val content: List<T>,
@@ -134,7 +124,7 @@ data class PageResponse<T>(
 )
 
 /**
- * 产品过滤条件
+ * Filters for product search queries.
  */
 data class ProductFilter(
     val categories: List<String>? = null,

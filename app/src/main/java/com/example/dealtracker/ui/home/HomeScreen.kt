@@ -5,48 +5,166 @@ import android.content.Intent
 import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.KeyboardVoice
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import coil.compose.AsyncImage
+import com.example.dealtracker.data.local.UserPreferences
+import com.example.dealtracker.data.remote.repository.HistoryRepository
+import com.example.dealtracker.data.remote.repository.ProductRepositoryImpl
+import com.example.dealtracker.domain.model.Product
+import com.example.dealtracker.domain.repository.RecommendationRepository
 import com.example.dealtracker.ui.home.viewmodel.HomeViewModel
+import com.example.dealtracker.ui.home.viewmodel.HomeViewModelFactory
 import com.example.dealtracker.ui.navigation.Routes
-import com.example.dealtracker.ui.navigation.navigateToRoot
-import kotlinx.coroutines.flow.collectLatest
+import com.example.dealtracker.ui.theme.AppTheme
 import kotlinx.coroutines.launch
+import androidx.lifecycle.viewmodel.compose.viewModel
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(navController: NavHostController, homeViewModel: HomeViewModel = viewModel()) {
-
-    // 监听 ViewModel 的 StateFlow
-    val searchQuery by homeViewModel.searchQuery.collectAsState()
-
-    // 控制是否进入搜索模式
-    var isSearchMode by remember { mutableStateOf(false) }
-
+fun HomeScreen(navController: NavHostController) {
     val context = LocalContext.current
+    val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
 
-    /** ---------- 语音识别 Launcher ---------- */
+    // for permission + settings
+    val activity = context as? Activity
+    val appSettingsIntent = remember {
+        Intent(
+            android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            android.net.Uri.fromParts("package", context.packageName, null)
+        )
+    }
+
+    UserPreferences.init(context)
+
+    val user = UserPreferences.getUser()
+    val userId = user?.uid ?: -1
+    val historyRepository = remember { HistoryRepository() }
+    val productRepository = remember { ProductRepositoryImpl() }
+
+    val recommendationRepository = remember {
+        RecommendationRepository(
+            historyRepository = historyRepository,
+            productRepository = productRepository
+        )
+    }
+
+    val homeViewModel: HomeViewModel = viewModel(
+        factory = HomeViewModelFactory(
+            recommendationRepository = recommendationRepository,
+            userId = userId
+        )
+    )
+
+    val searchQuery by homeViewModel.searchQuery.collectAsState()
+    val recommended by homeViewModel.recommendedProducts.collectAsState()
+    val voiceError by homeViewModel.voiceError.collectAsState()
+    var isSearchMode by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    // prevent rapid multiple launches
+    var isListening by remember { mutableStateOf(false) }
+    //  cached intent + support check
+    val speechIntent = remember {
+        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(
+                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+            )
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to search")
+        }
+    }
+
+    fun deviceSupportsSpeech(): Boolean {
+        return context.packageManager.queryIntentActivities(speechIntent, 0).isNotEmpty()
+    }
+
+    //  show snackbar when voiceError changes
+    LaunchedEffect(voiceError) {
+        val msg = voiceError ?: return@LaunchedEffect
+        val actionLabel = when {
+            msg.contains("permission", ignoreCase = true) -> "Settings"
+            msg.contains("support", ignoreCase = true) -> null
+            msg.contains("failed", ignoreCase = true) -> "Retry"
+            else -> null
+        }
+
+        val res = snackbarHostState.showSnackbar(
+            message = msg,
+            actionLabel = actionLabel,
+            withDismissAction = true,
+            duration = SnackbarDuration.Short
+        )
+
+        if (res == SnackbarResult.ActionPerformed) {
+            when (actionLabel) {
+                "Settings" -> runCatching { context.startActivity(appSettingsIntent) }
+                "Retry" -> {
+                }
+            }
+        }
+        homeViewModel.clearVoiceError()
+    }
+
+    // permission launcher
+    val micPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                // Check device support and enable voice after obtaining permission
+                if (!deviceSupportsSpeech()) {
+                    homeViewModel.setVoiceError("This device does not support speech recognition")
+                    return@rememberLauncherForActivityResult
+                }
+                runCatching {
+                    isListening = true
+                }.onFailure {
+                    isListening = false
+                    homeViewModel.setVoiceError("Voice start failed: ${it.message ?: "unknown"}")
+                }
+            } else {
+                // Refusal: divided into "ordinary refusal" and "permanent refusal"
+                val permanentlyDenied = activity != null &&
+                        !androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale(
+                            activity,
+                            android.Manifest.permission.RECORD_AUDIO
+                        )
+                if (permanentlyDenied) {
+                    homeViewModel.setVoiceError("Microphone permission denied. Please enable it in Settings.")
+                } else {
+                    homeViewModel.setVoiceError("Microphone permission is required for voice search.")
+                }
+            }
+        }
+    // handle result safely
     val voiceLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            isListening = false
             try {
                 if (result.resultCode == Activity.RESULT_OK) {
                     val text = result.data
@@ -54,121 +172,201 @@ fun HomeScreen(navController: NavHostController, homeViewModel: HomeViewModel = 
                         ?.firstOrNull()
 
                     if (text.isNullOrBlank()) {
-                        homeViewModel.setVoiceError("Empty voice result")
+                        homeViewModel.setVoiceError("No speech detected. Please try again.")
                     } else {
                         homeViewModel.applyVoiceResult(text)
                     }
-
                 } else {
-                    homeViewModel.setVoiceError("Voice recognition canceled")
+                    homeViewModel.setVoiceError("Voice recognition canceled.")
                 }
             } catch (e: Exception) {
-                homeViewModel.setVoiceError("Recognition failed: ${e.message}")
+                homeViewModel.setVoiceError("Recognition failed: ${e.message ?: "unknown error"}")
             }
         }
 
+    //  start voice with all checks
+    fun startVoiceSearch() {
+        if (isListening) return
 
-    /** ---------- 回到顶部按钮滚动控制 ---------- */
-    val listState = rememberLazyListState()
-    val showToTop by remember {
-        derivedStateOf { listState.firstVisibleItemIndex > 2 }
+        // Supportive check
+        if (!deviceSupportsSpeech()) {
+            homeViewModel.setVoiceError("This device does not support speech recognition")
+            return
+        }
+        // Permission check
+        val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+            context,
+            android.Manifest.permission.RECORD_AUDIO
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        if (!granted) {
+            // Trigger permission requests
+            micPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+            return
+        }
+
+        // Start voice
+        runCatching {
+            isListening = true
+            voiceLauncher.launch(speechIntent)
+        }.onFailure { e ->
+            isListening = false
+            homeViewModel.setVoiceError("Voice start failed: ${e.message ?: "unknown"}")
+        }
     }
 
-// 用于点击事件中启动协程
-    val coroutineScope = rememberCoroutineScope()
-
     Scaffold(
+        containerColor = colors.background,
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         floatingActionButton = {
-            if (showToTop) {
-                FloatingActionButton(
-                    onClick = {
-                        // 在点击事件中使用 coroutineScope.launch
-                        coroutineScope.launch {
-                            listState.animateScrollToItem(0)
-                        }
-                    },
-                    containerColor = MaterialTheme.colorScheme.primary
+            val showScrollTop by remember {
+                derivedStateOf { listState.firstVisibleItemIndex > 4 }
+            }
+            AnimatedVisibility(
+                visible = showScrollTop,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                SmallFloatingActionButton(
+                    onClick = { scope.launch { listState.animateScrollToItem(0) } },
+                    containerColor = colors.accent
                 ) {
-                    Text("Top", color = Color.White)
+                    Icon(
+                        Icons.Filled.KeyboardArrowUp,
+                        contentDescription = "Top",
+                        tint = colors.onPrimary
+                    )
                 }
             }
         },
         topBar = {
             TopAppBar(
+                navigationIcon = {
+                    if (isSearchMode) {
+                        IconButton(onClick = {
+                            isSearchMode = false
+                            homeViewModel.updateQuery("")
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "Exit search"
+                            )
+                        }
+                    }
+                },
                 title = {
                     if (!isSearchMode) {
-                        Text("Home", fontWeight = FontWeight.Bold)
+                        Text(
+                            "Home",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = (20 * fontScale).sp
+                        )
                     } else {
-                        /** ---------- 搜索框输入 ---------- */
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            /** ---------- 语音按钮  ---------- */
-                            IconButton(onClick = {
-                                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                                    putExtra(
-                                        RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                                        RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+
+                            // voice button uses safe startVoiceSearch() ----
+                            IconButton(
+                                onClick = { startVoiceSearch() },
+                                enabled = !isListening
+                            ) {
+                                if (isListening) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.KeyboardVoice,
+                                        contentDescription = "Voice Search",
+                                        tint = colors.accent
                                     )
                                 }
-                                val pm = context.packageManager
-                                val activities = pm.queryIntentActivities(intent, 0)
-
-                                if (activities.isNotEmpty()) {
-                                    voiceLauncher.launch(intent)
-                                } else {
-                                    homeViewModel.setVoiceError("This device does not support speech recognition")
-                                }
-
-                            }) {
-                                Icon(
-                                    imageVector = Icons.Default.KeyboardVoice,
-                                    contentDescription = "Voice Search",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
                             }
 
-                            /** ---------- 输入框 ---------- */
                             TextField(
                                 value = searchQuery,
                                 onValueChange = { homeViewModel.updateQuery(it) },
                                 modifier = Modifier.weight(1f),
-                                placeholder = { Text("Search products...") },
+                                placeholder = {
+                                    Text(
+                                        "Search products...",
+                                        fontSize = (14 * fontScale).sp
+                                    )
+                                },
                                 singleLine = true,
                                 colors = TextFieldDefaults.colors(
                                     focusedContainerColor = Color.Transparent,
                                     unfocusedContainerColor = Color.Transparent,
                                     disabledContainerColor = Color.Transparent,
                                     focusedIndicatorColor = Color.Transparent,
-                                    unfocusedIndicatorColor = Color.Transparent
+                                    unfocusedIndicatorColor = Color.Transparent,
+                                    focusedTextColor = colors.primaryText,
+                                    unfocusedTextColor = colors.primaryText
+                                ),
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                    imeAction = ImeAction.Search
+                                ),
+                                keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                                    onSearch = {
+                                        val q = searchQuery.trim()
+                                        if (q.isNotBlank()) {
+                                            navController.navigate(Routes.dealsWithQuery(q)) {
+                                                popUpTo(Routes.DEALS) { inclusive = true }
+                                            }
+                                            homeViewModel.updateQuery("")
+                                        }
+                                    }
                                 )
                             )
+
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { homeViewModel.updateQuery("") }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Clear text"
+                                    )
+                                }
+                            }
                         }
                     }
                 },
                 actions = {
-                    /** 搜索按钮 / 关闭按钮 */
-                    IconButton(onClick = {
-                        if (isSearchMode && searchQuery.isNotEmpty()) {
-                            // 执行搜索
-                            navController.navigateToRoot(Routes.DEALS)
-                        } else {
-                            isSearchMode = !isSearchMode
-                            if (!isSearchMode) homeViewModel.updateQuery("")
+                    if (!isSearchMode) {
+                        IconButton(onClick = { isSearchMode = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Enter search mode"
+                            )
                         }
-                    }) {
-                        Icon(
-                            imageVector = if (!isSearchMode) Icons.Default.Search else Icons.Default.Close,
-                            contentDescription = "Search"
-                        )
+                    } else {
+                        IconButton(onClick = {
+                            val q = searchQuery.trim()
+                            if (q.isNotBlank()) {
+                                navController.navigate(Routes.dealsWithQuery(q)) {
+                                    popUpTo(Routes.DEALS) { inclusive = true }
+                                }
+                                homeViewModel.updateQuery("")
+                            }
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search"
+                            )
+                        }
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = colors.topBarBackground,
+                    titleContentColor = colors.topBarContent,
+                    navigationIconContentColor = colors.topBarContent,
+                    actionIconContentColor = colors.topBarContent
+                )
             )
         }
     ) { innerPadding ->
-
-        /** ---------- 列表内容 ---------- */
         LazyColumn(
             state = listState,
             modifier = Modifier
@@ -178,33 +376,55 @@ fun HomeScreen(navController: NavHostController, homeViewModel: HomeViewModel = 
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                CategorySection(onCategoryClick = {
-                    navController.navigateToRoot(Routes.DEALS)
+                CategorySection(onCategoryClick = { category ->
+                    navController.navigate(Routes.dealsWithCategory(category))
                 })
             }
-
             item {
-                DealsOfTheDaySection(navController = navController)
+                Text(
+                    text = "Deals of the Day",
+                    fontSize = (22 * fontScale).sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.primaryText
+                )
+            }
+            items(recommended) { product ->
+                DealItem(
+                    product = product,
+                    onClick = {
+                        navController.navigate(
+                            Routes.detailRoute(
+                                pid = product.pid,
+                                name = product.title,
+                                price = product.price,
+                                rating = product.rating
+                            )
+                        )
+                    }
+                )
             }
         }
     }
 }
 
-/* ----------------------------- 分类部分 ----------------------------- */
 @Composable
-fun CategorySection(onCategoryClick: () -> Unit) {
+fun CategorySection(onCategoryClick: (String) -> Unit) {
+    val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
     var expanded by remember { mutableStateOf(false) }
 
     val allCategories = listOf(
         "Electronics", "Beauty", "Home", "Food", "Fashion", "Sports",
-        "Books", "Toys", "Health", "Outdoors", "Office", "Pets"
+        "Books", "Toys", "Health", "Pets"
     )
     val displayedCategories = if (expanded) allCategories else allCategories.take(6)
 
     Column {
         Text(
             text = "Categories",
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+            fontSize = (22 * fontScale).sp,
+            fontWeight = FontWeight.Bold,
+            color = colors.primaryText,
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(Modifier.height(8.dp))
@@ -219,7 +439,7 @@ fun CategorySection(onCategoryClick: () -> Unit) {
                         category = category,
                         modifier = Modifier
                             .weight(1f)
-                            .clickable { onCategoryClick() }
+                            .clickable { onCategoryClick(category) }
                     )
                 }
             }
@@ -234,92 +454,85 @@ fun CategorySection(onCategoryClick: () -> Unit) {
                 modifier = Modifier
                     .width(150.dp)
                     .height(50.dp)
-                    .background(Color(0xFFE0E0E0), shape = RoundedCornerShape(12.dp))
+                    .background(colors.card, shape = RoundedCornerShape(12.dp))
                     .clickable { expanded = !expanded },
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     if (expanded) "Less ▲" else "More ▼",
                     fontWeight = FontWeight.Medium,
-                    fontSize = 16.sp
+                    fontSize = (16 * fontScale).sp,
+                    color = colors.primaryText
                 )
             }
         }
     }
 }
 
-/* ----------------------------- 单个分类卡片 ----------------------------- */
 @Composable
 fun CategoryCard(category: String, modifier: Modifier = Modifier) {
+    val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
+
     Box(
         modifier = modifier
             .height(80.dp)
-            .background(Color(0xFFF2F2F2), shape = RoundedCornerShape(12.dp)),
+            .background(colors.card, shape = RoundedCornerShape(12.dp)),
         contentAlignment = Alignment.Center
     ) {
-        Text(text = category, fontWeight = FontWeight.Medium, fontSize = 16.sp)
+        Text(
+            text = category,
+            fontWeight = FontWeight.Medium,
+            fontSize = (16 * fontScale).sp,
+            color = colors.primaryText
+        )
     }
 }
 
-/* ----------------------------- Deals Of The Day ----------------------------- */
 @Composable
-fun DealsOfTheDaySection(navController: NavHostController) {
-    Text(
-        text = "Deals of the Day",
-        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-        modifier = Modifier.fillMaxWidth()
-    )
-    Spacer(Modifier.height(8.dp))
+fun DealItem(product: Product, onClick: () -> Unit) {
+    val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
 
-    val deals = listOf(
-        Triple("iPhone 16", "$999", "Amazon"),
-        Triple("Dyson Hair Dryer", "$399", "BestBuy"),
-        Triple("Sony Headphones", "$249", "Walmart"),
-        Triple("Nike Running Shoes", "$120", "Nike"),
-        Triple("Apple Watch", "$349", "Target"),
-        Triple("Samsung TV 65", "$799", "BestBuy"),
-        Triple("MacBook Air M3", "$1199", "Apple"),
-    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 110.dp)
+            .background(colors.card, shape = RoundedCornerShape(12.dp))
+            .padding(12.dp)
+            .clickable { onClick() },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AsyncImage(
+            model = product.imageUrl,
+            contentDescription = product.title,
+            modifier = Modifier
+                .size(60.dp)
+                .clip(RoundedCornerShape(8.dp))
+        )
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        deals.forEach { (name, price, site) ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(90.dp)
-                    .background(Color(0xFFF7F7F7), shape = RoundedCornerShape(12.dp))
-                    .padding(horizontal = 12.dp)
-                    .clickable {
-                        if (name == "iPhone 16") {
-                            navController.navigate(
-                                Routes.detailRoute(
-                                    pid = 1,
-                                    name = name,
-                                    price = price.removePrefix("$").toDouble(),
-                                    rating = 4.8f
-                                )
-                            )
-                        }
-                    },
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(60.dp)
-                        .background(Color(0xFFDDEEE0), RoundedCornerShape(8.dp))
-                )
-                Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(12.dp))
 
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(name, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-                    Text(price, color = Color(0xFF388E3C), fontSize = 15.sp)
-                    Text(
-                        "Available on $site",
-                        color = Color.Gray,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
+        Column {
+            Text(
+                product.title,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = (14 * fontScale).sp,
+                color = colors.primaryText,
+                maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+            Text(
+                product.priceText,
+                color = colors.accent,
+                fontSize = (16 * fontScale).sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                "Best from ${product.platform}",
+                color = colors.secondaryText,
+                fontSize = (12 * fontScale).sp
+            )
         }
     }
 }

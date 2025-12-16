@@ -73,11 +73,11 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
 
-    // Kotlin 协程
+    // Kotlin coroutine
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
-// Lifecycle + ViewModel + StateFlow 支持
+    // Lifecycle + ViewModel + StateFlow
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
 
@@ -86,6 +86,9 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("com.squareup.okhttp3:logging-interceptor:5.0.0-alpha.11")
 
-    // 图片加载库
+    // Image loading
     implementation("io.coil-kt:coil-compose:2.6.0")
+
+    // link
+    implementation("androidx.browser:browser:1.8.0")
 }

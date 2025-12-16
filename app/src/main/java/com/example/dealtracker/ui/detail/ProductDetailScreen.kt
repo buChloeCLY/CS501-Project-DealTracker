@@ -1,47 +1,59 @@
 package com.example.dealtracker.ui.detail
 
-import androidx.compose.foundation.Canvas
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.dealtracker.domain.model.Category
 import com.example.dealtracker.domain.model.PlatformPrice
-import com.example.dealtracker.domain.model.PricePoint
 import com.example.dealtracker.ui.detail.viewmodel.ProductViewModel
-import com.example.dealtracker.ui.theme.AppColors
-import com.example.dealtracker.ui.theme.AppDimens
+import com.example.dealtracker.ui.theme.AppTheme
 import com.example.dealtracker.domain.model.Platform
 import com.example.dealtracker.domain.model.Product
 import com.example.dealtracker.ui.wishlist.WishListHolder
 import com.example.dealtracker.ui.wishlist.viewmodel.WishListViewModel
+import com.example.dealtracker.data.remote.repository.HistoryRepository
 import kotlinx.coroutines.launch
-import kotlin.math.ceil
-import kotlin.math.floor
-import kotlin.math.log10
-import kotlin.math.pow
 
+/**
+ * Main Composable for the Product Detail Screen.
+ * @param pid Product ID.
+ * @param name Product name (title).
+ * @param price Current product price.
+ * @param rating Product rating.
+ * @param navController Navigation controller.
+ * @param uid User ID (default 1).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductDetailScreen(
@@ -54,32 +66,59 @@ fun ProductDetailScreen(
 ) {
     val viewModel: ProductViewModel = viewModel()
     val wishlistViewModel: WishListViewModel = viewModel()
+    val historyRepository = remember { HistoryRepository() }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
 
     val platformPricesState = viewModel.platformPrices.collectAsState()
     val priceHistoryState = viewModel.priceHistory.collectAsState()
 
-    // 获取当前登录用户
     val currentUser by com.example.dealtracker.domain.UserManager.currentUser.collectAsState()
     val actualUid = currentUser?.uid ?: uid
 
-    // 监听本地心愿单状态（即时更新）
     val wishList by WishListHolder.wishList.collectAsState()
     val isInWishlist = remember(wishList, pid) {
         wishList.any { it.pid == pid }
     }
 
+    // Record viewing history
+    LaunchedEffect(pid, currentUser) {
+        currentUser?.let { user ->
+            scope.launch {
+                try {
+                    historyRepository.addHistory(user.uid, pid)
+                } catch (e: Exception) {
+                    android.util.Log.e("ProductDetail", "Failed to record history", e)
+                }
+            }
+        }
+    }
+
+    // Load price data
     LaunchedEffect(pid) {
         viewModel.loadPlatformPrices(pid = pid)
-        viewModel.loadPriceHistory(pid = pid, days = 7)
+        viewModel.loadPriceHistory(pid = pid, days = 30)
     }
 
     val platformPrices = platformPricesState.value
     val priceHistory = priceHistoryState.value
 
-    val currentPrice = platformPrices.minOfOrNull { it.price } ?: price
-    val lowestPlatform = platformPrices.minByOrNull { it.price }
+    LaunchedEffect(platformPrices) {
+        platformPrices.forEach { platform ->
+            android.util.Log.d("ProductDetail", "Platform: ${platform.platformName}")
+            android.util.Log.d("ProductDetail", "  price: ${platform.price}")
+            android.util.Log.d("ProductDetail", "  link: '${platform.link}'")
+            android.util.Log.d("ProductDetail", "  link is null: ${platform.link == null}")
+        }
+    }
+    val nonEbayPrices = platformPrices.filter { it.platformName != "eBay" }
+
+    val currentPrice = nonEbayPrices.minOfOrNull { it.price } ?: price
+    val lowestPlatform = nonEbayPrices.minByOrNull { it.price }
 
     Scaffold(
         topBar = {
@@ -92,7 +131,15 @@ fun ProductDetailScreen(
                 },
                 actions = {
                     IconButton(onClick = {
-                        // 检查是否登录
+                        shareProduct(context, pid, name, currentPrice, platformPrices)
+                    }) {
+                        Icon(
+                            Icons.Filled.Share,
+                            contentDescription = "Share"
+                        )
+                    }
+
+                    IconButton(onClick = {
                         if (currentUser == null) {
                             scope.launch {
                                 snackbarHostState.showSnackbar("Please login first")
@@ -101,6 +148,7 @@ fun ProductDetailScreen(
                             return@IconButton
                         }
 
+                        // Create a Product object for wishlist operations
                         val product = Product(
                             pid = pid,
                             title = name,
@@ -119,11 +167,9 @@ fun ProductDetailScreen(
                             }
                             navController.navigate("wishlist")
                         } else {
-                            // 使用 WishListViewModel.addProduct，同步到本地 + 后端
                             wishlistViewModel.addProduct(
                                 uid = actualUid,
                                 product = product,
-                                targetPrice = price * 0.9,  // 默认目标价 = 当前价的 9 折
                                 alertEnabled = true
                             )
                             scope.launch {
@@ -134,22 +180,29 @@ fun ProductDetailScreen(
                         Icon(
                             if (isInWishlist) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                             contentDescription = "Add to WishList",
-                            tint = if (isInWishlist) Color.Red else AppColors.PrimaryText
+                            tint = if (isInWishlist) colors.error else colors.primaryText
                         )
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = colors.topBarBackground,
+                    titleContentColor = colors.topBarContent,
+                    navigationIconContentColor = colors.topBarContent,
+                    actionIconContentColor = colors.topBarContent
+                )
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = colors.background
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 产品头部
             ProductHeader(
                 name = name,
                 currentPrice = currentPrice,
@@ -157,74 +210,148 @@ fun ProductDetailScreen(
                 hasData = platformPrices.isNotEmpty()
             )
 
-            // 历史价格图表
+            // Price History Chart section
             when {
                 priceHistory.loading -> {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator()
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("Loading history…", color = AppColors.SecondaryText)
+                        CircularProgressIndicator(color = colors.accent)
                     }
                 }
-                priceHistory.data.isEmpty() -> {
+
+                priceHistory.error -> {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(AppDimens.CornerRadius),
-                        colors = CardDefaults.cardColors(containerColor = AppColors.Card)
+                        colors = CardDefaults.cardColors(
+                            containerColor = colors.card
+                        )
                     ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(220.dp)
                                 .padding(16.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("No price history available", color = AppColors.SecondaryText)
+                            Text(
+                                "No platform data available",
+                                color = colors.secondaryText,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
                         }
                     }
                 }
+
                 else -> {
-                    PriceHistoryChart(
-                        data = priceHistory.data.takeLast(7),
-                        height = 220.dp,
-                        yTickCount = 5,
-                        xLabelTilted = true,
-                        lineStrokeWidth = 2.dp
-                    )
+                    ScrollablePriceChart(priceHistory = priceHistory.data)
                 }
             }
 
-            // 平台价格列表
-            if (platformPrices.isEmpty()) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(AppDimens.CornerRadius),
-                    colors = CardDefaults.cardColors(containerColor = AppColors.Card)
+            // Platform Prices List section
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = colors.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("No platform prices available", color = AppColors.SecondaryText)
+                    val fontScale = AppTheme.fontScale
+
+                    Text(
+                        "Available on",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = (16 * fontScale).sp,
+                        color = colors.primaryText,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+
+                    if (platformPrices.isNotEmpty()) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            platformPrices.forEach { platform ->
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(72.dp)
+                                        .clickable {
+                                            android.util.Log.d(
+                                                "ProductDetail",
+                                                "Clicked: ${platform.platformName} - ${platform.link}"
+                                            )
+                                            if (!platform.link.isNullOrEmpty()) {
+                                                openUrl(context, platform.link)
+                                            } else {
+                                                android.util.Log.d(
+                                                    "ProductDetail",
+                                                    "No link available for ${platform.platformName}"
+                                                )
+                                            }
+                                        },
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = CardDefaults.cardColors(containerColor = colors.surface),
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            val fontScale = AppTheme.fontScale
+                                            PlatformIcon(platformIcon = platform.platformIcon)
+                                            Text(
+                                                text = platform.platformName,
+                                                fontWeight = FontWeight.Medium,
+                                                fontSize = (16 * fontScale).sp,
+                                                color = colors.primaryText
+                                            )
+                                        }
+                                        Text(
+                                            text = "$${"%.2f".format(platform.price)}",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = (16 * fontScale).sp,
+                                            color = colors.accent
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        Text(
+                            "No platform data available",
+                            color = colors.secondaryText,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
                     }
                 }
-            } else {
-                PlatformPriceCardList(
-                    items = platformPrices,
-                    onItemClick = { platformName ->
-                        scope.launch { snackbarHostState.showSnackbar("Open $platformName") }
-                    }
-                )
             }
         }
     }
 }
 
+/**
+ * Displays the product name and current lowest price/platform.
+ * @param name Product name.
+ * @param currentPrice The lowest price.
+ * @param lowestPlatform The name of the platform offering the lowest price.
+ * @param hasData Indicates if platform price data was successfully loaded.
+ */
 @Composable
 private fun ProductHeader(
     name: String,
@@ -232,145 +359,48 @@ private fun ProductHeader(
     lowestPlatform: String?,
     hasData: Boolean
 ) {
+    val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
+
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(AppDimens.CornerRadius),
-        colors = CardDefaults.cardColors(containerColor = AppColors.Card)
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = colors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(modifier = Modifier.padding(AppDimens.CardPadding)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 name,
-                fontSize = AppDimens.TitleText,
                 fontWeight = FontWeight.Bold,
-                color = AppColors.PrimaryText
+                fontSize = (20 * fontScale).sp,
+                color = colors.primaryText
             )
-
             Spacer(modifier = Modifier.height(8.dp))
-
-            if (hasData) {
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        "$${"%.2f".format(currentPrice)}",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = AppDimens.TitleText,
-                        color = AppColors.Accent
-                    )
-                    if (lowestPlatform != null) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            "from $lowestPlatform",
-                            color = AppColors.SecondaryText,
-                            fontSize = AppDimens.BodyText
-                        )
-                    }
-                }
-            } else {
+            Text(
+                "$${"%.2f".format(currentPrice)}",
+                fontSize = (28 * fontScale).sp,
+                fontWeight = FontWeight.Bold,
+                color = colors.accent
+            )
+            if (hasData && lowestPlatform != null) {
                 Text(
-                    "Price: Unknown",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = AppDimens.TitleText,
-                    color = AppColors.SecondaryText
+                    "Lowest price on $lowestPlatform",
+                    fontSize = (12 * fontScale).sp,
+                    color = colors.secondaryText
                 )
             }
         }
     }
 }
 
-@Composable
-private fun PriceHistoryChart(
-    data: List<PricePoint>,
-    height: Dp,
-    yTickCount: Int,
-    xLabelTilted: Boolean,
-    lineStrokeWidth: Dp
-) {
-    if (data.isEmpty()) return
-
-    val leftAxisSpace = 48.dp
-    val bottomAxisSpace = 48.dp
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(AppDimens.CornerRadius),
-        colors = CardDefaults.cardColors(containerColor = AppColors.Card)
-    ) {
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(height + bottomAxisSpace)
-                .padding(start = leftAxisSpace, top = 16.dp, end = 16.dp)
-        ) {
-            val prices = data.map { it.price }
-            val minVal = prices.min()
-            val maxVal = prices.max()
-            val (yMin, yMax, step) = niceAxis(minVal, maxVal, yTickCount)
-
-            val chartHeight = height.toPx()
-            val chartWidth = size.width
-            val stepCount = ((yMax - yMin) / step).toInt()
-
-            val yLabelPaint = android.graphics.Paint().apply {
-                color = AppColors.PrimaryText.toArgb()
-                textSize = 30f
-                textAlign = android.graphics.Paint.Align.RIGHT
-                isAntiAlias = true
-            }
-
-            val xLabelPaint = android.graphics.Paint().apply {
-                color = AppColors.PrimaryText.toArgb()
-                textSize = 28f
-                textAlign = android.graphics.Paint.Align.CENTER
-                isAntiAlias = true
-            }
-
-            for (i in 0..stepCount) {
-                val yy = chartHeight - (i * (chartHeight / stepCount))
-                drawLine(
-                    color = AppColors.ChartLine,
-                    start = androidx.compose.ui.geometry.Offset(0f, yy),
-                    end = androidx.compose.ui.geometry.Offset(chartWidth, yy),
-                    strokeWidth = 1f
-                )
-                val label = (yMin + step * i).toInt().toString()
-                drawIntoCanvas { cnv ->
-                    cnv.nativeCanvas.drawText(label, -24.dp.toPx(), yy + 8f, yLabelPaint)
-                }
-            }
-
-            val xCount = (data.size - 1).coerceAtLeast(1)
-            data.forEachIndexed { i, p ->
-                val xx = i * (chartWidth / xCount)
-                val baseY = chartHeight + 20f
-                drawIntoCanvas { cnv ->
-                    val nc = cnv.nativeCanvas
-                    if (xLabelTilted) {
-                        nc.save()
-                        nc.rotate(-45f, xx, baseY)
-                    }
-                    nc.drawText(p.date, xx, baseY + 20f, xLabelPaint)
-                    if (xLabelTilted) {
-                        nc.restore()
-                    }
-                }
-            }
-
-            val path = Path()
-            data.forEachIndexed { i, p ->
-                val x = i * (chartWidth / xCount)
-                val denom = (yMax - yMin).takeIf { it > 0 } ?: 1.0
-                val ratio = (p.price - yMin) / denom
-                val y = chartHeight - (ratio * chartHeight).toFloat()
-                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-            }
-
-            drawPath(path, AppColors.ChartLine, style = Stroke(lineStrokeWidth.toPx(), cap = StrokeCap.Round))
-        }
-    }
-}
-
+/**
+ * Displays a list of cards for platform-specific prices.
+ * (Note: Not currently used in ProductDetailScreen, kept for context.)
+ */
 @Composable
 private fun PlatformPriceCardList(
     items: List<PlatformPrice>,
+    context: Context,
     onItemClick: (String) -> Unit
 ) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -379,9 +409,11 @@ private fun PlatformPriceCardList(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(72.dp)
-                    .clickable { onItemClick(row.platformName) },
-                shape = RoundedCornerShape(AppDimens.CornerRadius),
-                colors = CardDefaults.cardColors(containerColor = AppColors.Card)
+                    .clickable {
+                        onItemClick(row.link ?: "")
+                    },
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = AppTheme.colors.card)
             ) {
                 Row(
                     modifier = Modifier
@@ -390,28 +422,160 @@ private fun PlatformPriceCardList(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(row.platformName, fontWeight = FontWeight.Medium, color = AppColors.PrimaryText)
-                    Text("$${"%.2f".format(row.price)}", fontWeight = FontWeight.Bold, color = AppColors.Accent)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        PlatformIcon(platformIcon = row.platformIcon)
+
+                        Column {
+                            Text(
+                                row.platformName,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+
+                    Text(
+                        "$${"%.2f".format(row.price)}",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
             }
         }
     }
 }
 
-private data class AxisInfo(val min: Double, val max: Double, val step: Double)
+/**
+ * Prepares and launches an Intent to share the product details.
+ */
+private fun shareProduct(
+    context: Context,
+    pid: Int,
+    name: String,
+    price: Double,
+    platforms: List<PlatformPrice>
+) {
+    val bestPlatform = platforms.minByOrNull { it.price }
+    val appLink = "dealtracker://product/$pid"
 
-private fun niceAxis(minVal: Double, maxVal: Double, tickCount: Int): AxisInfo {
-    val d = (maxVal - minVal)
-    val rawStep = d / (tickCount - 1).coerceAtLeast(1)
-    val exp = floor(log10(rawStep))
-    val base = rawStep / 10.0.pow(exp)
-    val step = when {
-        base < 1.5 -> 1.0
-        base < 3 -> 2.0
-        base < 7 -> 5.0
-        else -> 10.0
-    } * 10.0.pow(exp)
-    val niceMin = floor(minVal / step) * step
-    val niceMax = ceil(maxVal / step) * step
-    return AxisInfo(niceMin, niceMax, step)
+    val shareText = buildString {
+        append("Check out this deal!\n\n")
+        append("$name\n")
+        append("Best Price: $${"%.2f".format(price)}")
+        if (bestPlatform != null) {
+            append(" from ${bestPlatform.platformName}")
+        }
+        append("\n\nView in app: $appLink")
+
+        if (!bestPlatform?.link.isNullOrEmpty()) {
+            append("\nBuy now: ${bestPlatform.link}")
+        }
+    }
+
+    val shareIntent = Intent().apply {
+        action = Intent.ACTION_SEND
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, shareText)
+        putExtra(Intent.EXTRA_SUBJECT, "Deal: $name")
+    }
+
+    context.startActivity(Intent.createChooser(shareIntent, "Share via"))
+}
+
+/**
+ * Opens a URL using Chrome Custom Tabs or a regular browser as a fallback.
+ */
+private fun openUrl(context: Context, url: String) {
+    try {
+        // Use Chrome Custom Tabs
+        val builder = androidx.browser.customtabs.CustomTabsIntent.Builder()
+        builder.setShowTitle(true)
+        builder.setUrlBarHidingEnabled(false)
+
+        val customTabsIntent = builder.build()
+        customTabsIntent.launchUrl(context, Uri.parse(url))
+
+        android.util.Log.d("ProductDetail", "Opened URL in Custom Tab: $url")
+    } catch (e: Exception) {
+        // Fallback to regular browser
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            context.startActivity(intent)
+            android.util.Log.d("ProductDetail", "Opened URL in browser: $url")
+        } catch (ex: Exception) {
+            android.util.Log.e("ProductDetail", "Failed to open URL: $url", ex)
+        }
+    }
+}
+
+/**
+ * Displays the platform icon, loading from URL, local resource, or a default icon.
+ * @param platformIcon The URL or resource name for the icon.
+ */
+@Composable
+private fun PlatformIcon(platformIcon: String) {
+    val colors = AppTheme.colors
+
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(colors.card),
+        contentAlignment = Alignment.Center
+    ) {
+        when {
+            platformIcon.startsWith("http://") || platformIcon.startsWith("https://") -> {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(platformIcon)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = "Platform Icon",
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            }
+            platformIcon.isNotEmpty() -> {
+                val context = LocalContext.current
+                val drawableId = remember(platformIcon) {
+                    context.resources.getIdentifier(
+                        platformIcon,
+                        "drawable",
+                        context.packageName
+                    )
+                }
+
+                if (drawableId != 0) {
+                    Image(
+                        painter = painterResource(id = drawableId),
+                        contentDescription = "Platform Icon",
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Filled.ShoppingCart,
+                        contentDescription = "Platform Icon",
+                        modifier = Modifier.size(24.dp),
+                        tint = colors.secondaryText
+                    )
+                }
+            }
+            else -> {
+                Icon(
+                    imageVector = Icons.Filled.ShoppingCart,
+                    contentDescription = "Platform Icon",
+                    modifier = Modifier.size(24.dp),
+                    tint = colors.secondaryText
+                )
+            }
+        }
+    }
 }

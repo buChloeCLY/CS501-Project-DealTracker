@@ -1,6 +1,5 @@
 package com.example.dealtracker.ui.profile
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,7 +13,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -25,14 +23,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.example.dealtracker.ui.theme.AppTheme
 import kotlinx.coroutines.launch
 
+// User login screen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
     navController: NavController,
     viewModel: AuthViewModel = viewModel()
 ) {
+    val colors = AppTheme.colors
+    val fontScale = AppTheme.fontScale
+
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
@@ -45,12 +48,12 @@ fun LoginScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = colors.background
     ) { padding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFFCE4D6))
                 .padding(padding)
         ) {
             Column(
@@ -60,24 +63,22 @@ fun LoginScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Logo/Title
                 Text(
                     text = "Welcome Back",
-                    fontSize = 32.sp,
+                    fontSize = (32 * fontScale).sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF212121)
+                    color = colors.primaryText
                 )
 
                 Text(
                     text = "Sign in to continue",
-                    fontSize = 16.sp,
-                    color = Color(0xFF757575),
+                    fontSize = (16 * fontScale).sp,
+                    color = colors.secondaryText,
                     modifier = Modifier.padding(top = 8.dp)
                 )
 
                 Spacer(modifier = Modifier.height(48.dp))
 
-                // Email Field
                 OutlinedTextField(
                     value = email,
                     onValueChange = { email = it },
@@ -92,15 +93,14 @@ fun LoginScreen(
                         onNext = { focusManager.moveFocus(FocusDirection.Down) }
                     ),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White
+                        focusedContainerColor = colors.surface,
+                        unfocusedContainerColor = colors.surface
                     ),
                     shape = RoundedCornerShape(12.dp)
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Password Field
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
@@ -127,25 +127,23 @@ fun LoginScreen(
                         onDone = { focusManager.clearFocus() }
                     ),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White
+                        focusedContainerColor = colors.surface,
+                        unfocusedContainerColor = colors.surface
                     ),
                     shape = RoundedCornerShape(12.dp)
                 )
 
-                // Error message
                 if (error != null) {
                     Text(
                         text = error ?: "",
-                        color = MaterialTheme.colorScheme.error,
-                        fontSize = 14.sp,
+                        color = colors.error,
+                        fontSize = (14 * fontScale).sp,
                         modifier = Modifier.padding(top = 8.dp)
                     )
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // Login Button
                 Button(
                     onClick = {
                         if (email.isBlank() || password.isBlank()) {
@@ -176,34 +174,37 @@ fun LoginScreen(
                         .height(56.dp),
                     enabled = !isLoading,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFFF6B35)
+                        containerColor = colors.accent
                     ),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     if (isLoading) {
                         CircularProgressIndicator(
-                            color = Color.White,
+                            color = colors.onPrimary,
                             modifier = Modifier.size(24.dp)
                         )
                     } else {
-                        Text("Login", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            "Login",
+                            fontSize = (18 * fontScale).sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Register link
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center
                 ) {
                     Text(
                         text = "Don't have an account? ",
-                        color = Color(0xFF757575)
+                        color = colors.secondaryText
                     )
                     Text(
                         text = "Sign up",
-                        color = Color(0xFFFF6B35),
+                        color = colors.accent,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.clickable {
                             navController.navigate("register")
@@ -213,7 +214,6 @@ fun LoginScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Guest mode
                 TextButton(onClick = {
                     navController.navigate("deals") {
                         popUpTo("login") { inclusive = true }
@@ -221,7 +221,7 @@ fun LoginScreen(
                 }) {
                     Text(
                         text = "Continue as Guest",
-                        color = Color(0xFF757575)
+                        color = colors.secondaryText
                     )
                 }
             }

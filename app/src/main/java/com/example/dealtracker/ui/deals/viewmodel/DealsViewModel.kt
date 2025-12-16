@@ -9,183 +9,304 @@ import com.example.dealtracker.domain.model.Platform
 import com.example.dealtracker.domain.model.Product
 import com.example.dealtracker.domain.repository.ProductRepository
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-// 排序字段
-//enum class SortField(val label: String) {
-//    Price("Price"),
-//    Rating("Rating")
-//}
-//
-//enum class SortOrder { Asc, Desc }
-
-// 筛选状态
+// ---------------- Filter State ----------------
+/**
+ * Represents the current filtering criteria for deals.
+ */
 data class DealsFilterState(
     val priceMin: Float = 0f,
     val priceMax: Float = 2000f,
     val chooseAmazon: Boolean = true,
-    val chooseBestBuy: Boolean = true,
+    val chooseEBay: Boolean = true,
     val chooseWalmart: Boolean = true,
     val onlyFreeShipping: Boolean = false,
     val onlyInStock: Boolean = false
 )
 
-// 排序状态
+// ---------------- Sort State ----------------
+/**
+ * Represents the current sorting criteria for deals.
+ */
 data class DealsSortState(
     val field: SortField = SortField.Price,
     val order: SortOrder = SortOrder.Asc
 )
 
-// UI 状态
+// ---------------- UI State ----------------
+/**
+ * Represents the entire UI state for the Deals screen.
+ */
 data class DealsUiState(
-    val products: List<Product> = emptyList(),
-    val filteredSorted: List<Product> = emptyList(),
+    val products: List<Product> = emptyList(),       // Raw data fetched from API (current page or all).
+    val filteredSorted: List<Product> = emptyList(), // Filtered and sorted list derived from 'products'.
     val filters: DealsFilterState = DealsFilterState(),
     val sort: DealsSortState = DealsSortState(),
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+
+    // Pagination & Search
+    val searchQuery: String = "",
+    val currentPage: Int = 1,
+    val totalPages: Int = 1
 )
 
+/**
+ * ViewModel for managing product deals data, filtering, sorting, and pagination.
+ */
 class DealsViewModel : ViewModel() {
 
     private val TAG = "DealsViewModel"
 
-    // 使用 Repository
     private val repository: ProductRepository = ProductRepositoryImpl()
 
-    private val _products = MutableStateFlow<List<Product>>(emptyList())
-    val products: StateFlow<List<Product>> = _products
-
-    private val _filters = MutableStateFlow(DealsFilterState())
-    val filters: StateFlow<DealsFilterState> = _filters
-
-    private val _sort = MutableStateFlow(DealsSortState())
-    val sort: StateFlow<DealsSortState> = _sort
-
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading
-
-    private val _error = MutableStateFlow<String?>(null)
-    val error: StateFlow<String?> = _error
-
-    // 组合 Flow - 自动计算筛选和排序
-    val uiState: StateFlow<DealsUiState> =
-        combine(products, filters, sort, isLoading, error) { list, f, s, loading, err ->
-            val filtered = list.asSequence()
-                .filter { it.price in f.priceMin.toDouble()..f.priceMax.toDouble() }
-                .filter {
-                    (f.chooseAmazon && it.platform == Platform.Amazon) ||
-                            (f.chooseBestBuy && it.platform == Platform.BestBuy) ||
-                            (f.chooseWalmart && it.platform == Platform.Walmart)
-                }
-                .filter { if (f.onlyFreeShipping) it.freeShipping else true }
-                .filter { if (f.onlyInStock) it.inStock else true }
-                .toList()
-
-            val sorted = when (s.field) {
-                SortField.Price  -> filtered.sortedBy { it.price }
-                SortField.Rating -> filtered.sortedBy { it.rating }
-            }.let { if (s.order == SortOrder.Desc) it.reversed() else it }
-
-            DealsUiState(
-                products = list,
-                filteredSorted = sorted,
-                filters = f,
-                sort = s,
-                isLoading = loading,
-                error = err
-            )
-        }.stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5_000),
-            DealsUiState(isLoading = true)
-        )
+    // The single source of UI state
+    private val _uiState = MutableStateFlow(DealsUiState(isLoading = true))
+    val uiState: StateFlow<DealsUiState> = _uiState
 
     init {
-        // 初始化时自动加载产品
+        // Load all products by default
         loadProducts()
     }
 
+    // ---------------- Utility: Recompute filteredSorted list ----------------
     /**
-     * 从后端 API 加载所有产品
+     * Applies the current filters and sort order to the raw product list.
+     * @param state The current DealsUiState.
+     * @return The updated DealsUiState with the new filteredSorted list.
+     */
+    private fun recompute(state: DealsUiState): DealsUiState {
+        val f = state.filters
+        val s = state.sort
+
+        val filtered = state.products.asSequence()
+            .filter { it.price in f.priceMin.toDouble()..f.priceMax.toDouble() }
+            .filter {
+                (f.chooseAmazon && it.platform == Platform.Amazon) ||
+                        (f.chooseEBay && it.platform == Platform.eBay) ||
+                        (f.chooseWalmart && it.platform == Platform.Walmart)
+            }
+            .filter { if (f.onlyFreeShipping) it.freeShipping else true }
+            .filter { if (f.onlyInStock) it.inStock else true }
+            .toList()
+
+        val sorted = when (s.field) {
+            SortField.Price  -> filtered.sortedBy { it.price }
+            SortField.Rating -> filtered.sortedBy { it.rating }
+        }.let { if (s.order == SortOrder.Desc) it.reversed() else it }
+
+        return state.copy(filteredSorted = sorted)
+    }
+
+    // ---------------- Load All Products (Non-Search) ----------------
+    /**
+     * Loads all available products from the repository.
      */
     fun loadProducts() {
         viewModelScope.launch {
-            _isLoading.value = true
-            _error.value = null
-
-            Log.d(TAG, "Loading products from backend...")
+            _uiState.update { it.copy(isLoading = true, error = null) }
 
             repository.getAllProducts()
-                .onSuccess { productList ->
-                    _products.value = productList
-                    Log.d(TAG, "Loaded ${productList.size} products")
+                .onSuccess { list ->
+                    _uiState.update { old ->
+                        recompute(
+                            old.copy(
+                                products = list,
+                                isLoading = false,
+                                error = null,
+                                searchQuery = "",
+                                currentPage = 1,
+                                totalPages = 1
+                            )
+                        )
+                    }
                 }
-                .onFailure { exception ->
-                    val errorMsg = exception.message ?: "Unknown error"
-                    _error.value = errorMsg
-                    Log.e(TAG, "Failed to load products: $errorMsg")
-
-                    // 失败时使用备用数据（可选）
-                    _products.value = getDummyProducts()
+                .onFailure { e ->
+                    Log.e(TAG, "Failed to load products", e)
+                    _uiState.update { old ->
+                        recompute(
+                            old.copy(
+                                products = getDummyProducts(),
+                                isLoading = false,
+                                error = e.message ?: "Unknown error",
+                                searchQuery = "",
+                                currentPage = 1,
+                                totalPages = 1
+                            )
+                        )
+                    }
                 }
-
-            _isLoading.value = false
         }
     }
 
+    // ---------------- Apply Category Filter (from home screen) ----------------
     /**
-     * 搜索产品
+     * Loads all products and filters them locally by the given category name.
+     * @param categoryName The category name string to filter by.
      */
-    fun searchProducts(query: String) {
-        if (query.isBlank()) {
+    fun applyCategory(categoryName: String) {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isLoading = true,
+                    error = null,
+                    searchQuery = categoryName, // Used for display only
+                    currentPage = 1,
+                    totalPages = 1
+                )
+            }
+
+            repository.getAllProducts()
+                .onSuccess { list ->
+                    val filtered = list.filter { product ->
+                        product.category
+                            .toString()
+                            .equals(categoryName, ignoreCase = true)
+                    }
+
+                    _uiState.update { old ->
+                        recompute(
+                            old.copy(
+                                products = filtered,
+                                isLoading = false,
+                                error = null
+                            )
+                        )
+                    }
+                }
+                .onFailure { e ->
+                    Log.e(TAG, "Failed to load products for category", e)
+                    _uiState.update { old ->
+                        old.copy(
+                            isLoading = false,
+                            error = e.message ?: "Unknown error"
+                        )
+                    }
+                }
+        }
+    }
+
+
+    // ---------------- Apply Search Query (from home screen) ----------------
+    /**
+     * Initiates a paginated search or reverts to loading all products if the query is blank.
+     * @param query The search term.
+     */
+    fun applySearch(query: String?) {
+        if (query.isNullOrBlank()) {
+            loadProducts()
+            return
+        }
+
+        _uiState.update {
+            it.copy(
+                searchQuery = query,
+                currentPage = 1
+            )
+        }
+        searchPaged()
+    }
+
+    // ---------------- Paginated Search ----------------
+    /**
+     * Executes the paginated product search based on current state (query and page).
+     */
+    fun searchPaged() {
+        val current = _uiState.value
+        val q = current.searchQuery
+        val page = current.currentPage
+
+        if (q.isBlank()) {
             loadProducts()
             return
         }
 
         viewModelScope.launch {
-            _isLoading.value = true
-            _error.value = null
+            _uiState.update { it.copy(isLoading = true, error = null) }
 
-            Log.d(TAG, "Searching: $query")
-
-            repository.searchProducts(query)
-                .onSuccess { productList ->
-                    _products.value = productList
-                    Log.d(TAG, "Found ${productList.size} products")
+            repository.searchProductsPaged(q, page, 10)
+                .onSuccess { result ->
+                    _uiState.update { old ->
+                        recompute(
+                            old.copy(
+                                products = result.products,
+                                isLoading = false,
+                                error = null,
+                                currentPage = result.page,
+                                totalPages = result.totalPages
+                            )
+                        )
+                    }
                 }
-                .onFailure { exception ->
-                    _error.value = "Search failed: ${exception.message}"
-                    Log.e(TAG, "Search error")
+                .onFailure { e ->
+                    Log.e(TAG, "Search failed", e)
+                    _uiState.update { old ->
+                        old.copy(
+                            isLoading = false,
+                            error = "Search failed: ${e.message}"
+                        )
+                    }
                 }
+        }
+    }
 
-            _isLoading.value = false
+    // ---------------- Pagination Controls ----------------
+    /**
+     * Loads the next page of search results if available.
+     */
+    fun loadNextPage() {
+        val state = _uiState.value
+        if (state.currentPage < state.totalPages && state.searchQuery.isNotBlank()) {
+            _uiState.update {
+                it.copy(currentPage = it.currentPage + 1)
+            }
+            searchPaged()
         }
     }
 
     /**
-     * 刷新产品列表
+     * Loads the previous page of search results if available.
      */
-    fun refreshProducts() {
-        loadProducts()
+    fun loadPrevPage() {
+        val state = _uiState.value
+        if (state.currentPage > 1 && state.searchQuery.isNotBlank()) {
+            _uiState.update {
+                it.copy(currentPage = it.currentPage - 1)
+            }
+            searchPaged()
+        }
     }
 
+    // ---------------- Refresh Button ----------------
     /**
-     * 备用假数据（API 连接失败时使用）
+     * Refreshes the current list, either by re-running the search or loading all products.
+     */
+    fun refreshProducts() {
+        val q = _uiState.value.searchQuery
+        if (q.isNotBlank()) {
+            searchPaged()
+        } else {
+            loadProducts()
+        }
+    }
+
+    // ---------------- Dummy Data ----------------
+    /**
+     * Generates a list of dummy products used when the API connection fails.
      */
     private fun getDummyProducts(): List<Product> {
         return listOf(
             Product(
                 pid = 999,
                 title = "Demo Product - API Not Connected",
+                fullTitle = "Demo Product - API Not Connected",
                 price = 99.0,
                 rating = 4.0f,
                 platform = Platform.Amazon,
+                platformList = listOf("Amazon"),
                 freeShipping = true,
                 inStock = true,
                 information = "Please check:\n1. Node.js server is running\n2. Backend URL is correct\n3. Database has data",
@@ -195,14 +316,94 @@ class DealsViewModel : ViewModel() {
         )
     }
 
-    // ---- 筛选和排序方法 ----
-    fun setPrice(min: Float, max: Float) = _filters.update { it.copy(priceMin = min, priceMax = max) }
-    fun toggleAmazon(checked: Boolean) = _filters.update { it.copy(chooseAmazon = checked) }
-    fun toggleBestBuy(checked: Boolean) = _filters.update { it.copy(chooseBestBuy = checked) }
-    fun toggleWalmart(checked: Boolean) = _filters.update { it.copy(chooseWalmart = checked) }
-    fun setOnlyFreeShipping(v: Boolean) = _filters.update { it.copy(onlyFreeShipping = v) }
-    fun setOnlyInStock(v: Boolean) = _filters.update { it.copy(onlyInStock = v) }
-    fun setSortField(field: SortField) = _sort.update { it.copy(field = field) }
-    fun setSortOrder(order: SortOrder) = _sort.update { it.copy(order = order) }
-    fun clearFilters() = _filters.update { DealsFilterState() }
+    // ---------------- Filter / Sort API ----------------
+    /**
+     * Sets the price range filter and recomputes the list.
+     * @param min Minimum price.
+     * @param max Maximum price.
+     */
+    fun setPrice(min: Float, max: Float) {
+        _uiState.update { old ->
+            recompute(old.copy(filters = old.filters.copy(priceMin = min, priceMax = max)))
+        }
+    }
+
+    /**
+     * Toggles the Amazon platform filter.
+     * @param checked New checked state.
+     */
+    fun toggleAmazon(checked: Boolean) {
+        _uiState.update { old ->
+            recompute(old.copy(filters = old.filters.copy(chooseAmazon = checked)))
+        }
+    }
+
+    /**
+     * Toggles the eBay platform filter.
+     * @param checked New checked state.
+     */
+    fun toggleEBay(checked: Boolean) {
+        _uiState.update { old ->
+            recompute(old.copy(filters = old.filters.copy(chooseEBay = checked)))
+        }
+    }
+
+    /**
+     * Toggles the Walmart platform filter.
+     * @param checked New checked state.
+     */
+    fun toggleWalmart(checked: Boolean) {
+        _uiState.update { old ->
+            recompute(old.copy(filters = old.filters.copy(chooseWalmart = checked)))
+        }
+    }
+
+    /**
+     * Toggles the free shipping filter.
+     * @param v New filter state.
+     */
+    fun setOnlyFreeShipping(v: Boolean) {
+        _uiState.update { old ->
+            recompute(old.copy(filters = old.filters.copy(onlyFreeShipping = v)))
+        }
+    }
+
+    /**
+     * Toggles the in-stock filter.
+     * @param v New filter state.
+     */
+    fun setOnlyInStock(v: Boolean) {
+        _uiState.update { old ->
+            recompute(old.copy(filters = old.filters.copy(onlyInStock = v)))
+        }
+    }
+
+    /**
+     * Sets the field used for sorting (Price or Rating).
+     * @param field The new sort field.
+     */
+    fun setSortField(field: SortField) {
+        _uiState.update { old ->
+            recompute(old.copy(sort = old.sort.copy(field = field)))
+        }
+    }
+
+    /**
+     * Sets the sort order (Ascending or Descending).
+     * @param order The new sort order.
+     */
+    fun setSortOrder(order: SortOrder) {
+        _uiState.update { old ->
+            recompute(old.copy(sort = old.sort.copy(order = order)))
+        }
+    }
+
+    /**
+     * Resets all filters to their default state.
+     */
+    fun clearFilters() {
+        _uiState.update { old ->
+            recompute(old.copy(filters = DealsFilterState()))
+        }
+    }
 }

@@ -3,6 +3,9 @@ package com.example.dealtracker.data.remote.api
 import retrofit2.Response
 import retrofit2.http.*
 
+/**
+ * Data class representing a single item in the user's wishlist response.
+ */
 data class WishlistItemResponse(
     val wid: Int,
     val uid: Int,
@@ -30,31 +33,68 @@ data class WishlistUpsertRequest(
     val priority: Int? = 2
 )
 
+data class WishlistUpsertResponse(
+    val success: Boolean,
+    val priceReached: Boolean? = null,
+    val currentPrice: Double? = null
+)
+
+/**
+ * API interface for managing user wishlists and price alerts.
+ */
 interface WishlistApi {
 
-    // 对应 server.js 里的 app.get('/api/wishlist', ...)
-    // BASE_URL = http://10.0.2.2:8080/api/，这里写 "wishlist"
+    /**
+     * Retrieves the user's wishlist.
+     * @param uid User ID.
+     */
     @GET("wishlist")
     suspend fun getWishlist(
         @Query("uid") uid: Int
     ): Response<List<WishlistItemResponse>>
 
-    // 对应 app.post('/api/wishlist', ...)
+    /**
+     * Adds or updates a wishlist item.
+     * @param body The request body containing item details.
+     */
     @POST("wishlist")
     suspend fun upsertWishlist(
         @Body body: WishlistUpsertRequest
-    ): Response<Map<String, Any>>
+    ): Response<WishlistUpsertResponse>
 
-    // 对应 app.delete('/api/wishlist', ...)
-    // 这里使用有 body 的 DELETE
+    /**
+     * Deletes a wishlist item.
+     * @param body A map containing the item ID to delete.
+     */
     @HTTP(method = "DELETE", path = "wishlist", hasBody = true)
     suspend fun deleteWishlist(
         @Body body: Map<String, Int>
     ): Response<Map<String, Any>>
 
-    // 对应 app.get('/api/wishlist/alerts', ...)
+    /**
+     * Retrieves wishlist items that meet the price alert criteria.
+     * @param uid User ID.
+     */
     @GET("wishlist/alerts")
     suspend fun getAlerts(
         @Query("uid") uid: Int
     ): Response<List<WishlistItemResponse>>
+
+    /**
+     * Marks a price alert as "notified" (sent).
+     * @param body A map containing the item ID.
+     */
+    @POST("wishlist/mark-notified")
+    suspend fun markNotified(
+        @Body body: Map<String, Int>
+    ): Response<Map<String, Any>>
+
+    /**
+     * Marks a price alert as "read" (user clicked notification).
+     * @param body A map containing the item ID.
+     */
+    @POST("wishlist/mark-read")
+    suspend fun markRead(
+        @Body body: Map<String, Int>
+    ): Response<Map<String, Any>>
 }

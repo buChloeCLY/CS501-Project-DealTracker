@@ -3,7 +3,6 @@
 DealTracker is an intelligent Android application designed to help users make informed purchasing decisions by comparing real-time prices from multiple e-commerce platforms. Users can search for products, view live price updates, subscribe to price-drop alerts, and receive personalized shopping recommendations based on browsing habits. The app leverages Kotlin, Jetpack Compose, and Node.js backend to deliver a modern, responsive, and delightful shopping experience.
 
 
-
 ## Build & Run Instructions
 
 #### Prerequisites
@@ -34,7 +33,7 @@ Used to serve product data and platform prices.
 ```
 cd backend
 npm init -y
-npm install express mysql2 axios cors dotenv node-cron
+npm install express mysql2 axios cors dotenv node-cron openai
 node server.js
 ```
 
@@ -46,16 +45,15 @@ Server running on http://localhost:8080
 Daily update scheduled at 3:00 AM EST
 ```
 
-Import Initial Data
+If you want to use admin interface, update OpenAI API key in /backend/.env
 
 ```
-curl -X POST http://localhost:8080/api/admin/import-initial
+OPENAI_API_KEY=your-own-openai-key
 ```
 
 #### 3. Run Application
 
 Run `app` in Android Studio.
-
 
 
 ## Current Features
@@ -69,153 +67,66 @@ Run `app` in Android Studio.
 - Automated price monitoring updates product data daily.
 
 #### Application Features
-| Feature                          | Status      | Notes                                                       |
-|----------------------------------|-------------|-------------------------------------------------------------|
-| Multi-platform price integration | Completed   | Amazon /Walmart, but more platforms will be added in future |
-| Wishlist API                     | Completed   | Alerts endpoint implemented                                 |
-| Cron daily price update          | In Progress | Testing scheduled job                                       |
-| User login & register            | Completed   | SHA-256 password hash                                       |
-| Historical price chart           | Completed     |                                                             | |
-| Basic MVVM                       |  Completed     | Architecture implemented for scalability                    |
-| Price Comparison                 | Completed      | Supports multiple platforms; more platforms to be added     |
-| Sensor Integration               |  Completed     | Sensors data collected and processed                        |
-| AI Recommendation                |  Not Implemented | Planned for future release                                  |
-| Price Alert / Wishlist           | In Progress    | Alerts endpoint implemented; testing ongoing                |
+| Feature                          |  Notes                                                      |
+|----------------------------------|------------------------------------------------------------|
+| Multi-platform price integration |  Amazon, Walmart and eBay |
+| Wishlist API                     |  Alerts endpoint implemented                                |
+| Daily price update               |  Automatically updated at 3:00 am every day                 |
+| User login & register            |  SHA-256 password hash                                      |
+| Historical price chart           |  Via the Canvas library                                    | 
+| Basic MVVM                       |  Architecture implemented for scalability                   |
+| Price Comparison                 | Support multiple platforms; more platforms to be added     |
+| Sensor Integration               | Integrate the microphone as an input sensor for voice search                   |
 
 #### 1. Home Screen
 
 - Intuitive navigation shows four main screens.
-- Top search bar implemented in UI.
+- Support text input and voice search.
 - Category browsing with intuitive navigation to the Deals screen.
-- “Deals of the Day” section showcasing featured sample products.
+- "Deals of the Day" section provides recommendations based on user behavior.
+
+![home.png](home.png)
 
 #### 2. Deals Screen
 
-- Fetches real-time product data from the Node.js backend API.
-- Supports filtering products by price and rating.
+- Fetch real-time product data from the Node.js backend API.
+- Support filtering products by price and rating.
 - Periodic data updates ensure the latest deals.
 - Compare button navigates to detail screen.
 
+![deal.png](deal.png)
+
 #### 3. Detail Screen
 
-- Displays comprehensive product details.
+- Display comprehensive product details.
 - Historical price charts and trend analysis via Flask API.
 - Seamless navigation to e-commerce platforms.
-- Allows users to add products to their wishlist for target price tracking.
+- Allow users to add products to their wishlist for target price tracking.
+
+![detail.png](detail.png)
 
 #### 4. Lists Screen
 
-- Wishlist management allows adding, removing and browsing specific products.
+- Wishlist management.
 - Set target prices for automatic notifications.
+
+![list.png](list.png)
 
 #### 5. Profile Screen
 
 - Manage user account information and preferences.
-- Access wishlist and browsing history using mock data.
-- Font size adjustment and dark mode toggle interfaces implemented in UI.
-- Log out
+- Wishlist and browsing history management.
+- Font size adjustment and dark mode support.
+- Log out.
+
+![profile.png](profile.png)
 
 #### 6. Login and Register Screen
 
-- Input account and password to login
-- Register new account
+- Input account and password to login.
+- Register new account.
 
-## API references
-
-### a) User Management (`/api/user/...`)
-
-| Method | Endpoint | Description |
-|--------|---------|-------------|
-| GET | `/api/user/:uid` | Fetch basic user profile (uid, name, email, gender, timestamps) |
-| POST | `/api/user/login` | Log in with email + password (hashed with SHA-256), returns user info on success |
-| POST | `/api/user/register` | Register a new user, checks duplicate email, stores hashed password |
-| PUT | `/api/user/:uid` | Update user fields (name, email, gender, password) |
-| DELETE | `/api/user/:uid` | Delete a user by UID |
-
----
-
-### b) Price & History APIs
-
-| Method | Endpoint | Description |
-|--------|---------|-------------|
-| GET | `/api/price/:pid` | Returns the latest price per platform for a product (price, free_shipping, in_stock, link) |
-| GET | `/api/history/:pid?days=N` | Returns daily minimum price history for the last N days |
-| GET | `/api/products/:pid/lowest-price` | Computes current lowest price across platforms and returns: <br> - `lowestPrice` – minimum price <br> - `platforms` – platforms sharing lowest price <br> - `allPrices` – latest price from every platform |
-
----
-
-### c) Product Management (`/api/products/...`)
-
-| Method | Endpoint | Description |
-|--------|---------|-------------|
-| GET | `/api/products` | Returns product list with optional filters: category, search, min_price, max_price, in_stock, free_shipping |
-| GET | `/api/products/:pid` | Returns a single product from the products table |
-
----
-
-### d) Wishlist APIs
-
-| Method | Endpoint | Description |
-|--------|---------|-------------|
-| GET | `/api/wishlist?uid=UID` | Returns wishlist items for a user: pid, target_price, product info, current_price |
-| POST | `/api/wishlist` | Add or update wishlist entry (`uid`, `pid`, `target_price`) |
-| DELETE | `/api/wishlist` | Remove wishlist item by `uid` + `pid` |
-| GET | `/api/wishlist/alerts?uid=UID` | Returns wishlist items where current lowest price <= target_price for notifications |
-
----
-
-### e) Admin / Maintenance APIs
-
-| Method | Endpoint | Description |
-|--------|---------|-------------|
-| POST | `/api/admin/import-initial` | Imports seed products from Amazon, then adds BestBuy/Walmart prices |
-| POST | `/api/admin/update-all-prices` | Fetches fresh prices for all products from all platforms |
-| POST | `/api/admin/sync-lowest-prices` | Computes the cheapest platform for each product and updates the `products` table |
-
----
-
-### f) Scheduled Job
-
-- A cron job runs **daily at 3:00 AM (America/New_York)**:
-  - Fetches new prices from Amazon / BestBuy / Walmart for all products
-  - Inserts new rows into `price` table
-  - Calls `syncLowestPrices()` to update the `products` table to the latest lowest prices
-
----
-
-### g) System / Test Endpoints
-
-| Method | Endpoint | Description |
-|--------|---------|-------------|
-| GET | `/api/health` | Health check: database connection, API key configuration, platform key status |
-| GET | `/api/test/extract-title` | Test short title extraction logic on sample titles |
-
----
-
-###  Progress We've Made
-
-- **Multi-platform price integration**
-  - RapidAPI integration for BestBuy and Walmart, in addition to Amazon
-  - Multiple price records per product (price, free_shipping, in_stock, link)
-
-- **Smarter Product Modeling**
-  - `extractShortTitle()` generates concise, user-friendly short titles
-  - Title similarity logic chooses best Walmart match from multiple results
-
-- **Richer Admin Workflows**
-  - `/api/admin/import-initial` imports products and attaches multi-platform prices
-  - `/api/admin/update-all-prices` refreshes all existing products’ prices
-  - `/api/admin/sync-lowest-prices` centralizes cheapest platform calculation
-
-- **Wishlist Support**
-  - New `/api/wishlist` and `/api/wishlist/alerts` endpoints
-  - Alerts endpoint encapsulates logic for notifications
-
-- **Daily Scheduled Multi-Platform Update**
-  - Cron job fetches fresh prices from all platforms
-  - Automatically syncs products table to the newest lowest prices
-
-
+![register.png](register.png)
 
 ## Tech Stack
 
@@ -239,129 +150,19 @@ Run `app` in Android Studio.
 - **Engine:** MySQL 8.0
 
 
-## Repo organization
-```
-├── MainActivity.kt
-├── data
-│   ├── local
-│   │   └── UserPreferences.kt
-│   └── remote
-│       ├── api
-│       │   ├── DatabaseApiService.kt
-│       │   ├── PriceApi.kt
-│       │   ├── UserApi.kt
-│       │   ├── WishListApi.kt
-│       │   └── Wishlistapiservice.kt
-│       ├── dto
-│       │   ├── HistoryPriceDto.kt
-│       │   ├── PriceDto.kt
-│       │   └── ProductDto.kt
-│       └── repository
-│           ├── PriceRepositoryImpl.kt
-│           ├── ProductRepositoryImpl.kt
-│           ├── RetrofitClient.kt
-│           ├── UserRepository.kt
-│           └── Wishlistrepository.kt
-├── domain
-│   ├── UserManager.kt
-│   ├── model
-│   │   ├── Category.kt
-│   │   ├── Platform.kt
-│   │   ├── PlatformPrice.kt
-│   │   ├── PricePoint.kt
-│   │   ├── Product.kt
-│   │   └── User.kt
-│   └── repository
-│       ├── PriceRepository.kt
-│       └── ProductRepository.kt
-└── ui
-├── deals
-│   ├── DealsScreen.kt
-│   └── viewmodel
-│       ├── DealsViewModel.kt
-│       ├── SortField.kt
-│       └── SortOrder.kt
-├── detail
-│   ├── ProductDetailScreen.kt
-│   └── viewmodel
-│       ├── HistoryUiState.kt
-│       └── ProductViewModel.kt
-├── home
-│   ├── HomeScreen.kt
-│   └── viewmodel
-│       └── HomeViewModel.kt
-├── navigation
-│   ├── BottomNavBar.kt
-│   ├── MainNavGraph.kt
-│   ├── NavExtensions.kt
-│   └── Routes.kt
-├── notifications
-│   └── NotificationHelper.kt
-├── profile
-│   ├── AuthViewModel.kt
-│   ├── EditProfileScreen.kt
-│   ├── HistoryScreen.kt
-│   ├── LoginScreen.kt
-│   ├── ProfileScreen.kt
-│   ├── RegisterScreen.kt
-│   └── SettingScreen.kt
-├── theme
-│   ├── AppColors.kt
-│   ├── AppDimens.kt
-│   ├── Color.kt
-│   ├── Theme.kt
-│   └── Type.kt
-└── wishlist
-├── WishListHolder.kt
-├── WishListScreen.kt
-└── viewmodel
-├── WishListModel.kt
-└── WishListViewModel.kt
-```
+## Architecture Diagram
 
-## Testing and debugging
-### API debugging
-I first added log statements in the code and inspected both the Android Logcat output and the backend server logs.
-![img1.png](img1.png)
-Then I used the RapidAPI console and Postman to manually test each endpoint to confirm that the backend was parsing and returning fields correctly.
-![img2.png](img2.png)
-Based on these experiments, I drew conclusions from the responses: for example, an HTTP status code `429` indicates that our free quota on RapidAPI has been exhausted and the service stops responding; a timeout error shows that the API is too slow, in which case we should consider removing or relaxing the timeout limit.
-### Backend debugging
-My Deals page started returning a 500 error, and Logcat showed the following messages:
-
-```text
-2025-12-02 10:21:14.158 15681-15716 ProductRepository       com.example.dealtracker              E  API Error: 500 - Internal Server Error
-2025-12-02 10:21:14.225 15681-15681 DealsViewModel          com.example.dealtracker              E  Failed to load products: API Error: 500 - Internal Server Error
-```
-
-This indicated a backend issue. After checking the server logs, I found the following error:
-
-```text
-Get products error: Error: read ECONNRESET
-    at PromisePool.query (C:\Users\JOY\Desktop\CS501\project\CS501-Project-DealTracker\backend\node_modules\mysql2\lib\promise\pool.js:36:22)       
-    at C:\Users\JOY\Desktop\CS501\project\CS501-Project-DealTracker\backend\server.js:900:39
-    ...
-  code: 'ECONNRESET',
-  errno: -4077,
-  sql: undefined,
-  sqlState: undefined,
-  sqlMessage: undefined
-}
-```
-
-`ECONNRESET` means that the database connection was reset, which usually happens when a query takes too long and the database times out. In my case, the `/api/products` route was performing additional joins on the `price` table for every product, making the query too complex and slow. Since the `products` table already stores the current lowest price for each item, I simplified the endpoint by removing the extra `price` lookups, which resolved the timeout and the 500 error.
+![architecture diagram.png](architecture%20diagram.png)
 
 
-## commit, code quality
-- all commits of these days are under branch "demo2"
 
+## Code Quality & Management
+- Created separate branches for major features or development stages. Used clear commit messages to document changes.
 - Follow project coding standards and use linting/formatting tools (e.g., Kotlin style guidelines).
-
-- Avoid duplicated logic (abort flask backend, merge 2 backends).
-
 - Use defensive programming: handle errors, timeouts, and nullability safely.
 
 
-## AI use
-- AI tools are be used to speed up development
+## AI Usage
+- AI tools are be used to speed up development.
 - All AI-generated code are reviewed, tested, and verified by the developer.
+- For detailed AI reflections, please refer to the final report.

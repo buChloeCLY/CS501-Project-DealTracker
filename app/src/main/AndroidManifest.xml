@@ -3,9 +3,9 @@
     xmlns:tools="http://schemas.android.com/tools"
     package="com.example.dealtracker">
 
-    <!-- ✅ 必须在 application 之前 -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
         android:usesCleartextTraffic="true"
@@ -27,6 +27,17 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <!-- Deep Link: dealtracker://product/{pid} -->
+                <data
+                    android:scheme="dealtracker"
+                    android:host="product"
+                    android:pathPrefix="/" />
             </intent-filter>
         </activity>
     </application>
