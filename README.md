@@ -85,6 +85,7 @@ Run `app` in Android Studio.
 - Top search bar implemented in UI.
 - Category browsing with intuitive navigation to the Deals screen.
 - "Deals of the Day" section showcasing featured sample products.
+
 ![home.png](home.png)
 
 #### 2. Deals Screen
@@ -93,7 +94,8 @@ Run `app` in Android Studio.
 - Supports filtering products by price and rating.
 - Periodic data updates ensure the latest deals.
 - Compare button navigates to detail screen.
-![deals.png](delas.png)
+
+![deal.png](deal.png)
 
 #### 3. Detail Screen
 
@@ -101,12 +103,14 @@ Run `app` in Android Studio.
 - Historical price charts and trend analysis via Flask API.
 - Seamless navigation to e-commerce platforms.
 - Allows users to add products to their wishlist for target price tracking.
+
 ![detail.png](detail.png)
 
 #### 4. Lists Screen
 
 - Wishlist management allows adding, removing and browsing specific products.
 - Set target prices for automatic notifications.
+
 ![list.png](list.png)
 
 #### 5. Profile Screen
@@ -115,12 +119,14 @@ Run `app` in Android Studio.
 - Access wishlist and browsing history using mock data.
 - Font size adjustment and dark mode toggle interfaces implemented in UI.
 - Log out
+
 ![profile.png](profile.png)
 
 #### 6. Login and Register Screen
 
 - Input account and password to login
 - Register new account
+
 ![register.png](register.png)
 
 ## Tech Stack
