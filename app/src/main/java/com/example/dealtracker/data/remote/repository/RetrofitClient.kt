@@ -1,6 +1,6 @@
 package com.example.dealtracker.data.remote.repository
 
-import com.example.dealtracker.data.remote.api.DatabaseApiService
+import com.example.dealtracker.data.remote.api.ProducApi
 import com.example.dealtracker.data.remote.api.PriceApi
 import com.example.dealtracker.data.remote.api.UserApi
 import com.example.dealtracker.data.remote.api.WishlistApi
@@ -44,7 +44,7 @@ object RetrofitClient {
     /**
      * Legacy API service for general database operations.
      */
-    val api: DatabaseApiService = retrofit.create(DatabaseApiService::class.java)
+    val api: ProducApi = retrofit.create(ProducApi::class.java)
 
     /**
      * API service for price-related endpoints.

@@ -8,7 +8,7 @@ import retrofit2.http.*
 /**
  * API interface for accessing product data from the backend server.
  */
-interface DatabaseApiService {
+interface ProducApi {
 
     /**
      * Retrieves a list of all products.
