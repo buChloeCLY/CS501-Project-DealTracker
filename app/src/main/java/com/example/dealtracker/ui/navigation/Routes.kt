@@ -20,6 +20,7 @@ object Routes {
     const val WISHLIST = "wishlist"
     const val EDIT_PROFILE = "edit_profile"
 
+    // AI suggested this
     // Deals sub-routes (separated prefixes to avoid route matching ambiguity)
     const val DEALS_SEARCH = "deals_search"
     const val DEALS_CATEGORY = "deals_category"

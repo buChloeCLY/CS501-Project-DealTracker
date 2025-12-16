@@ -38,7 +38,6 @@ import com.example.dealtracker.domain.repository.RecommendationRepository
 import com.example.dealtracker.ui.home.viewmodel.HomeViewModel
 import com.example.dealtracker.ui.home.viewmodel.HomeViewModelFactory
 import com.example.dealtracker.ui.navigation.Routes
-import com.example.dealtracker.ui.navigation.navigateToRoot
 import com.example.dealtracker.ui.theme.AppTheme
 import kotlinx.coroutines.launch
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -268,7 +267,7 @@ fun HomeScreen(navController: NavHostController) {
                             modifier = Modifier.fillMaxWidth()
                         ) {
 
-                            // ---- UPDATED: voice button uses safe startVoiceSearch() ----
+                            // voice button uses safe startVoiceSearch() ----
                             IconButton(
                                 onClick = { startVoiceSearch() },
                                 enabled = !isListening

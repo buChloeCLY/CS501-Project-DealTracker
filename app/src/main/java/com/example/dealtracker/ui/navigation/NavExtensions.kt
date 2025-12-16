@@ -10,6 +10,7 @@ import androidx.navigation.NavHostController
  */
 fun NavHostController.navigateToRoot(route: String) {
 
+    // AI suggested this:
     // Parameterized Deals routes should create a new destination to correctly handle parameters.
     val isParameterizedDeals =
         route.startsWith("${Routes.DEALS_SEARCH}?") || route.startsWith("${Routes.DEALS_CATEGORY}/")
