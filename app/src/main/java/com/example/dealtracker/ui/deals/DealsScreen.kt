@@ -31,6 +31,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.request.ImageRequest
 import com.example.dealtracker.domain.model.Platform
 import com.example.dealtracker.domain.model.Product
+import com.example.dealtracker.ui.deals.viewmodel.DealsMode
 import com.example.dealtracker.ui.deals.viewmodel.DealsViewModel
 import com.example.dealtracker.ui.deals.viewmodel.SortField
 import com.example.dealtracker.ui.deals.viewmodel.SortOrder
@@ -56,6 +57,7 @@ fun DealsScreen(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
+    // Route-driven loading
     LaunchedEffect(searchQuery, category) {
         when {
             !category.isNullOrBlank() -> viewModel.applyCategory(category)
@@ -63,7 +65,6 @@ fun DealsScreen(
             else -> viewModel.loadProducts()
         }
     }
-
 
     Scaffold(
         containerColor = colors.background,
@@ -105,8 +106,7 @@ fun DealsScreen(
                     Spacer(Modifier.height(16.dp))
                     Text("Loading...")
                 }
-            }
-            else if (ui.error != null) {
+            } else if (ui.error != null) {
                 Column(
                     modifier = Modifier.align(Alignment.Center),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -126,27 +126,48 @@ fun DealsScreen(
                         Text("Retry")
                     }
                 }
-            }
-            else {
+            } else {
                 Column(Modifier.fillMaxSize()) {
 
-                    if (ui.searchQuery.isNotBlank()) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                "Searching: \"${ui.searchQuery}\" (Page ${ui.currentPage} / ${ui.totalPages})",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                    // ---------- Header hint (SEARCH / CATEGORY) ----------
+                    when (ui.mode) {
+                        DealsMode.SEARCH -> {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    "Searching: \"${ui.searchQuery}\" (Page ${ui.currentPage} / ${ui.totalPages})",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
+
+                        DealsMode.CATEGORY -> {
+                            val cat = ui.currentCategory.orEmpty()
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp)
+                            ) {
+                                Text(
+                                    "Category: \"$cat\"",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+
+                        else -> Unit
                     }
 
-                    if (ui.searchQuery.isNotBlank() && ui.products.isEmpty()) {
+                    // ---------- Empty state (only for SEARCH) ----------
+                    if (ui.mode == DealsMode.SEARCH && ui.products.isEmpty()) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
@@ -160,6 +181,7 @@ fun DealsScreen(
                         return@Box
                     }
 
+                    // ---------- Chips ----------
                     Row(
                         Modifier
                             .fillMaxWidth()
@@ -183,6 +205,7 @@ fun DealsScreen(
                         )
                     }
 
+                    // ---------- List ----------
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
@@ -205,7 +228,8 @@ fun DealsScreen(
                             )
                         }
 
-                        if (ui.searchQuery.isNotBlank()) {
+                        // ---------- Pagination (only for SEARCH) ----------
+                        if (ui.mode == DealsMode.SEARCH) {
                             item {
                                 Row(
                                     modifier = Modifier

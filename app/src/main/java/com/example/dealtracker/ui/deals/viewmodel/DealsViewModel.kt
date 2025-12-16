@@ -27,6 +27,8 @@ data class DealsFilterState(
     val onlyInStock: Boolean = false
 )
 
+enum class DealsMode { DEFAULT, SEARCH, CATEGORY }
+
 // ---------------- Sort State ----------------
 /**
  * Represents the current sorting criteria for deals.
@@ -51,7 +53,11 @@ data class DealsUiState(
     // Pagination & Search
     val searchQuery: String = "",
     val currentPage: Int = 1,
-    val totalPages: Int = 1
+    val totalPages: Int = 1,
+
+    val mode: DealsMode = DealsMode.DEFAULT,
+    val currentCategory: String? = null
+
 )
 
 /**
@@ -102,7 +108,7 @@ class DealsViewModel : ViewModel() {
      */
     fun loadProducts() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            _uiState.update { it.copy(isLoading = true, error = null, mode = DealsMode.DEFAULT, currentCategory = null) }
 
             repository.getAllProducts()
                 .onSuccess { list ->
@@ -114,7 +120,9 @@ class DealsViewModel : ViewModel() {
                                 error = null,
                                 searchQuery = "",
                                 currentPage = 1,
-                                totalPages = 1
+                                totalPages = 1,
+                                mode = DealsMode.DEFAULT,
+                                currentCategory = null
                             )
                         )
                     }
@@ -129,13 +137,16 @@ class DealsViewModel : ViewModel() {
                                 error = e.message ?: "Unknown error",
                                 searchQuery = "",
                                 currentPage = 1,
-                                totalPages = 1
+                                totalPages = 1,
+                                mode = DealsMode.DEFAULT,
+                                currentCategory = null
                             )
                         )
                     }
                 }
         }
     }
+
 
     // ---------------- Apply Category Filter (from home screen) ----------------
     /**
@@ -143,31 +154,38 @@ class DealsViewModel : ViewModel() {
      * @param categoryName The category name string to filter by.
      */
     fun applyCategory(categoryName: String) {
+        val cat = categoryName.trim()
+        if (cat.isBlank()) {
+            loadProducts()
+            return
+        }
+
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
                     isLoading = true,
                     error = null,
-                    searchQuery = categoryName, // Used for display only
+                    searchQuery = "",
                     currentPage = 1,
-                    totalPages = 1
+                    totalPages = 1,
+                    mode = DealsMode.CATEGORY,
+                    currentCategory = cat
                 )
             }
 
             repository.getAllProducts()
                 .onSuccess { list ->
                     val filtered = list.filter { product ->
-                        product.category
-                            .toString()
-                            .equals(categoryName, ignoreCase = true)
+                        product.category.toString().equals(cat, ignoreCase = true)
                     }
-
                     _uiState.update { old ->
                         recompute(
                             old.copy(
                                 products = filtered,
                                 isLoading = false,
-                                error = null
+                                error = null,
+                                mode = DealsMode.CATEGORY,
+                                currentCategory = cat
                             )
                         )
                     }
@@ -175,14 +193,12 @@ class DealsViewModel : ViewModel() {
                 .onFailure { e ->
                     Log.e(TAG, "Failed to load products for category", e)
                     _uiState.update { old ->
-                        old.copy(
-                            isLoading = false,
-                            error = e.message ?: "Unknown error"
-                        )
+                        old.copy(isLoading = false, error = e.message ?: "Unknown error")
                     }
                 }
         }
     }
+
 
 
     // ---------------- Apply Search Query (from home screen) ----------------
@@ -191,15 +207,18 @@ class DealsViewModel : ViewModel() {
      * @param query The search term.
      */
     fun applySearch(query: String?) {
-        if (query.isNullOrBlank()) {
+        val q = query?.trim().orEmpty()
+        if (q.isBlank()) {
             loadProducts()
             return
         }
 
         _uiState.update {
             it.copy(
-                searchQuery = query,
-                currentPage = 1
+                searchQuery = q,
+                currentPage = 1,
+                mode = DealsMode.SEARCH,
+                currentCategory = null
             )
         }
         searchPaged()
@@ -231,7 +250,9 @@ class DealsViewModel : ViewModel() {
                                 isLoading = false,
                                 error = null,
                                 currentPage = result.page,
-                                totalPages = result.totalPages
+                                totalPages = result.totalPages,
+                                mode = DealsMode.SEARCH,      // keep search
+                                currentCategory = null        // clear category
                             )
                         )
                     }
@@ -254,7 +275,7 @@ class DealsViewModel : ViewModel() {
      */
     fun loadNextPage() {
         val state = _uiState.value
-        if (state.currentPage < state.totalPages && state.searchQuery.isNotBlank()) {
+        if (state.mode == DealsMode.SEARCH && state.currentPage < state.totalPages) {
             _uiState.update {
                 it.copy(currentPage = it.currentPage + 1)
             }
@@ -267,7 +288,7 @@ class DealsViewModel : ViewModel() {
      */
     fun loadPrevPage() {
         val state = _uiState.value
-        if (state.currentPage > 1 && state.searchQuery.isNotBlank()) {
+        if (state.mode == DealsMode.SEARCH && state.currentPage > 1) {
             _uiState.update {
                 it.copy(currentPage = it.currentPage - 1)
             }
@@ -280,11 +301,20 @@ class DealsViewModel : ViewModel() {
      * Refreshes the current list, either by re-running the search or loading all products.
      */
     fun refreshProducts() {
-        val q = _uiState.value.searchQuery
-        if (q.isNotBlank()) {
-            searchPaged()
-        } else {
-            loadProducts()
+        when (_uiState.value.mode) {
+            DealsMode.SEARCH -> {
+                // stay in keyword search mode
+                searchPaged()
+            }
+            DealsMode.CATEGORY -> {
+                // re-fetch all then filter by category (your requirement)
+                val cat = _uiState.value.currentCategory
+                if (!cat.isNullOrBlank()) applyCategory(cat) else loadProducts()
+            }
+            DealsMode.DEFAULT -> {
+                // stay in default deals mode
+                loadProducts()
+            }
         }
     }
 
