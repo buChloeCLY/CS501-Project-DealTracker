@@ -74,19 +74,19 @@ Run `app` in Android Studio.
 |----------------------------------|-------------------------------------------------------------|
 | Multi-platform price integration |  Amazon, Walmart and eBay |
 | Wishlist API                     |  Alerts endpoint implemented                                 |
-| Cron daily price update          |  One scheduled job  is designed to do it                     |
+| Daily price update          |  One scheduled job  is designed to do it                     |
 | User login & register            |  SHA-256 password hash                                       |
-| Historical price chart           |  Use Canvas                                     | 
+| Historical price chart           |  Via the Canvas library                                     | 
 | Basic MVVM                       |  Architecture implemented for scalability                    |
 | Price Comparison                 | Supports multiple platforms; more platforms to be added     |
-| Sensor Integration               |   Sensors data collected and processed                        |
+| Sensor Integration               | Integrate the microphone as an input sensor for voice search                       |
 
 #### 1. Home Screen
 
 - Intuitive navigation shows four main screens.
-- Top search bar implemented in UI.
+- Search bar is at the top
 - Category browsing with intuitive navigation to the Deals screen.
-- "Deals of the Day" section showcasing featured sample products.
+- "Deals of the Day" section provides recommendations based on user behavior.
 
 ![home.png](home.png)
 
@@ -110,7 +110,7 @@ Run `app` in Android Studio.
 
 #### 4. Lists Screen
 
-- Wishlist management allows adding, removing and browsing specific products.
+- Wishlist management
 - Set target prices for automatic notifications.
 
 ![list.png](list.png)
@@ -118,8 +118,8 @@ Run `app` in Android Studio.
 #### 5. Profile Screen
 
 - Manage user account information and preferences.
-- Access wishlist and browsing history using mock data.
-- Font size adjustment and dark mode toggle interfaces implemented in UI.
+- Wishlist and browsing history management
+- Font size adjustment and dark mode support
 - Log out
 
 ![profile.png](profile.png)
@@ -153,14 +153,14 @@ Run `app` in Android Studio.
 - **Engine:** MySQL 8.0
 
 
-## commit, code quality
-- all commits of these days are under branch "final", with notes to explain the changes
+## Code Quality & Management
+- Created separate branches for major features or development stages. Used clear commit messages to document changes.
 
 - Follow project coding standards and use linting/formatting tools (e.g., Kotlin style guidelines).
 
 - Use defensive programming: handle errors, timeouts, and nullability safely.
 
 
-## AI use
+## AI Usage
 - AI tools are be used to speed up development
 - All AI-generated code are reviewed, tested, and verified by the developer.
