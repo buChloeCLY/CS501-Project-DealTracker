@@ -349,15 +349,17 @@ private fun ProductCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    SuggestionChip(
-                        onClick = {},
-                        label = {
-                            Text(
-                                product.platform.name,
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                        }
-                    )
+                    product.platformList.forEach { platformName ->
+                        SuggestionChip(
+                            onClick = {},
+                            label = {
+                                Text(
+                                    text = platformName,
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                        )
+                    }
 
                     if (product.freeShipping) {
                         Icon(

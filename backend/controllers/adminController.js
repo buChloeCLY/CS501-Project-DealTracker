@@ -92,10 +92,10 @@ async function updateAllPrices(req, res) {
 
                     if (amazonDetails && amazonDetails.price > 0) {
                         await pool.query(`
-                            INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, idInPlatform)
-                            VALUES (?, ?, ?, ?, ?, NOW(), ?)
+                            INSERT INTO price (pid, platform, price, free_shipping, in_stock, date, idInPlatform, link)
+                            VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)
                         `, [dbProduct.pid, 'Amazon', amazonDetails.price, amazonDetails.freeShipping,
-                            amazonDetails.inStock, dbProduct.amazon_asin]);
+                            amazonDetails.inStock, dbProduct.amazon_asin, amazonDetails.link]);
                         console.log(`  Amazon: $${amazonDetails.price}`);
                     }
                     await new Promise(resolve => setTimeout(resolve, 5000));
@@ -265,8 +265,7 @@ async function syncEBayPrices(req, res) {
 
                 const [existing] = await pool.query(`
                     SELECT id FROM price
-                    WHERE pid = ? AND platform = 'eBay'
-                    ORDER BY date DESC
+                    WHERE pid = ? AND platform = 'eBay' AND DATE(date) = CURDATE()
                     LIMIT 1
                 `, [dbProduct.pid]);
 

@@ -74,21 +74,11 @@ async function addToWishlist(req, res) {
                 updated_at = CURRENT_TIMESTAMP
         `, [uid, pid, tp]);
 
-        const [priceCheck] = await pool.query(`
-            SELECT MIN(p1.price) AS current_price
-            FROM price p1
-            JOIN (
-                SELECT pid, platform, MAX(date) AS max_date
-                FROM price
-                WHERE pid = ?
-                GROUP BY pid, platform
-            ) latest ON latest.pid = p1.pid
-                       AND latest.platform = p1.platform
-                       AND latest.max_date = p1.date
-            WHERE p1.pid = ?
-        `, [pid, pid]);
+        const [productCheck] = await pool.query(`
+            SELECT price FROM products WHERE pid = ?
+        `, [pid]);
 
-        const currentPrice = priceCheck[0]?.current_price;
+        const currentPrice = productCheck[0]?.price;
         const priceReached = tp && currentPrice && currentPrice <= tp;
 
         res.json({ success: true, priceReached: priceReached, currentPrice: currentPrice });
@@ -143,34 +133,18 @@ async function getPriceAlerts(req, res) {
                 p.title,
                 p.category,
                 p.image_url,
-                lp.current_price
+                p.price AS current_price
             FROM wishlist w
             JOIN products p ON w.pid = p.pid
-            JOIN (
-                SELECT
-                    w2.pid,
-                    MIN(p1.price) AS current_price
-                FROM wishlist w2
-                JOIN price p1 ON p1.pid = w2.pid
-                JOIN (
-                    SELECT pid, platform, MAX(date) AS max_date
-                    FROM price
-                    GROUP BY pid, platform
-                ) latest ON latest.pid = p1.pid
-                           AND latest.platform = p1.platform
-                           AND latest.max_date = p1.date
-                WHERE w2.uid = ?
-                GROUP BY w2.pid
-            ) lp ON lp.pid = w.pid
             WHERE w.uid = ?
               AND w.alert_status < 2
-              AND lp.current_price IS NOT NULL
-              AND lp.current_price <= w.target_price
+              AND p.price IS NOT NULL
+              AND p.price <= w.target_price
               AND (
                   w.last_alert_time IS NULL
                   OR w.last_alert_time < DATE_SUB(NOW(), INTERVAL 6 HOUR)
               )
-        `, [uid, uid]);
+        `, [uid]);
 
         res.json(rows);
     } catch (error) {

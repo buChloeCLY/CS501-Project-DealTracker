@@ -21,17 +21,6 @@ data class Product(
     val priceText: String
         get() = "$%.2f".format(price)
 
-    // Convenience property: text indicating the source of the best price, supporting multiple platforms.
-    val sourceText: String
-        get() = when {
-            platformList.size > 1 -> "Best Price from ${platformList.joinToString(" & ")}"
-            else -> when (platform) {
-                Platform.Amazon -> "Best Price from Amazon"
-                Platform.eBay -> "Best Price from BestBuy"
-                Platform.Walmart -> "Best Price from Walmart"
-            }
-        }
-
     // Convenience property: title to use in detail views (prefers fullTitle).
     val displayTitle: String
         get() = fullTitle?.takeIf { it.isNotBlank() } ?: title

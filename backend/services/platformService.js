@@ -46,20 +46,19 @@ async function fetchFromEbay(query, page = 1) {
             return [];
         }
 
-        const response = await axios.get('https://ebay-data-api.p.rapidapi.com/search', {
+        const response = await axios.get('https://real-time-ebay-data.p.rapidapi.com/ebay_search', {
             params: {
-                query: query,
-                page: page.toString(),
-                countryIso: 'us',
-                minPrice: 0
+                q: query,
+                limit: 50,
+                offset: (page - 1) * 50
             },
             headers: {
                 'X-RapidAPI-Key': RAPIDAPI_KEYS.ebay,
-                'X-RapidAPI-Host': 'ebay-data-api.p.rapidapi.com'
+                'X-RapidAPI-Host': 'real-time-ebay-data.p.rapidapi.com'
             }
         });
 
-        const products = response.data?.data?.items || [];
+        const products = response.data?.itemSummaries || [];
         console.log(`[eBay] Found ${products.length} products`);
         return products;
 
@@ -184,43 +183,22 @@ function transformAmazonProduct(apiProduct, category) {
 
 // Transform eBay API product to standardized format
 function transformEbayProduct(apiProduct) {
-    const price = apiProduct.total || apiProduct.price || 0;
+    const price = apiProduct.price?.value || 0;
 
-    const freeShipping = apiProduct.shipping === 0 ||
-                        apiProduct['delivery-date']?.toLowerCase().includes('free');
+    const freeShipping = apiProduct.shippingOptions && apiProduct.shippingOptions.some(opt =>
+        opt.shippingCost && (opt.shippingCost.value === '0.00' || parseFloat(opt.shippingCost.value) === 0)
+    );
 
     const inStock = !apiProduct.condition?.toLowerCase().includes('sold out');
-    //reserve information
-    const info = [];
-
-    if (apiProduct.itemId) {
-        info.push(`eBay ID: ${apiProduct.itemId}`);
-    }
-
-    if (apiProduct['bid-count']) {
-        info.push(`Bids: ${apiProduct['bid-count']}`);
-    }
-
-    if (apiProduct['time-left']) {
-        info.push(`Time left: ${apiProduct['time-left']}`);
-    }
-
-    if (apiProduct.condition) {
-        info.push(`Condition: ${apiProduct.condition}`);
-    }
-
-    if (apiProduct['delivery-date']) {
-        info.push(`Delivery: ${apiProduct['delivery-date']}`);
-    }
 
     return {
         title: apiProduct.title || '',
-        price: price,
+        price: parseFloat(price) || 0,
         platform: 'eBay',
         freeShipping: freeShipping ? 1 : 0,
         inStock: inStock ? 1 : 0,
         idInPlatform: apiProduct.itemId || '',
-        link: apiProduct.url || '',
+        link: apiProduct.itemWebUrl || '',
         condition: apiProduct.condition || ''
     };
 }
@@ -477,13 +455,15 @@ async function getAmazonProductDetails(asin) {
             data.product_availability.toLowerCase().includes('in stock') ||
             data.product_availability.toLowerCase().includes('available')
         );
+        const link = data.product_url;
 
         console.log(`   [Amazon] Details: price=$${price}, inStock=${inStock}, freeShipping=${freeShipping}`);
 
         return {
             price: price,
             freeShipping: freeShipping ? 1 : 0,
-            inStock: inStock ? 1 : 0
+            inStock: inStock ? 1 : 0,
+            link: link
         };
 
     } catch (error) {
@@ -503,33 +483,36 @@ async function getEbayProductDetails(productLink) {
             return null;
         }
 
-        const response = await axios.get('https://ebay-data-api.p.rapidapi.com/item/description', {
+        const response = await axios.get('https://real-time-ebay-data.p.rapidapi.com/product_get', {
             params: {
-                itemUrl: productLink
+                url: productLink
             },
             headers: {
                 'X-RapidAPI-Key': RAPIDAPI_KEYS.ebay,
-                'X-RapidAPI-Host': 'ebay-data-api.p.rapidapi.com'
-            }
+                'X-RapidAPI-Host': 'real-time-ebay-data.p.rapidapi.com'
+            },
+            timeout: 30000
         });
 
-        const data = response.data?.data;
+        const data = response.data?.body;
 
         if (!data) {
-            console.log('   No data returned');
+            console.log('     No data returned');
             return null;
         }
 
-        const price = data.price || 0;
-        const freeShipping = data.shippingOptions && data.shippingOptions.some(opt =>
-            opt.shippingCost && opt.shippingCost.price === null || opt.shippingCost.price === 0
-        );
-        const inStock = data.condition && !data.condition.toLowerCase().includes('sold out');
+        const price = data.price?.value || 0;
+
+        const freeShipping = data.shippingSummary &&
+                            (data.shippingSummary.toLowerCase().includes('free') ||
+                             data.shippingSummary === 'Free');
+
+        const inStock = data.availableQuantity && data.availableQuantity > 0;
 
         console.log(`   [eBay] Details: price=$${price}, inStock=${inStock}, freeShipping=${freeShipping}`);
 
         return {
-            price: price,
+            price: parseFloat(price) || 0,
             freeShipping: freeShipping ? 1 : 0,
             inStock: inStock ? 1 : 0
         };
