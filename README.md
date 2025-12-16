@@ -3,7 +3,6 @@
 DealTracker is an intelligent Android application designed to help users make informed purchasing decisions by comparing real-time prices from multiple e-commerce platforms. Users can search for products, view live price updates, subscribe to price-drop alerts, and receive personalized shopping recommendations based on browsing habits. The app leverages Kotlin, Jetpack Compose, and Node.js backend to deliver a modern, responsive, and delightful shopping experience.
 
 
-
 ## Build & Run Instructions
 
 #### Prerequisites
@@ -32,8 +31,6 @@ cd CS501-Project-DealTracker
 Used to serve product data and platform prices.
 
 ```
-git clone https://github.com/buChloeCLY/CS501-Project-DealTracker.git
-cd CS501-Project-DealTracker
 cd backend
 npm init -y
 npm install express mysql2 axios cors dotenv node-cron openai
@@ -70,21 +67,21 @@ Run `app` in Android Studio.
 - Automated price monitoring updates product data daily.
 
 #### Application Features
-| Feature                          |  Notes                                                       |
-|----------------------------------|-------------------------------------------------------------|
+| Feature                          |  Notes                                                      |
+|----------------------------------|------------------------------------------------------------|
 | Multi-platform price integration |  Amazon, Walmart and eBay |
-| Wishlist API                     |  Alerts endpoint implemented                                 |
-| Daily price update          |  One scheduled job  is designed to do it                     |
-| User login & register            |  SHA-256 password hash                                       |
-| Historical price chart           |  Via the Canvas library                                     | 
-| Basic MVVM                       |  Architecture implemented for scalability                    |
-| Price Comparison                 | Supports multiple platforms; more platforms to be added     |
-| Sensor Integration               | Integrate the microphone as an input sensor for voice search                       |
+| Wishlist API                     |  Alerts endpoint implemented                                |
+| Daily price update               |  Automatically updated at 3:00 am every day                 |
+| User login & register            |  SHA-256 password hash                                      |
+| Historical price chart           |  Via the Canvas library                                    | 
+| Basic MVVM                       |  Architecture implemented for scalability                   |
+| Price Comparison                 | Support multiple platforms; more platforms to be added     |
+| Sensor Integration               | Integrate the microphone as an input sensor for voice search                   |
 
 #### 1. Home Screen
 
 - Intuitive navigation shows four main screens.
-- Search bar is at the top
+- Support text input and voice search.
 - Category browsing with intuitive navigation to the Deals screen.
 - "Deals of the Day" section provides recommendations based on user behavior.
 
@@ -92,8 +89,8 @@ Run `app` in Android Studio.
 
 #### 2. Deals Screen
 
-- Fetches real-time product data from the Node.js backend API.
-- Supports filtering products by price and rating.
+- Fetch real-time product data from the Node.js backend API.
+- Support filtering products by price and rating.
 - Periodic data updates ensure the latest deals.
 - Compare button navigates to detail screen.
 
@@ -101,16 +98,16 @@ Run `app` in Android Studio.
 
 #### 3. Detail Screen
 
-- Displays comprehensive product details.
+- Display comprehensive product details.
 - Historical price charts and trend analysis via Flask API.
 - Seamless navigation to e-commerce platforms.
-- Allows users to add products to their wishlist for target price tracking.
+- Allow users to add products to their wishlist for target price tracking.
 
 ![detail.png](detail.png)
 
 #### 4. Lists Screen
 
-- Wishlist management
+- Wishlist management.
 - Set target prices for automatic notifications.
 
 ![list.png](list.png)
@@ -118,16 +115,16 @@ Run `app` in Android Studio.
 #### 5. Profile Screen
 
 - Manage user account information and preferences.
-- Wishlist and browsing history management
-- Font size adjustment and dark mode support
-- Log out
+- Wishlist and browsing history management.
+- Font size adjustment and dark mode support.
+- Log out.
 
 ![profile.png](profile.png)
 
 #### 6. Login and Register Screen
 
-- Input account and password to login
-- Register new account
+- Input account and password to login.
+- Register new account.
 
 ![register.png](register.png)
 
@@ -153,15 +150,19 @@ Run `app` in Android Studio.
 - **Engine:** MySQL 8.0
 
 
+## Architecture Diagram
+
+![architecture diagram.png](architecture%20diagram.png)
+
+
+
 ## Code Quality & Management
 - Created separate branches for major features or development stages. Used clear commit messages to document changes.
-
 - Follow project coding standards and use linting/formatting tools (e.g., Kotlin style guidelines).
-
 - Use defensive programming: handle errors, timeouts, and nullability safely.
 
 
 ## AI Usage
-- AI tools are be used to speed up development
+- AI tools are be used to speed up development.
 - All AI-generated code are reviewed, tested, and verified by the developer.
 - For detailed AI reflections, please refer to the final report.
