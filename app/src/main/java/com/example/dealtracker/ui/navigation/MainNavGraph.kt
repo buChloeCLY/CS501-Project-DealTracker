@@ -46,8 +46,7 @@ fun MainNavGraph(
         composable(Routes.HOME) {
             HomeScreen(navController = navController)
         }
-
-// ============= Deals Screen (Default entry) =============
+        // ============= Deals Screen (Default entry) =============
         composable(Routes.DEALS) {
             DealsScreen(
                 showBack = navController.previousBackStackEntry != null,
@@ -67,9 +66,9 @@ fun MainNavGraph(
             )
         }
 
-// ============= Deals Screen (Category entry) =============
+        // ============= Deals Screen (Category entry) =============
         composable(
-            route = "deals/{category}",
+            route = "${Routes.DEALS_CATEGORY}/{category}",
             arguments = listOf(
                 navArgument("category") { type = NavType.StringType }
             )
@@ -81,7 +80,7 @@ fun MainNavGraph(
                 showBack = navController.previousBackStackEntry != null,
                 onBack = { navController.popBackStack() },
                 searchQuery = null,
-                category = category, // Use category parameter
+                category = category,
                 onCompareClick = { product ->
                     navController.navigate(
                         Routes.detailRoute(
@@ -96,9 +95,9 @@ fun MainNavGraph(
         }
 
 
-// ============= Deals Screen (Search entry) =============
+        // ============= Deals Screen (Search entry) =============
         composable(
-            route = "deals?query={query}",
+            route = "${Routes.DEALS_SEARCH}?query={query}",
             arguments = listOf(
                 navArgument("query") {
                     type = NavType.StringType
@@ -108,13 +107,13 @@ fun MainNavGraph(
             )
         ) { backStackEntry ->
 
-            val query = backStackEntry.arguments?.getString("query")
+            val query = backStackEntry.arguments?.getString("query")?.trim()
 
             DealsScreen(
                 showBack = navController.previousBackStackEntry != null,
                 onBack = { navController.popBackStack() },
                 searchQuery = query,
-                category = null,  // Category is null during search
+                category = null,
                 onCompareClick = { product ->
                     navController.navigate(
                         Routes.detailRoute(

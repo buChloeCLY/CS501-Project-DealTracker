@@ -312,10 +312,12 @@ fun HomeScreen(navController: NavHostController) {
                                 ),
                                 keyboardActions = androidx.compose.foundation.text.KeyboardActions(
                                     onSearch = {
-                                        if (searchQuery.isNotBlank()) {
-                                            navController.navigateToRoot(
-                                                Routes.dealsWithQuery(searchQuery)
-                                            )
+                                        val q = searchQuery.trim()
+                                        if (q.isNotBlank()) {
+                                            navController.navigate(Routes.dealsWithQuery(q)) {
+                                                popUpTo(Routes.DEALS) { inclusive = true }
+                                            }
+                                            homeViewModel.updateQuery("")
                                         }
                                     }
                                 )
@@ -342,8 +344,12 @@ fun HomeScreen(navController: NavHostController) {
                         }
                     } else {
                         IconButton(onClick = {
-                            if (searchQuery.isNotBlank()) {
-                                navController.navigateToRoot(Routes.dealsWithQuery(searchQuery))
+                            val q = searchQuery.trim()
+                            if (q.isNotBlank()) {
+                                navController.navigate(Routes.dealsWithQuery(q)) {
+                                    popUpTo(Routes.DEALS) { inclusive = true }
+                                }
+                                homeViewModel.updateQuery("")
                             }
                         }) {
                             Icon(
@@ -372,7 +378,7 @@ fun HomeScreen(navController: NavHostController) {
         ) {
             item {
                 CategorySection(onCategoryClick = { category ->
-                    navController.navigate("deals/$category")
+                    navController.navigate(Routes.dealsWithCategory(category))
                 })
             }
             item {

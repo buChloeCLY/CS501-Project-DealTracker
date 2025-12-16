@@ -7,16 +7,22 @@ import android.net.Uri
  */
 object Routes {
 
+    // Root tabs / main destinations
     const val HOME = "home"
     const val DEALS = "deals"
     const val LISTS = "lists"
     const val PROFILE = "profile"
-    const val DETAIL_BASE = "detail"
 
+    // Sub routes
+    const val DETAIL_BASE = "detail"
     const val HISTORY = "history"
     const val SETTINGS = "settings"
     const val WISHLIST = "wishlist"
     const val EDIT_PROFILE = "edit_profile"
+
+    // Deals sub-routes (separated prefixes to avoid route matching ambiguity)
+    const val DEALS_SEARCH = "deals_search"
+    const val DEALS_CATEGORY = "deals_category"
 
     /**
      * Constructs the route string for the product detail page with embedded parameters.
@@ -39,7 +45,15 @@ object Routes {
      * @return The formatted URL route string.
      */
     fun dealsWithQuery(query: String): String {
-        val encoded = Uri.encode(query)
-        return "deals?query=$encoded"
+        val encoded = Uri.encode(query.trim())
+        return "$DEALS_SEARCH?query=$encoded"
+    }
+    /**
+     * Constructs the route string for the Deals category entry with a category path parameter.
+     * The category is URL encoded.
+     */
+    fun dealsWithCategory(category: String): String {
+        val encoded = Uri.encode(category.trim())
+        return "$DEALS_CATEGORY/$encoded"
     }
 }

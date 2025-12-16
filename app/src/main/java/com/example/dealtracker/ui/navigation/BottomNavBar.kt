@@ -41,7 +41,10 @@ fun BottomNavBarRouteAware(
 
         NavigationBarItem(
             selected = currentRoute == Routes.DEALS,
-            onClick = { onTabSelected(Routes.DEALS) },
+            onClick = {
+                // Always navigate to the default Deals screen from bottom tab
+                onTabSelected(Routes.DEALS)
+            },
             icon = { Icon(Icons.Outlined.LocalOffer, contentDescription = "Deals") },
             label = { Text("Deals") },
             colors = itemColors
