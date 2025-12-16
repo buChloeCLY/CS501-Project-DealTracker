@@ -58,11 +58,12 @@ fun DealsScreen(
 
     LaunchedEffect(searchQuery, category) {
         when {
-            category != null -> viewModel.applyCategory(category)
-            searchQuery != null -> viewModel.applySearch(searchQuery)
+            !category.isNullOrBlank() -> viewModel.applyCategory(category)
+            !searchQuery.isNullOrBlank() -> viewModel.applySearch(searchQuery)
             else -> viewModel.loadProducts()
         }
     }
+
 
     Scaffold(
         containerColor = colors.background,

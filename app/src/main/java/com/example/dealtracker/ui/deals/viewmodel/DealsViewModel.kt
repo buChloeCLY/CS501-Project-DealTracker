@@ -67,11 +67,6 @@ class DealsViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(DealsUiState(isLoading = true))
     val uiState: StateFlow<DealsUiState> = _uiState
 
-    init {
-        // Load all products by default
-        loadProducts()
-    }
-
     // ---------------- Utility: Recompute filteredSorted list ----------------
     /**
      * Applies the current filters and sort order to the raw product list.
