@@ -34,7 +34,7 @@ Used to serve product data and platform prices.
 ```
 cd backend
 npm init -y
-npm install express mysql2 axios cors dotenv node-cron
+npm install express mysql2 axios cors dotenv node-cron openai
 node server.js
 ```
 
@@ -57,7 +57,6 @@ curl -X POST http://localhost:8080/api/admin/import-initial
 Run `app` in Android Studio.
 
 
-
 ## Current Features
 
 #### Architecture & Backend
@@ -69,25 +68,24 @@ Run `app` in Android Studio.
 - Automated price monitoring updates product data daily.
 
 #### Application Features
-| Feature                          | Status      | Notes                                                       |
-|----------------------------------|-------------|-------------------------------------------------------------|
-| Multi-platform price integration | Completed   | Amazon /Walmart, but more platforms will be added in future |
-| Wishlist API                     | Completed   | Alerts endpoint implemented                                 |
-| Cron daily price update          | In Progress | Testing scheduled job                                       |
-| User login & register            | Completed   | SHA-256 password hash                                       |
-| Historical price chart           | Completed     |                                                             | |
-| Basic MVVM                       |  Completed     | Architecture implemented for scalability                    |
-| Price Comparison                 | Completed      | Supports multiple platforms; more platforms to be added     |
-| Sensor Integration               |  Completed     | Sensors data collected and processed                        |
-| AI Recommendation                |  Not Implemented | Planned for future release                                  |
-| Price Alert / Wishlist           | In Progress    | Alerts endpoint implemented; testing ongoing                |
+| Feature                          |  Notes                                                       |
+|----------------------------------|-------------------------------------------------------------|
+| Multi-platform price integration |  Amazon, Walmart and eBay |
+| Wishlist API                     |  Alerts endpoint implemented                                 |
+| Cron daily price update          |  One scheduled job  is designed to do it                     |
+| User login & register            |  SHA-256 password hash                                       |
+| Historical price chart           |  Use Canvas                                     | 
+| Basic MVVM                       |  Architecture implemented for scalability                    |
+| Price Comparison                 | Supports multiple platforms; more platforms to be added     |
+| Sensor Integration               |   Sensors data collected and processed                        |
 
 #### 1. Home Screen
 
 - Intuitive navigation shows four main screens.
 - Top search bar implemented in UI.
 - Category browsing with intuitive navigation to the Deals screen.
-- “Deals of the Day” section showcasing featured sample products.
+- "Deals of the Day" section showcasing featured sample products.
+![home.png](home.png)
 
 #### 2. Deals Screen
 
@@ -95,6 +93,7 @@ Run `app` in Android Studio.
 - Supports filtering products by price and rating.
 - Periodic data updates ensure the latest deals.
 - Compare button navigates to detail screen.
+![deals.png](delas.png)
 
 #### 3. Detail Screen
 
@@ -102,11 +101,13 @@ Run `app` in Android Studio.
 - Historical price charts and trend analysis via Flask API.
 - Seamless navigation to e-commerce platforms.
 - Allows users to add products to their wishlist for target price tracking.
+![detail.png](detail.png)
 
 #### 4. Lists Screen
 
 - Wishlist management allows adding, removing and browsing specific products.
 - Set target prices for automatic notifications.
+![list.png](list.png)
 
 #### 5. Profile Screen
 
@@ -114,108 +115,13 @@ Run `app` in Android Studio.
 - Access wishlist and browsing history using mock data.
 - Font size adjustment and dark mode toggle interfaces implemented in UI.
 - Log out
+![profile.png](profile.png)
 
 #### 6. Login and Register Screen
 
 - Input account and password to login
 - Register new account
-
-## API references
-
-### a) User Management (`/api/user/...`)
-
-| Method | Endpoint | Description |
-|--------|---------|-------------|
-| GET | `/api/user/:uid` | Fetch basic user profile (uid, name, email, gender, timestamps) |
-| POST | `/api/user/login` | Log in with email + password (hashed with SHA-256), returns user info on success |
-| POST | `/api/user/register` | Register a new user, checks duplicate email, stores hashed password |
-| PUT | `/api/user/:uid` | Update user fields (name, email, gender, password) |
-| DELETE | `/api/user/:uid` | Delete a user by UID |
-
----
-
-### b) Price & History APIs
-
-| Method | Endpoint | Description |
-|--------|---------|-------------|
-| GET | `/api/price/:pid` | Returns the latest price per platform for a product (price, free_shipping, in_stock, link) |
-| GET | `/api/history/:pid?days=N` | Returns daily minimum price history for the last N days |
-| GET | `/api/products/:pid/lowest-price` | Computes current lowest price across platforms and returns: <br> - `lowestPrice` – minimum price <br> - `platforms` – platforms sharing lowest price <br> - `allPrices` – latest price from every platform |
-
----
-
-### c) Product Management (`/api/products/...`)
-
-| Method | Endpoint | Description |
-|--------|---------|-------------|
-| GET | `/api/products` | Returns product list with optional filters: category, search, min_price, max_price, in_stock, free_shipping |
-| GET | `/api/products/:pid` | Returns a single product from the products table |
-
----
-
-### d) Wishlist APIs
-
-| Method | Endpoint | Description |
-|--------|---------|-------------|
-| GET | `/api/wishlist?uid=UID` | Returns wishlist items for a user: pid, target_price, product info, current_price |
-| POST | `/api/wishlist` | Add or update wishlist entry (`uid`, `pid`, `target_price`) |
-| DELETE | `/api/wishlist` | Remove wishlist item by `uid` + `pid` |
-| GET | `/api/wishlist/alerts?uid=UID` | Returns wishlist items where current lowest price <= target_price for notifications |
-
----
-
-### e) Admin / Maintenance APIs
-
-| Method | Endpoint | Description |
-|--------|---------|-------------|
-| POST | `/api/admin/import-initial` | Imports seed products from Amazon, then adds BestBuy/Walmart prices |
-| POST | `/api/admin/update-all-prices` | Fetches fresh prices for all products from all platforms |
-| POST | `/api/admin/sync-lowest-prices` | Computes the cheapest platform for each product and updates the `products` table |
-
----
-
-### f) Scheduled Job
-
-- A cron job runs **daily at 3:00 AM (America/New_York)**:
-  - Fetches new prices from Amazon / BestBuy / Walmart for all products
-  - Inserts new rows into `price` table
-  - Calls `syncLowestPrices()` to update the `products` table to the latest lowest prices
-
----
-
-### g) System / Test Endpoints
-
-| Method | Endpoint | Description |
-|--------|---------|-------------|
-| GET | `/api/health` | Health check: database connection, API key configuration, platform key status |
-| GET | `/api/test/extract-title` | Test short title extraction logic on sample titles |
-
----
-
-###  Progress We've Made
-
-- **Multi-platform price integration**
-  - RapidAPI integration for BestBuy and Walmart, in addition to Amazon
-  - Multiple price records per product (price, free_shipping, in_stock, link)
-
-- **Smarter Product Modeling**
-  - `extractShortTitle()` generates concise, user-friendly short titles
-  - Title similarity logic chooses best Walmart match from multiple results
-
-- **Richer Admin Workflows**
-  - `/api/admin/import-initial` imports products and attaches multi-platform prices
-  - `/api/admin/update-all-prices` refreshes all existing products’ prices
-  - `/api/admin/sync-lowest-prices` centralizes cheapest platform calculation
-
-- **Wishlist Support**
-  - New `/api/wishlist` and `/api/wishlist/alerts` endpoints
-  - Alerts endpoint encapsulates logic for notifications
-
-- **Daily Scheduled Multi-Platform Update**
-  - Cron job fetches fresh prices from all platforms
-  - Automatically syncs products table to the newest lowest prices
-
-
+![register.png](register.png)
 
 ## Tech Stack
 
@@ -239,84 +145,6 @@ Run `app` in Android Studio.
 - **Engine:** MySQL 8.0
 
 
-## Repo organization
-```
-├── MainActivity.kt
-├── data
-│   ├── local
-│   │   └── UserPreferences.kt
-│   └── remote
-│       ├── api
-│       │   ├── DatabaseApiService.kt
-│       │   ├── PriceApi.kt
-│       │   ├── UserApi.kt
-│       │   ├── WishListApi.kt
-│       │   └── Wishlistapiservice.kt
-│       ├── dto
-│       │   ├── HistoryPriceDto.kt
-│       │   ├── PriceDto.kt
-│       │   └── ProductDto.kt
-│       └── repository
-│           ├── PriceRepositoryImpl.kt
-│           ├── ProductRepositoryImpl.kt
-│           ├── RetrofitClient.kt
-│           ├── UserRepository.kt
-│           └── Wishlistrepository.kt
-├── domain
-│   ├── UserManager.kt
-│   ├── model
-│   │   ├── Category.kt
-│   │   ├── Platform.kt
-│   │   ├── PlatformPrice.kt
-│   │   ├── PricePoint.kt
-│   │   ├── Product.kt
-│   │   └── User.kt
-│   └── repository
-│       ├── PriceRepository.kt
-│       └── ProductRepository.kt
-└── ui
-├── deals
-│   ├── DealsScreen.kt
-│   └── viewmodel
-│       ├── DealsViewModel.kt
-│       ├── SortField.kt
-│       └── SortOrder.kt
-├── detail
-│   ├── ProductDetailScreen.kt
-│   └── viewmodel
-│       ├── HistoryUiState.kt
-│       └── ProductViewModel.kt
-├── home
-│   ├── HomeScreen.kt
-│   └── viewmodel
-│       └── HomeViewModel.kt
-├── navigation
-│   ├── BottomNavBar.kt
-│   ├── MainNavGraph.kt
-│   ├── NavExtensions.kt
-│   └── Routes.kt
-├── notifications
-│   └── NotificationHelper.kt
-├── profile
-│   ├── AuthViewModel.kt
-│   ├── EditProfileScreen.kt
-│   ├── HistoryScreen.kt
-│   ├── LoginScreen.kt
-│   ├── ProfileScreen.kt
-│   ├── RegisterScreen.kt
-│   └── SettingScreen.kt
-├── theme
-│   ├── Color.kt
-│   ├── Theme.kt
-│   └── Type.kt
-└── wishlist
-├── WishListHolder.kt
-├── WishListScreen.kt
-└── viewmodel
-├── WishListModel.kt
-└── WishListViewModel.kt
-```
-
 ## Testing and debugging
 ### API debugging
 I first added log statements in the code and inspected both the Android Logcat output and the backend server logs.
@@ -324,6 +152,13 @@ I first added log statements in the code and inspected both the Android Logcat o
 Then I used the RapidAPI console and Postman to manually test each endpoint to confirm that the backend was parsing and returning fields correctly.
 ![img2.png](img2.png)
 Based on these experiments, I drew conclusions from the responses: for example, an HTTP status code `429` indicates that our free quota on RapidAPI has been exhausted and the service stops responding; a timeout error shows that the API is too slow, in which case we should consider removing or relaxing the timeout limit.
+
+### Deep Link debugging
+```
+adb shell am start -a android.intent.action.VIEW -d "dealtracker://product/3"
+```
+run command like this, then the app will open the link for the product whose pid is 3.
+
 ### Backend debugging
 My Deals page started returning a 500 error, and Logcat showed the following messages:
 
@@ -351,11 +186,9 @@ Get products error: Error: read ECONNRESET
 
 
 ## commit, code quality
-- all commits of these days are under branch "demo2"
+- all commits of these days are under branch "final", with notes to explain the changes
 
 - Follow project coding standards and use linting/formatting tools (e.g., Kotlin style guidelines).
-
-- Avoid duplicated logic (abort flask backend, merge 2 backends).
 
 - Use defensive programming: handle errors, timeouts, and nullability safely.
 

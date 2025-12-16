@@ -10,6 +10,7 @@ enum class FontSize(val scale: Float, val displayName: String) {
     LARGE(1.15f, "Large")
 }
 
+// AI helps to find the hard-coded fontsize and design this manager
 object FontSizeManager {
     private val _currentFontSize = MutableStateFlow(FontSize.MEDIUM)
     val currentFontSize: Flow<FontSize> = _currentFontSize

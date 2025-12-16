@@ -182,7 +182,7 @@ fun RegisterScreen(
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
-
+                // AI helps to implement this part by suggesting how to make the password visible or not and how to secure the password.
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
