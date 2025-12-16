@@ -51,6 +51,15 @@ fun HomeScreen(navController: NavHostController) {
     val colors = AppTheme.colors
     val fontScale = AppTheme.fontScale
 
+    // for permission + settings
+    val activity = context as? Activity
+    val appSettingsIntent = remember {
+        Intent(
+            android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            android.net.Uri.fromParts("package", context.packageName, null)
+        )
+    }
+
     UserPreferences.init(context)
 
     val user = UserPreferences.getUser()
@@ -74,32 +83,142 @@ fun HomeScreen(navController: NavHostController) {
 
     val searchQuery by homeViewModel.searchQuery.collectAsState()
     val recommended by homeViewModel.recommendedProducts.collectAsState()
+    val voiceError by homeViewModel.voiceError.collectAsState()
     var isSearchMode by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    // prevent rapid multiple launches
+    var isListening by remember { mutableStateOf(false) }
+    //  cached intent + support check
+    val speechIntent = remember {
+        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(
+                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+            )
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to search")
+        }
+    }
+
+    fun deviceSupportsSpeech(): Boolean {
+        return context.packageManager.queryIntentActivities(speechIntent, 0).isNotEmpty()
+    }
+
+    //  show snackbar when voiceError changes
+    LaunchedEffect(voiceError) {
+        val msg = voiceError ?: return@LaunchedEffect
+        val actionLabel = when {
+            msg.contains("permission", ignoreCase = true) -> "Settings"
+            msg.contains("support", ignoreCase = true) -> null
+            msg.contains("failed", ignoreCase = true) -> "Retry"
+            else -> null
+        }
+
+        val res = snackbarHostState.showSnackbar(
+            message = msg,
+            actionLabel = actionLabel,
+            withDismissAction = true,
+            duration = SnackbarDuration.Short
+        )
+
+        if (res == SnackbarResult.ActionPerformed) {
+            when (actionLabel) {
+                "Settings" -> runCatching { context.startActivity(appSettingsIntent) }
+                "Retry" -> {
+                }
+            }
+        }
+        homeViewModel.clearVoiceError()
+    }
+
+    // permission launcher
+    val micPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                // Check device support and enable voice after obtaining permission
+                if (!deviceSupportsSpeech()) {
+                    homeViewModel.setVoiceError("This device does not support speech recognition")
+                    return@rememberLauncherForActivityResult
+                }
+                runCatching {
+                    isListening = true
+                }.onFailure {
+                    isListening = false
+                    homeViewModel.setVoiceError("Voice start failed: ${it.message ?: "unknown"}")
+                }
+            } else {
+                // Refusal: divided into "ordinary refusal" and "permanent refusal"
+                val permanentlyDenied = activity != null &&
+                        !androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale(
+                            activity,
+                            android.Manifest.permission.RECORD_AUDIO
+                        )
+                if (permanentlyDenied) {
+                    homeViewModel.setVoiceError("Microphone permission denied. Please enable it in Settings.")
+                } else {
+                    homeViewModel.setVoiceError("Microphone permission is required for voice search.")
+                }
+            }
+        }
+    // handle result safely
     val voiceLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            isListening = false
             try {
                 if (result.resultCode == Activity.RESULT_OK) {
                     val text = result.data
                         ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
                         ?.firstOrNull()
+
                     if (text.isNullOrBlank()) {
-                        homeViewModel.setVoiceError("Empty voice result")
+                        homeViewModel.setVoiceError("No speech detected. Please try again.")
                     } else {
                         homeViewModel.applyVoiceResult(text)
                     }
                 } else {
-                    homeViewModel.setVoiceError("Voice recognition canceled")
+                    homeViewModel.setVoiceError("Voice recognition canceled.")
                 }
             } catch (e: Exception) {
-                homeViewModel.setVoiceError("Recognition failed: ${e.message}")
+                homeViewModel.setVoiceError("Recognition failed: ${e.message ?: "unknown error"}")
             }
         }
 
+    //  start voice with all checks
+    fun startVoiceSearch() {
+        if (isListening) return
+
+        // Supportive check
+        if (!deviceSupportsSpeech()) {
+            homeViewModel.setVoiceError("This device does not support speech recognition")
+            return
+        }
+        // Permission check
+        val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+            context,
+            android.Manifest.permission.RECORD_AUDIO
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        if (!granted) {
+            // Trigger permission requests
+            micPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+            return
+        }
+
+        // Start voice
+        runCatching {
+            isListening = true
+            voiceLauncher.launch(speechIntent)
+        }.onFailure { e ->
+            isListening = false
+            homeViewModel.setVoiceError("Voice start failed: ${e.message ?: "unknown"}")
+        }
+    }
+
     Scaffold(
         containerColor = colors.background,
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         floatingActionButton = {
             val showScrollTop by remember {
                 derivedStateOf { listState.firstVisibleItemIndex > 4 }
@@ -148,29 +267,26 @@ fun HomeScreen(navController: NavHostController) {
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            IconButton(onClick = {
-                                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                                    putExtra(
-                                        RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                                        RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+
+                            // ---- UPDATED: voice button uses safe startVoiceSearch() ----
+                            IconButton(
+                                onClick = { startVoiceSearch() },
+                                enabled = !isListening
+                            ) {
+                                if (isListening) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.KeyboardVoice,
+                                        contentDescription = "Voice Search",
+                                        tint = colors.accent
                                     )
                                 }
-
-                                val pm = context.packageManager
-                                val activities = pm.queryIntentActivities(intent, 0)
-
-                                if (activities.isNotEmpty()) {
-                                    voiceLauncher.launch(intent)
-                                } else {
-                                    homeViewModel.setVoiceError("This device does not support speech recognition")
-                                }
-                            }) {
-                                Icon(
-                                    imageVector = Icons.Default.KeyboardVoice,
-                                    contentDescription = "Voice Search",
-                                    tint = colors.accent
-                                )
                             }
+
                             TextField(
                                 value = searchQuery,
                                 onValueChange = { homeViewModel.updateQuery(it) },

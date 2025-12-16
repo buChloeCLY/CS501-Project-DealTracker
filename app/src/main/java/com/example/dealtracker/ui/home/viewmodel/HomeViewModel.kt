@@ -51,6 +51,15 @@ class HomeViewModel(
     }
 
     /**
+     * Clears the current voice error after it has been shown to the user.
+     * Prevents the same Snackbar from showing repeatedly on recomposition.
+     */
+    fun clearVoiceError() {
+        _voiceError.value = null
+    }
+
+
+    /**
      * Updates the search bar input text.
      * @param newQuery The new query string.
      */
